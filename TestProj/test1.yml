@@ -1,14 +1,13 @@
 substitutions:
   devicename: livingroom_thermostat
   thermostat_name: "Livingroom Thermostat"
-  sda_pin: GPIO5
-  scl_pin: GPIO4
-  dht_pin: GPIO5
-  encode_pin_1: GPIO7
-  encode_pin_2: GPIO6
-  encode_sw_pin: GPIO2
-  relay_pin: GPIO4
-  relay_pin2: GPIO10
+  sda_pin: GPIO21
+  scl_pin: GPIO22
+  encode_pin_1: GPIO34
+  encode_pin_2: GPIO35
+  encode_sw_pin: GPIO14
+  relay_pin: GPIO26
+  relay_pin2: GPIO25
   offset: '-2.4' #offset is in oC.
 
 <<: !include ThermostatBase.yml
