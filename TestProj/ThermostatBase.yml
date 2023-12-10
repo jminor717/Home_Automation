@@ -40,6 +40,12 @@ i2c:
      scl: $scl_pin
      scan: true
 
+# globals:
+#   - id: last_rotary_state
+#     type: float
+#     restore_value: no
+#     initial_value: '0'
+
 sensor:
   - platform: sht4x
     update_interval: 30s
@@ -47,13 +53,12 @@ sensor:
     temperature:
       name: "Temperature"
       id: temp
-      unit_of_measurement: "°F"
-      filters:
-        - lambda: return x * (9.0/5.0) + 32.0;
+      unit_of_measurement: "°C"
+      # filters:
+      #   - lambda: return x * (9.0/5.0) + 32.0;
     humidity:
       name: "Relative Humidity"
       id: humid
-
 
   - platform: rotary_encoder
     id: dial
@@ -63,6 +68,24 @@ sensor:
     pin_b:
       number: $encode_pin_2
       mode: INPUT # _PULLUP external pull up resistor required
+    on_clockwise:
+      - lambda:
+          auto newTemp = id(therm).target_temperature + (5.0/9.0);
+          // ESP_LOGD("ccw", "old, %f,  new; %f,     OS; %f,   NS; %f", id(therm).target_temperature, newTemp, id(last_rotary_state), id(dial).state);
+          ESP_LOGD("ccw", "old, %f,  new; %f", id(therm).target_temperature, newTemp);
+          // id(last_rotary_state) = id(dial).state;
+          auto call = id(therm).make_call();
+          call.set_target_temperature(newTemp);
+          call.perform();
+    on_anticlockwise:
+      - lambda:
+          auto newTemp = id(therm).target_temperature - (5.0/9.0);
+          ESP_LOGD("ccw", "old, %f,  new; %f", id(therm).target_temperature, newTemp);
+          // id(last_rotary_state) = id(dial).state;
+          auto call = id(therm).make_call();
+          call.set_target_temperature(newTemp);
+          call.perform();
+
 
 switch:
   #heater
@@ -75,31 +98,90 @@ switch:
     id: heaterHigh
     restore_mode: always_off
 
+
 climate:
-  - platform: thermostat
-    internal: false
-    id: therm
-    name: $thermostat_name
-    # unit_of_measurement: "°F"
-    sensor: temp
-    #heating config
-    heat_deadband: 0.1 °F
-    heat_overrun: 0.1 °F
-    min_heating_off_time: 60 s
-    min_heating_run_time: 60 s
-    heat_action:
-      switch.turn_on: heaterLow
-    supplemental_heating_action:
-      switch.turn_on: heaterHigh
-    max_heating_run_time: 90 min
-    supplemental_heating_delta: 2
-    #idle config
-    min_idle_time: 10 min
-    idle_action:
-      - switch.turn_off: heaterHigh
-      - switch.turn_off: heaterLow
-    preset:
-      # Custom preset
-      - name: A custom preset
-        default_target_temperature_low: 65
-        mode: HEAT
+- platform: thermostat
+  name: $thermostat_name
+  sensor: temp
+  id: therm
+  default_preset: home
+  supplemental_heating_delta: 3 °C
+  startup_delay: True
+  min_heating_off_time: 30s
+  min_heating_run_time: 30s
+  max_heating_run_time: 180s
+  min_idle_time: 30s
+  heat_action:
+    - switch.turn_on: heaterLow
+  supplemental_heating_action:
+    - switch.turn_on: heaterHigh
+  idle_action:
+    - switch.turn_off: heaterLow
+    - switch.turn_off: heaterHigh
+  preset:
+    - name: home
+      default_target_temperature_low: 19 °C 
+      mode: heat
+    - name: away
+      default_target_temperature_low: 10 °C 
+      mode: heat
+    - name: sleep
+      default_target_temperature_low: 18 °C 
+      mode: heat
+
+
+# climate:
+#   - platform: thermostat
+#     internal: false
+#     id: therm
+#     name: $thermostat_name
+#     sensor: temp
+#     # default_target_temperature_low: 19.444 °C
+#     #heating config
+#     heat_deadband: 0.1 °C
+#     heat_overrun: 0.1 °C
+#     min_heating_off_time: 60 s
+#     min_heating_run_time: 60 s
+#     heat_action:
+#       switch.turn_on: heaterLow
+#     supplemental_heating_action:
+#       switch.turn_on: heaterHigh
+#     max_heating_run_time: 90 min
+#     supplemental_heating_delta: 2
+#     #idle config
+#     min_idle_time: 60 s
+#     idle_action:
+#       - switch.turn_off: heaterHigh
+#       - switch.turn_off: heaterLow
+    #away config
+    # away_config:
+    #     default_target_temperature_low: 15.555 °C
+
+# climate:
+#   - platform: thermostat
+#     internal: false
+#     id: therm
+#     name: $thermostat_name
+#     # unit_of_measurement: "°F"
+#     sensor: temp
+#     #heating config
+#     heat_deadband: 0.1
+#     heat_overrun: 0.1
+#     min_heating_off_time: 60 s
+#     min_heating_run_time: 60 s
+#     heat_action:
+#       switch.turn_on: heaterLow
+#     supplemental_heating_action:
+#       switch.turn_on: heaterHigh
+#     max_heating_run_time: 90 min
+#     supplemental_heating_delta: 2
+#     #idle config
+#     min_idle_time: 10 min
+#     idle_action:
+#       - switch.turn_off: heaterHigh
+#       - switch.turn_off: heaterLow
+#     preset:
+#       # Custom preset
+#       - name: A custom preset
+#         default_target_temperature_low: 25
+#         mode: HEAT
