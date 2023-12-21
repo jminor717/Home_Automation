@@ -252,7 +252,8 @@ void EPD_1in9_Write_Screen( unsigned char *image)
 	for(char j = 0 ; j<15 ; j++ )
 		Wire.write(image[j]);
 
-	Wire.write(0x00);
+	Wire.write(0x00);	// WTF is this wys is this the only difference between 
+						//EPD_1in9_Write_Screen and EPD_1in9_Write_Screen1
 	Wire.endTransmission();
 
 
