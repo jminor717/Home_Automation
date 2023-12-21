@@ -5,54 +5,37 @@ using namespace i2c;
 
 #define EPD_RST 19
 
-enum DisplayActions {
-    No_Action,
-    Reset_Display,
-    Write_Screen,
+typedef void (*callback_function)(void);
+
+struct DisplayAction {
+    callback_function function; // Function pointer
+    uint16_t delayAfter; // time to wait after this action before the next is performed
 };
 
-enum HighLevelActions {
-    No_HL_Action,
-    Init,
-    Full_Refresh,
-};
+void init_Display(void)
+{
+}
 
 class SegmentedEPaper : public Component, public i2c::I2CDevice {
     I2CBus* _i2cBus;
-
-    uint64_t startNextStepAt = 0;
-    uint64_t startNextActionAt = 0;
-    uint64_t eligibleForNextActionAt = 0;
-    DisplayActions nextAction = No_Action;
-    DisplayActions currentAction = No_Action;
-    int8_t nextStepNumber = 0;
-    int8_t currentStepNumber = -1;
-
-    HighLevelActions currentHLAction = No_HL_Action;
-    int8_t next_HL_StepNumber = 0;
-    int8_t current_HL_StepNumber = -1;
-
-    bool actionRunning = false;
-
     uint8_t VAR_Temperature = 20;
+    DisplayAction actionQueue[32];
+    uint8_t queueIndex = 0;
+    uint8_t queueHead = 0;
+    uint8_t queueLength = 0;
+    uint8_t queueModulus = 0b00011111;
 
-    void StartNextActionIn(DisplayActions next, uint64_t offset_ms)
+    uint64_t canRunNextActionAt = 0;
+
+    void AddAction(callback_function action, uint16_t delay)
     {
-        if (offset_ms == 0) {
-            currentAction = nextAction;
-            currentStepNumber = 0;
-            actionRunning = true;
-        } else {
-            startNextActionAt = esp_timer_get_time() + (offset_ms * 1000);
-            nextAction = next;
+        if (queueLength >= 31) {
+            // bork
+            return;
         }
-    }
-
-    void StartNextStepIn(uint64_t offset_ms)
-    {
-        startNextStepAt = esp_timer_get_time() + (offset_ms * 1000);
-        nextStepNumber = currentStepNumber + 1;
-        currentStepNumber = -1;
+        actionQueue[queueHead] = { action, delay };
+        queueHead = (queueHead + 1) & queueModulus;
+        queueLength++;
     }
 
 public:
@@ -65,74 +48,20 @@ public:
         // set_i2c_address(0x44);
         pinMode(18, INPUT);
         pinMode(EPD_RST, OUTPUT);
-        currentHLAction = Init;
-        current_HL_StepNumber = 0;
+        AddAction(init_Display, 200);
+        AddAction(init_Display, 200);
     }
 
     void loop() override
     { // This will be called very often after setup time. think of it as the loop() call in Arduino
         uint64_t currentTime = esp_timer_get_time();
-        if (currentTime > startNextActionAt && !actionRunning) {
-            StartNextActionIn(nextAction, 0);
-        }
-        if (currentTime > startNextStepAt) {
-            currentStepNumber = nextStepNumber;
-        }
+        if (queueLength > 0 && canRunNextActionAt > currentTime) {
 
-        switch (currentHLAction) {
-        case Init:
-            switch (current_HL_StepNumber) {
-            case 0:
-                StartNextActionIn(Reset_Display, 0);
-                current_HL_StepNumber++;
-                break;
-            case 1:
-                if (!actionRunning) {
-                    
-                }
-                current_HL_StepNumber++;
-                break;
-            default:
-                break;
-            }
-            break;
-        case Full_Refresh:
-            /* code */
-            break;
-
-        default:
-            break;
-        }
-
-        switch (currentAction) {
-        case No_Action:
-            break;
-        case Reset_Display: {
-            switch (currentStepNumber) {
-            case 0:
-                digitalWrite(EPD_RST, 1);
-                StartNextStepIn(200);
-                break;
-            case 1:
-                digitalWrite(EPD_RST, 0);
-                StartNextStepIn(20);
-                break;
-            case 2:
-                digitalWrite(EPD_RST, 1);
-                StartNextStepIn(200);
-                break;
-            case 3:
-                actionRunning = false;
-                break;
-            default:
-                break;
-            }
-            break;
-        }
-        case Full_Refresh:
-            break;
-        default:
-            break;
+            DisplayAction runningAction = actionQueue[queueIndex];
+            runningAction.function();
+            canRunNextActionAt = esp_timer_get_time() + (runningAction.delayAfter * 1000);
+            queueLength--;
+            queueIndex = (queueIndex + 1) & queueModulus;
         }
     }
 };

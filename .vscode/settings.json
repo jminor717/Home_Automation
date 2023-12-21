@@ -2,6 +2,7 @@
     "files.associations": {
         "*.json": "jsonc",
         "*.gpl": "vb",
-        "xutility": "cpp"
+        "xutility": "cpp",
+        "functional": "cpp"
     }
 }
