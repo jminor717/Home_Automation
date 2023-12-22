@@ -1,0 +1,57 @@
+substitutions:
+  sda_pin: GPIO21
+  scl_pin: GPIO22
+  disp_rst_pin: GPIO19
+
+esphome:
+  name: e_paper_tester
+  includes:
+    - ../my_components/Segmented_Epaper.h
+    - ../my_components/segment_E_papaer/EPD_1in9.h
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  password: ""
+
+ota:
+  password: ""
+
+wifi:
+  ssid: "MuskFi"
+  password: "123456789"
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "test AP"
+    password: "BiSG9yrKP394"
+
+captive_portal:
+    
+
+external_components:
+  # use all components from a local folder
+  - source:
+      type: local
+      path: ../my_components
+
+i2c:
+   - id: bus_a
+     sda: $sda_pin
+     scl: $scl_pin
+     scan: true
+
+custom_component:
+- lambda: |-
+    auto ePaper_display = new SegmentedEPaper(id(bus_a));
+    return {ePaper_display};
+  components:
+  - id: segmented_e_paper
+  
