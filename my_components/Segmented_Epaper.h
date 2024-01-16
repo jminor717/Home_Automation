@@ -4,12 +4,22 @@ using namespace i2c;
 
 #define UINT_64_MAX 0xfffffffffffffff // one byte short because we are adding ~10 seconds worth of uS to this value when the screen is active and dont want an overflow
 #define EPD_RST 19
+#define UPDATES_BETWEEN_REFRESH 20
+const uint64_t TimeBetweenFullUpdates = 60 * 1000 * 1000; // 2 minute timeout
+
 static const char* const TAG = "Segmented_E_paper";
 
 // clang-format off
 unsigned char DSPNUM_1in9_on[]   = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00,      };  // all black
 unsigned char DSPNUM_1in9_off[]  = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,      };  // all white
 unsigned char DSPNUM_1in9_W3[]   = {0x00, 0xf5, 0x1f, 0xf5, 0x1f, 0xf5, 0x1f, 0xf5, 0x1f, 0xf5, 0x1f, 0xf5, 0x1f, 0x00, 0x00, 0x00,      };  // 3
+#define TEMP_TENS 1
+#define TEMP_ONES 3
+#define TEMP_TENTHS 11
+
+#define HUMID_TENS 5
+#define HUMID_ONES 7
+#define HUMID_TENTHS 9
 
 uint8_t SegmentNumbers[][2] = {
     {0xbf, 0x1f}, // 0
@@ -30,7 +40,10 @@ typedef void (*callback_function)(I2CBus* bussin);
 struct DisplayAction {
     callback_function function; // Function pointer
     uint16_t delayAfter; // time to wait after this action before the next is performed
+    uint16_t actionId;
 };
+
+#define InitId 22
 
 // 8 frame deep circular buffer, one frame is 15 bytes plus one for some unknown purpose taken from the exapmle driver code
 uint8_t ScreenBuffer[8][16];
@@ -39,6 +52,10 @@ uint8_t ScreenBufferHead = 0;
 uint8_t ScreenBufferLength = 0;
 const uint8_t ScreenBufferModulus = 0b111;
 
+uint8_t CurrentDisplay[16] = { 0 };
+
+bool updatingDisplay = false;
+bool initting = false;
 uint8_t Current_EPD_Temperature_Compensation = 25;
 
 void EPD_RST_ON(I2CBus* bussin) { digitalWrite(EPD_RST, 1); }
@@ -63,6 +80,7 @@ void EPD_Temperature2(I2CBus* bussin)
     else
         data[1] = 0x0e; // 0x0e  (14+1)*20ms=300ms
     bussin->write(adds_com, data, 2);
+    initting = false;
 }
 /* 5 waveform better ghosting, Boot waveform EPD_1in9_lut_5S*/
 void EPD_ClearScreen_Brush1(I2CBus* bussin) { bussin->write(adds_com, new uint8_t[7] { 0x82, 0x28, 0x20, 0xA8, 0xA0, 0x50, 0x65 }, 7); }
@@ -79,8 +97,10 @@ void EPD_Write_Screen(I2CBus* bussin)
     bussin->write(adds_com, new uint8_t[5] { 0xAC, 0x2B, 0x40, 0xA9, 0xA8 }, 5); // Close the sleep, turn on the power,  Write RAM address, Turn on the first SRAM, Shut down the first SRAM
 
     // ESP_LOGD(TAG, "WRITE:   %d,%d,%d,%d,%d,%d,%d,%d,%d", dispNumber, dispVal[0], dispVal[1], dispVal[2], dispVal[3], dispVal[4], dispVal[5], dispVal[6], dispVal[7], dispVal[8]);
-
+    updatingDisplay = false;
     bussin->write(adds_data, ScreenBuffer[ScreenBufferIndex], 16);
+    memcpy(CurrentDisplay, ScreenBuffer[ScreenBufferHead], sizeof(uint8_t) * 16);
+
     ScreenBufferLength--;
     ScreenBufferIndex = (ScreenBufferIndex + 1) & ScreenBufferModulus;
 
@@ -127,26 +147,48 @@ class SegmentedEPaper : public Component, public i2c::I2CDevice {
     bool displayAsleep = false;
     const uint32_t DisplayTimeout = 30 * 1000 * 1000; // 30 second timeout
 
-    void AddAction(callback_function action, uint16_t delay)
+    float displayedTemp = 0;
+    uint8_t displayedSetpoint = 0;
+
+    uint8_t Temp_tenthsPlace = 0;
+    uint8_t Temp_onesPlace = 0;
+    uint8_t Temp_tensPlace = 0;
+
+    uint8_t SP_onesPlace = 0;
+    uint8_t SP_tensPlace = 0;
+
+    uint8_t UpdatesTillFullRefresh = UPDATES_BETWEEN_REFRESH;
+    uint64_t TimeOfLastFullUpdate = 0;
+
+    void AddAction(callback_function action, uint16_t delay, uint16_t Id = 0)
     {
         if (queueLength >= queueModulus) {
             // bork
             ESP_LOGE(TAG, "actionQueue overflow");
             return;
         }
-        actionQueue[queueHead] = { action, delay };
+        actionQueue[queueHead] = { action, delay, 0 };
         queueHead = (queueHead + 1) & queueModulus;
         queueLength++;
+    }
+
+    bool FindAction(uint16_t ID)
+    {
+        for (size_t i = queueIndex; i < queueHead - 1; i++) {
+            if (actionQueue[i].actionId == ID)
+                return true;
+        }
+        return false;
     }
 
 public:
     SegmentedEPaper(I2CBus* Bus) { _i2cBus = Bus; }
 
-    void Reset_Display(void)
+    void Reset_Display(uint16_t id)
     {
-        AddAction(EPD_RST_ON, 200);
-        AddAction(EPD_RST_OFF, 20);
-        AddAction(EPD_RST_ON, 200);
+        AddAction(EPD_RST_ON, 200, id);
+        AddAction(EPD_RST_OFF, 20, id);
+        AddAction(EPD_RST_ON, 200, id);
     }
 
     void CompensateForTemperature(uint8_t currentTemp)
@@ -159,12 +201,15 @@ public:
 
     void Init_Display(void)
     {
-        ESP_LOGD(TAG, "HEY ##### ###### #### Display init started");
-        displayAsleep = false;
-        Reset_Display();
-        AddAction(EPD_PowerOn, 10);
-        AddAction(EPD_Boost, 10);
-        CompensateForTemperature(25);
+        if (!initting) {
+            initting = true;
+            ESP_LOGD(TAG, "HEY ##### ###### #### Display init started");
+            displayAsleep = false;
+            Reset_Display(InitId);
+            AddAction(EPD_PowerOn, 10, InitId);
+            AddAction(EPD_Boost, 10, InitId);
+            CompensateForTemperature(25);
+        }
     }
 
     void Sleep_Display(void)
@@ -183,56 +228,138 @@ public:
         WriteScreen(DSPNUM_1in9_on, true);
         WriteScreen(DSPNUM_1in9_off);
         AddAction(EPD_Default_Brush, 0);
+        TimeOfLastFullUpdate = esp_timer_get_time();
     }
-    uint8_t dispNumber = 0;
+
+    float absVal(float number)
+    {
+        if (number < 0)
+            return -number;
+        else
+            return number;
+    }
+
+    void SetAmbientTemp(float temp)
+    {
+        float dif = absVal(displayedTemp - temp);
+        if (dif > 0.5) {
+            ESP_LOGD(TAG, "SET TEMP: current:%f next:%f", displayedTemp, temp);
+            Temp_tenthsPlace = ((uint16_t)((temp * 10.0) + 0.5 - ((temp * 10.0) < 0))) % 10;
+            Temp_onesPlace = ((uint16_t)temp) % 10;
+            Temp_tensPlace = ((uint16_t)(temp / 10.0)) % 10;
+
+            UpdateScreen();
+
+            displayedTemp = temp;
+        }
+    }
+
+    void SetTempSetpoint(float setpoint)
+    {
+        setpoint = setpoint + 0.5 - (setpoint < 0); // add 0.5 if x > 0
+        uint8_t intSetpoint = (int)setpoint;
+
+        if (displayedSetpoint != intSetpoint) {
+            ESP_LOGD(TAG, "SET Setpoint: current:%d next:%d", displayedSetpoint, setpoint);
+            SP_onesPlace = ((uint16_t)intSetpoint) % 10;
+            SP_tensPlace = ((uint16_t)(intSetpoint / 10)) % 10;
+
+            UpdateScreen();
+
+            displayedSetpoint = intSetpoint;
+        }
+    }
+
+    void UpdateScreen()
+    {
+        uint8_t dispVal[16] = { 0 };
+        // memcpy(dispVal, CurrentDisplay, sizeof(uint8_t) * 16);
+        memcpy(dispVal + TEMP_TENS, SegmentNumbers[Temp_tensPlace], sizeof(uint8_t) * 2);
+        memcpy(dispVal + TEMP_ONES, SegmentNumbers[Temp_onesPlace], sizeof(uint8_t) * 2);
+        memcpy(dispVal + TEMP_TENTHS, SegmentNumbers[Temp_tenthsPlace], sizeof(uint8_t) * 2);
+
+        memcpy(dispVal + HUMID_TENS, SegmentNumbers[SP_tensPlace], sizeof(uint8_t) * 2);
+        memcpy(dispVal + HUMID_ONES, SegmentNumbers[SP_onesPlace], sizeof(uint8_t) * 2);
+
+        dispVal[13] = 0x06; // fahrenheit symbol
+        dispVal[4] |= 0xf0; // decimal place
+
+        WriteScreen(dispVal);
+    }
+
     void IncrementTest(void)
     {
-        dispNumber++;
-        dispNumber = dispNumber % 10;
-        uint8_t dispVal[16] = { 0 };
-        memcpy(dispVal + 1, SegmentNumbers[dispNumber], sizeof(uint8_t) * 2);
-        memcpy(dispVal + 3, SegmentNumbers[dispNumber], sizeof(uint8_t) * 2);
-        memcpy(dispVal + 5, SegmentNumbers[dispNumber], sizeof(uint8_t) * 2);
-        memcpy(dispVal + 7, SegmentNumbers[dispNumber], sizeof(uint8_t) * 2);
-        memcpy(dispVal + 9, SegmentNumbers[dispNumber], sizeof(uint8_t) * 2);
-        memcpy(dispVal + 11, SegmentNumbers[dispNumber], sizeof(uint8_t) * 2);
+        // uint8_t dispVal[16] = { 0 };
+        // memcpy(dispVal + 1, SegmentNumbers[1], sizeof(uint8_t) * 2);
+        // memcpy(dispVal + 3, SegmentNumbers[2], sizeof(uint8_t) * 2);
+        // memcpy(dispVal + 5, SegmentNumbers[3], sizeof(uint8_t) * 2);
+        // memcpy(dispVal + 7, SegmentNumbers[4], sizeof(uint8_t) * 2);
+        // memcpy(dispVal + 9, SegmentNumbers[5], sizeof(uint8_t) * 2);
+        // memcpy(dispVal + 11, SegmentNumbers[6], sizeof(uint8_t) * 2);
+        // ESP_LOGD(TAG, "dec:   %d,%d,%d,%d,%d,%d,%d,%d,%d",  dispVal[0], dispVal[1], dispVal[2], dispVal[3], dispVal[4], dispVal[5], dispVal[6], dispVal[7], dispVal[8]);
+        // WriteScreen(dispVal);
 
-        dispVal[13] = 0x06;
-        dispVal[4] = dispVal[4] | 0b100000;
-        dispVal[8] = dispVal[8] | 0b100000;
-        ESP_LOGD(TAG, "dec %d:   %d,%d,%d,%d,%d,%d,%d,%d,%d", dispNumber, dispVal[0], dispVal[1], dispVal[2], dispVal[3], dispVal[4], dispVal[5], dispVal[6], dispVal[7], dispVal[8]);
-        WriteScreen(dispVal);
+        float temp = 0;
+        if (displayedTemp < 20 || displayedTemp > 90) {
+            temp = 20.7;
+        } else {
+            temp = displayedTemp + 1;
+        }
+        SetAmbientTemp(temp);
     }
 
     void DecrementTest(void)
     {
-        WriteScreen(DSPNUM_1in9_off);
+        // WriteScreen(DSPNUM_1in9_off);
+        uint8_t setpoint = 0;
+        if (displayedSetpoint < 20 || displayedSetpoint > 90) {
+            setpoint = 20;
+        } else {
+            setpoint = displayedSetpoint + 1;
+        }
+        float spSim = ((float)setpoint) + 0.3;
+        SetTempSetpoint(spSim);
     }
     void WriteScreen(uint8_t* data, bool fullBlack = false)
     {
-        if (displayAsleep) {
+        UpdatesTillFullRefresh--;
+        bool updateNeeded = UpdatesTillFullRefresh <= 1 || esp_timer_get_time() > TimeOfLastFullUpdate + TimeBetweenFullUpdates;
+
+        if (displayAsleep || updateNeeded) {
             Init_Display();
             AddAction(EPD_Default_Brush, 0);
         }
-        if (ScreenBufferLength >= ScreenBufferModulus) {
-            // bork
-            ESP_LOGE(TAG, "ScreenBuffer overflow");
-            return;
+        if (updateNeeded) {
+            TimeOfLastFullUpdate = esp_timer_get_time();
+            UpdatesTillFullRefresh = UPDATES_BETWEEN_REFRESH;
+            FullRefreshScreen();
+            updatingDisplay = false;
         }
-        if (fullBlack) {
-            data[15] = 0x03;
+
+        if (!updatingDisplay) {
+            updatingDisplay = true;
+            if (ScreenBufferLength >= ScreenBufferModulus) {
+                // bork
+                ESP_LOGE(TAG, "ScreenBuffer overflow");
+                return;
+            }
+            if (fullBlack) {
+                data[15] = 0x03;
+            } else {
+                data[15] = 0x00;
+            }
+
+            memcpy(ScreenBuffer[ScreenBufferHead], data, sizeof(uint8_t) * 16);
+            ScreenBufferHead = (ScreenBufferHead + 1) & ScreenBufferModulus;
+            ScreenBufferLength++;
+
+            AddAction(EPD_Write_Screen, 1500);
+            // AddAction(AsyncDelay, 2000); // replace with monitoring the busy pin
+            AddAction(EPD_Screen_Sleep, 500);
+            // AddAction(AsyncDelay, 500);
         } else {
-            data[15] = 0x00;
+            memcpy(ScreenBuffer[ScreenBufferIndex], data, sizeof(uint8_t) * 16);
         }
-
-        memcpy(ScreenBuffer[ScreenBufferHead], data, sizeof(uint8_t) * 16);
-        ScreenBufferHead = (ScreenBufferHead + 1) & ScreenBufferModulus;
-        ScreenBufferLength++;
-
-        AddAction(EPD_Write_Screen, 1500);
-        //AddAction(AsyncDelay, 2000); // replace with monitoring the busy pin
-        AddAction(EPD_Screen_Sleep, 500);
-        //AddAction(AsyncDelay, 500);
     }
 
     void setup() override
@@ -250,7 +377,7 @@ public:
         if (queueLength > 0 && currentTime > canRunNextActionAt) {
             DisplayAction runningAction = actionQueue[queueIndex];
             InactiveSince = UINT_64_MAX;
-            ESP_LOGD(TAG, "running action %d at %d, %d remaining, next action in %d", queueIndex, currentTime, queueLength, runningAction.delayAfter);
+            // ESP_LOGD(TAG, "running action %d at %d, %d remaining, next action in %d", queueIndex, currentTime, queueLength, runningAction.delayAfter);
 
             runningAction.function(_i2cBus);
             canRunNextActionAt = esp_timer_get_time() + (runningAction.delayAfter * 1000);

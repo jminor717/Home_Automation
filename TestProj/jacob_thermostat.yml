@@ -1,16 +1,25 @@
 substitutions:
   devicename: jacob_thermostat
   thermostat_name: "Jacob Thermostat"
-  sda_pin: GPIO21
-  scl_pin: GPIO22
-  encode_pin_1: GPIO34
-  encode_pin_2: GPIO35
-  # encode_sw_pin: GPIO14
-  relay_pin: GPIO26
-  relay_pin2: GPIO25
-  disp_rst_pin: GPIO19
-  offset: '-2.4' #offset is in oC.
-
+  sda_pin: GPIO4
+  scl_pin: GPIO5
+  disp_rst_pin: GPIO6
+  disp_busy_pin: GPIO7
+  encode_pin_1: GPIO8
+  encode_pin_2: GPIO9
+  encode_sw_pin: GPIO18
+  relay_pin: GPIO10
+  relay_pin2: GPIO19
+  # strapping 2, 8, 9  
 <<: !include ThermostatBase.yml
 
-# unused 23, 18, 17, 16, 13 4, 2
+
+#   sda_pin: GPIO21
+#   scl_pin: GPIO22
+#   encode_pin_1: GPIO34
+#   encode_pin_2: GPIO35
+#   # encode_sw_pin: GPIO14
+#   relay_pin: GPIO26
+#   relay_pin2: GPIO25
+#   disp_rst_pin: GPIO19
+# # unused 23, 18, 17, 16, 13 4, 2
