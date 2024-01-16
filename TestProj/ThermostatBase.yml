@@ -2,14 +2,21 @@ esphome:
   name: $devicename
   includes:
     - ../my_components/Segmented_Epaper.h
-    - ../my_components/segment_E_papaer/EPD_1in9.h
 
 
 
 esp32:
-  board: esp32-c3-devkitm-1
+  # board: esp32-c3-devkitm-1
+  board: esp32-c6-devkitc-1
+  variant: esp32c6
   framework:
-    type: arduino
+    type: esp-idf
+    version: 5.1.0
+    platform_version: https://github.com/stintel/platform-espressif32#esp32-c6-test
+# esp32:
+#   board: esp32dev
+#   framework:
+#     type: arduino
 
 # Enable logging
 logger:
@@ -31,12 +38,6 @@ wifi:
     password: "BiSG9yrKP394"
 
 captive_portal:
-
-external_components:
-  # use all components from a local folder
-  - source:
-      type: local
-      path: ../my_components
 
 i2c:
   - id: bus_a

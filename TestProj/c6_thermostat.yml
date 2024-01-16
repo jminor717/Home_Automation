@@ -1,0 +1,13 @@
+substitutions:
+  devicename: jacob_thermostat
+  thermostat_name: "Jacob Thermostat"
+  sda_pin: GPIO10
+  scl_pin: GPIO11
+  encode_pin_1: GPIO12
+  encode_pin_2: GPIO13
+  # encode_sw_pin: GPIO14
+  relay_pin: GPIO15
+  relay_pin2: GPIO16
+  disp_rst_pin: GPIO17
+
+<<: !include ThermostatBase.yml
