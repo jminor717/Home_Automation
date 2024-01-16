@@ -1,6 +1,9 @@
-#include "EPD_1in9.h"
+//#include "EPD_1in9.h"
 #include "esphome.h"
 using namespace i2c;
+
+#define adds_com 0x3C
+#define adds_data 0x3D
 
 #define UINT_64_MAX 0xfffffffffffffff // one byte short because we are adding ~10 seconds worth of uS to this value when the screen is active and dont want an overflow
 #define EPD_RST 19
@@ -41,8 +44,11 @@ const uint8_t ScreenBufferModulus = 0b111;
 
 uint8_t Current_EPD_Temperature_Compensation = 25;
 
-void EPD_RST_ON(I2CBus* bussin) { digitalWrite(EPD_RST, 1); }
-void EPD_RST_OFF(I2CBus* bussin) { digitalWrite(EPD_RST, 0); }
+esp32::ESP32InternalGPIOPin* Busy_pin_obj;
+esp32::ESP32InternalGPIOPin* Rst_pin_obj;
+
+void EPD_RST_ON(I2CBus* bussin) { /*digitalWrite(EPD_RST, 1);*/ }
+void EPD_RST_OFF(I2CBus* bussin) { /*digitalWrite(EPD_RST, 0);*/ }
 void EPD_PowerOn(I2CBus* bussin) { bussin->write(adds_com, new uint8_t[1] { 0x2B }, 1); } // POWER_ON
 void EPD_Boost(I2CBus* bussin) { bussin->write(adds_com, new uint8_t[2] { 0xA7, 0xE0 }, 2); } // boost, TSON
 void EPD_Temperature1(I2CBus* bussin)
@@ -98,18 +104,18 @@ void EPD_DEEP_SLEEP(I2CBus* bussin)
     bussin->write(adds_com, new uint8_t[1] { 0xAD }, 1); // DEEP_SLEEP
 }
 
-void EPD_1in9_ReadBusy(void)
-{
-    Serial.println("e-Paper busy");
-    delay(10);
-    while (1) { //=1 BUSY;
-        if (digitalRead(EPD_BUSY_PIN) == 1)
-            break;
-        delay(1);
-    }
-    delay(10);
-    Serial.println("e-Paper busy release");
-}
+// void EPD_1in9_ReadBusy(void)
+// {
+//     Serial.println("e-Paper busy");
+//     delay(10);
+//     while (1) { //=1 BUSY;
+//         if (digitalRead(EPD_BUSY_PIN) == 1)
+//             break;
+//         delay(1);
+//     }
+//     delay(10);
+//     Serial.println("e-Paper busy release");
+// }
 
 void AsyncDelay(I2CBus* bussin) { }
 
@@ -238,27 +244,41 @@ public:
     void setup() override
     { // This will be called once to set up the component think of it as the setup() call in Arduino
         // set_i2c_address(0x44);
-        pinMode(18, INPUT);
-        pinMode(EPD_RST, OUTPUT);
+        gpio_num_t busy_pin = static_cast<gpio_num_t>(18);
+        gpio_num_t rst_pin = static_cast<gpio_num_t>(EPD_RST);
+
+        Busy_pin_obj = new esp32::ESP32InternalGPIOPin();
+        Busy_pin_obj->set_pin(busy_pin);
+        Busy_pin_obj->set_inverted(false);
+        Busy_pin_obj->set_drive_strength(::GPIO_DRIVE_CAP_2);
+        Busy_pin_obj->set_flags(gpio::Flags::FLAG_INPUT);
+
+        Rst_pin_obj = new esp32::ESP32InternalGPIOPin();
+        Rst_pin_obj->set_pin(rst_pin);
+        Rst_pin_obj->set_inverted(false);
+        Rst_pin_obj->set_drive_strength(::GPIO_DRIVE_CAP_2);
+        Rst_pin_obj->set_flags(gpio::Flags::FLAG_OUTPUT);
+        //pinMode(18, INPUT);
+        //pinMode(EPD_RST, OUTPUT);
         Init_Display();
         FullRefreshScreen();
     }
 
     void loop() override
     { // This will be called very often after setup time. think of it as the loop() call in Arduino
-        uint64_t currentTime = esp_timer_get_time();
+        uint64_t currentTime = 3; // esp_timer_get_time()
         if (queueLength > 0 && currentTime > canRunNextActionAt) {
             DisplayAction runningAction = actionQueue[queueIndex];
             InactiveSince = UINT_64_MAX;
-            ESP_LOGD(TAG, "running action %d at %d, %d remaining, next action in %d", queueIndex, currentTime, queueLength, runningAction.delayAfter);
+            //ESP_LOGD(TAG, "running action %d at %d, %d remaining, next action in %d", queueIndex, currentTime, queueLength, runningAction.delayAfter);
 
             runningAction.function(_i2cBus);
-            canRunNextActionAt = esp_timer_get_time() + (runningAction.delayAfter * 1000);
+            canRunNextActionAt = 5 + (runningAction.delayAfter * 1000);
 
             queueIndex = (queueIndex + 1) & queueModulus;
             queueLength--;
             if (queueLength == 0) {
-                InactiveSince = esp_timer_get_time();
+                InactiveSince = 5;
             }
         }
         if (!displayAsleep && currentTime > InactiveSince + DisplayTimeout) {
