@@ -266,7 +266,7 @@ public:
         uint8_t intSetpoint = (int)setpoint;
 
         if (displayedSetpoint != intSetpoint) {
-            ESP_LOGD(TAG, "SET Setpoint: current:%d next:%d", displayedSetpoint, setpoint);
+            ESP_LOGD(TAG, "SET Setpoint: current:%d next:%f", displayedSetpoint, setpoint);
             SP_onesPlace = ((uint16_t)intSetpoint) % 10;
             SP_tensPlace = ((uint16_t)(intSetpoint / 10)) % 10;
 
@@ -385,8 +385,8 @@ public:
         Rst_pin_obj->set_inverted(false);
         Rst_pin_obj->set_drive_strength(::GPIO_DRIVE_CAP_2);
         Rst_pin_obj->set_flags(gpio::Flags::FLAG_OUTPUT);
-        //pinMode(18, INPUT);
-        //pinMode(EPD_RST, OUTPUT);
+        // pinMode(18, INPUT);
+        // pinMode(EPD_RST, OUTPUT);
         Init_Display();
         FullRefreshScreen();
     }
