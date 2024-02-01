@@ -1,14 +1,18 @@
 substitutions:
   devicename: livingroom_thermostat
   thermostat_name: "Livingroom Thermostat"
-  sda_pin: GPIO21
-  scl_pin: GPIO22
-  encode_pin_1: GPIO35
-  encode_pin_2: GPIO34
+  sda_pin: GPIO5
+  scl_pin: GPIO6
+  encode_pin_1: GPIO9
+  encode_pin_2: GPIO10
   # encode_sw_pin: GPIO14
-  relay_pin: GPIO26
-  relay_pin2: GPIO25
-  disp_rst_pin: GPIO19
+  relay_pin: GPIO11
+  relay_pin2: GPIO12
+  disp_rst_pin: GPIO7
+  disp_busy_pin: GPIO8
 # unused 23, 18, 17, 16, 13 4, 2
 
 <<: !include ThermostatBase.yml
+
+
+# CONF_TIMEOUT  CONF_BUSY_PIN   CONF_RESET_PIN

@@ -1,14 +1,14 @@
 esphome:
   name: $devicename
   includes:
-    - ../my_components/Segmented_Epaper.h
+    - ../my_components/Segmented_E_paper.h
 
 
 
 esp32:
-  # board: esp32-c3-devkitm-1
+  board: esp32-c3-devkitm-1
   # board: esp32dev
-  board: esp32-c6-devkitc-1
+  # board: esp32-c6-devkitc-1
   variant: esp32c6
   framework:
     type: esp-idf
@@ -57,6 +57,7 @@ i2c:
 custom_component:
   - lambda: |-
       auto ePaper_display = new SegmentedEPaper(id(bus_a));
+      //ePaper_display->SetPins($disp_rst_pin, $disp_busy_pin);
       return {ePaper_display};
     components:
       - id: segmented_e_paper

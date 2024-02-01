@@ -3,6 +3,14 @@
         "*.json": "jsonc",
         "*.gpl": "vb",
         "xutility": "cpp",
-        "functional": "cpp"
+        "functional": "cpp",
+        "locale": "cpp",
+        "thread": "cpp",
+        "xlocale": "cpp",
+        "xlocmes": "cpp",
+        "xlocmon": "cpp",
+        "xlocnum": "cpp",
+        "xloctime": "cpp",
+        "istream": "cpp"
     }
 }

@@ -5,8 +5,10 @@ using namespace i2c;
 #define adds_com 0x3C
 #define adds_data 0x3D
 
+#define EPD_RST 7
+#define EPD_BUSY 8
+
 #define UINT_64_MAX 0xfffffffffffffff // one byte short because we are adding ~10 seconds worth of uS to this value when the screen is active and dont want an overflow
-#define EPD_RST 19
 #define UPDATES_BETWEEN_REFRESH 20
 const uint64_t TimeBetweenFullUpdates = 60 * 1000 * 1000; // 2 minute timeout
 
@@ -190,6 +192,10 @@ class SegmentedEPaper : public Component, public i2c::I2CDevice {
 public:
     SegmentedEPaper(I2CBus* Bus) { _i2cBus = Bus; }
 
+    void SetPins(uint8_t EpdRst, uint8_t EpdBusy){
+
+    }
+
     void Reset_Display(uint16_t id)
     {
         AddAction(EPD_RST_ON, 200, id);
@@ -371,7 +377,7 @@ public:
     void setup() override
     { // This will be called once to set up the component think of it as the setup() call in Arduino
         // set_i2c_address(0x44);
-        gpio_num_t busy_pin = static_cast<gpio_num_t>(18);
+        gpio_num_t busy_pin = static_cast<gpio_num_t>(EPD_BUSY);
         gpio_num_t rst_pin = static_cast<gpio_num_t>(EPD_RST);
 
         Busy_pin_obj = new esp32::ESP32InternalGPIOPin();
@@ -385,7 +391,7 @@ public:
         Rst_pin_obj->set_inverted(false);
         Rst_pin_obj->set_drive_strength(::GPIO_DRIVE_CAP_2);
         Rst_pin_obj->set_flags(gpio::Flags::FLAG_OUTPUT);
-        // pinMode(18, INPUT);
+        // pinMode(EPD_BUSY, INPUT);
         // pinMode(EPD_RST, OUTPUT);
         Init_Display();
         FullRefreshScreen();
