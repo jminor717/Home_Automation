@@ -11,6 +11,24 @@
         "xlocmon": "cpp",
         "xlocnum": "cpp",
         "xloctime": "cpp",
-        "istream": "cpp"
-    }
+        "istream": "cpp",
+        "ostream": "cpp",
+        "chrono": "cpp",
+        "optional": "cpp",
+        "regex": "cpp",
+        "system_error": "cpp",
+        "type_traits": "cpp",
+        "xtr1common": "cpp",
+        "bitset": "cpp",
+        "iterator": "cpp",
+        "xhash": "cpp",
+        "xtree": "cpp",
+        "array": "cpp",
+        "span": "cpp",
+        "vector": "cpp",
+        "xstring": "cpp"
+    },
+    "cSpell.words": [
+        "epaper"
+    ]
 }

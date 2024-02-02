@@ -1,5 +1,5 @@
 substitutions:
-  devicename: jacob_thermostat
+  device_name: jacob-thermostat
   thermostat_name: "Jacob Thermostat"
   sda_pin: GPIO10
   scl_pin: GPIO11
