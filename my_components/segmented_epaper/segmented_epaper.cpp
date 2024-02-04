@@ -64,7 +64,7 @@ namespace segmented_epaper {
             Upper_onesPlace = ((uint16_t)Num) % 10;
             Upper_tensPlace = ((uint16_t)(Num / 10.0)) % 10;
 
-            //UpdateScreen();
+            UpdateScreen();
 
             displayedUpper = Num;
         }
@@ -80,10 +80,28 @@ namespace segmented_epaper {
             Lower_onesPlace = ((uint16_t)intSetpoint) % 10;
             Lower_tensPlace = ((uint16_t)(intSetpoint / 10)) % 10;
 
-            //UpdateScreen();
+            UpdateScreen();
 
             displayedLower = intSetpoint;
         }
+    }
+
+    void Segmented_ePaper::UpdateScreen()
+    {
+        uint8_t dispVal[16] = { 0 };
+        // memcpy(dispVal, CurrentDisplay, sizeof(uint8_t) * 16);
+        memcpy(dispVal + UPPER_TENS, SegmentNumbers[Upper_tensPlace], sizeof(uint8_t) * 2);
+        memcpy(dispVal + UPPER_ONES, SegmentNumbers[Upper_onesPlace], sizeof(uint8_t) * 2);
+        memcpy(dispVal + UPPER_TENTHS, SegmentNumbers[Upper_tenthsPlace], sizeof(uint8_t) * 2);
+
+        memcpy(dispVal + LOWER_TENS, SegmentNumbers[Lower_tensPlace], sizeof(uint8_t) * 2);
+        memcpy(dispVal + LOWER_ONES, SegmentNumbers[Lower_onesPlace], sizeof(uint8_t) * 2);
+        memcpy(dispVal + LOWER_TENTHS, SegmentNumbers[DIGIT_OFF], sizeof(uint8_t) * 2);
+
+        dispVal[13] = 0x06; // fahrenheit symbol
+        dispVal[4] |= 0xf0; // decimal place
+
+        WriteScreen(dispVal);
     }
 
     void Segmented_ePaper::setup()
@@ -101,7 +119,28 @@ namespace segmented_epaper {
     // micros()
     void Segmented_ePaper::loop()
     {
-        ESP_LOGV(TAG, "received %d-bit value: %llx", count, value);
+        uint64_t currentTime = micros();
+        if (queueLength > 0 && currentTime > canRunNextActionAt) {
+            DisplayAction runningAction = actionQueue[queueIndex];
+            InactiveSince = UINT_64_MAX; // set to max val so that we don't unintentional sleep the display
+
+            //ESP_LOGD(TAG, "running action %d at %d, %d remaining, next action in %d", queueIndex, currentTime, queueLength, runningAction.delayAfter);
+
+            // https://stackoverflow.com/questions/7869716/dereferencing-a-member-pointer-error-cannot-be-used-as-member-pointer
+            // https://www.reddit.com/r/Cplusplus/comments/9t8417/error_must_use_or_or_to_call_pointertomember/
+            (*this.*runningAction.function)();
+
+            canRunNextActionAt = currentTime + (runningAction.delayAfter * 1000);
+
+            queueIndex = (queueIndex + 1) & queueModulus;
+            queueLength--;
+            if (queueLength == 0) {
+                InactiveSince = currentTime;
+            }
+        }
+        if (!displayAsleep && currentTime > InactiveSince + DISPLAY_TIMEOUT) {
+            Sleep_Display();
+        }
     }
 
     void Segmented_ePaper::WriteScreen(uint8_t* data, bool fullBlack)
@@ -138,9 +177,9 @@ namespace segmented_epaper {
             ScreenBufferLength++;
 
             AddAction(&Segmented_ePaper::EPD_Write_Screen, 1500);
-            // AddAction(AsyncDelay, 2000); // replace with monitoring the busy pin
+            AddAction(&Segmented_ePaper::AsyncDelay, 2000); // replace with monitoring the busy pin
             AddAction(&Segmented_ePaper::EPD_Screen_Sleep, 500);
-            // AddAction(AsyncDelay, 500);
+            AddAction(&Segmented_ePaper::AsyncDelay, 500);
         } else {
             memcpy(ScreenBuffer[ScreenBufferIndex], data, sizeof(uint8_t) * 16);
         }

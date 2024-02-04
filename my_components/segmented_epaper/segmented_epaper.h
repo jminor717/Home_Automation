@@ -91,6 +91,7 @@ namespace segmented_epaper {
         uint8_t Current_EPD_Temperature_Compensation = 25; // room temp 25 c
 
         void AddAction(callback_function action, uint16_t delay, uint16_t Id = 0);
+        void UpdateScreen(void);
 
         void addressed_write(uint8_t address, const uint8_t* data, size_t len);
         void EPD_RST_ON() { this->Reset_pin_->digital_write(1); }
