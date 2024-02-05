@@ -124,7 +124,7 @@ namespace segmented_epaper {
             DisplayAction runningAction = actionQueue[queueIndex];
             InactiveSince = UINT_64_MAX; // set to max val so that we don't unintentional sleep the display
 
-            //ESP_LOGD(TAG, "running action %d at %d, %d remaining, next action in %d", queueIndex, currentTime, queueLength, runningAction.delayAfter);
+            // ESP_LOGD(TAG, "running action %d at %d, %d remaining, next action in %d", queueIndex, currentTime, queueLength, runningAction.delayAfter);
 
             // https://stackoverflow.com/questions/7869716/dereferencing-a-member-pointer-error-cannot-be-used-as-member-pointer
             // https://www.reddit.com/r/Cplusplus/comments/9t8417/error_must_use_or_or_to_call_pointertomember/
@@ -177,9 +177,10 @@ namespace segmented_epaper {
             ScreenBufferLength++;
 
             AddAction(&Segmented_ePaper::EPD_Write_Screen, 1500);
-            AddAction(&Segmented_ePaper::AsyncDelay, 2000); // replace with monitoring the busy pin
+            // AddAction(&Segmented_ePaper::AsyncDelay, 2000); // replace with monitoring the busy pin
             AddAction(&Segmented_ePaper::EPD_Screen_Sleep, 500);
-            AddAction(&Segmented_ePaper::AsyncDelay, 500);
+            // AddAction(&Segmented_ePaper::AsyncDelay, 500);
+            CleanupQueueAndRestart();
         } else {
             memcpy(ScreenBuffer[ScreenBufferIndex], data, sizeof(uint8_t) * 16);
         }
@@ -204,12 +205,14 @@ namespace segmented_epaper {
         AddAction(&Segmented_ePaper::EPD_DEEP_SLEEP, 2000);
         AddAction(&Segmented_ePaper::EPD_RST_OFF, 20);
         displayAsleep = true;
+        CleanupQueueAndRestart();
     }
     void Segmented_ePaper::Reset_Display()
     {
         AddAction(&Segmented_ePaper::EPD_RST_ON, 200);
         AddAction(&Segmented_ePaper::EPD_RST_OFF, 20);
         AddAction(&Segmented_ePaper::EPD_RST_ON, 200);
+        CleanupQueueAndRestart();
     }
 
     void Segmented_ePaper::FullRefreshScreen()
@@ -221,18 +224,54 @@ namespace segmented_epaper {
         WriteScreen(DSPNUM_1in9_off);
         AddAction(&Segmented_ePaper::EPD_Default_Brush, 0);
         TimeOfLastFullUpdate = micros();
+        CleanupQueueAndRestart();
+    }
+
+    void Segmented_ePaper::CompensateForTemperature(uint8_t currentTemp)
+    {
+        ESP_LOGD(TAG, "temp Compensation %d", currentTemp);
+        Current_EPD_Temperature_Compensation = currentTemp;
+        AddAction(&Segmented_ePaper::EPD_Temperature1, 10);
+        AddAction(&Segmented_ePaper::EPD_Temperature2, 10);
+        CleanupQueueAndRestart();
     }
 
     void Segmented_ePaper::AddAction(callback_function action, uint16_t delay, uint16_t Id)
     {
+        if (BufferOverflow) {
+            return;
+        }
         if (queueLength >= queueModulus) {
             // bork
             ESP_LOGE(TAG, "actionQueue overflow");
+            BufferOverflow = true;
             return;
         }
         actionQueue[queueHead] = { action, delay, 0 };
         queueHead = (queueHead + 1) & queueModulus;
         queueLength++;
+    }
+
+    void Segmented_ePaper::CleanupQueueAndRestart()
+    {
+        if (BufferOverflow) {
+            BufferOverflow = false;
+            ESP_LOGI(TAG, "Reseting Display Queue");
+            queueIndex = 0;
+            queueHead = 0;
+            queueLength = 0;
+            TimeOfLastFullUpdate = micros();
+            Init_Display();
+            canRunNextActionAt = micros();
+            if (ScreenBufferLength > 0){
+                ScreenBufferLength = 1;
+                AddAction(&Segmented_ePaper::EPD_Write_Screen, 1500);
+                // AddAction(&Segmented_ePaper::AsyncDelay, 2000); // replace with monitoring the busy pin
+                AddAction(&Segmented_ePaper::EPD_Screen_Sleep, 500);
+                // AddAction(&Segmented_ePaper::AsyncDelay, 500);
+
+            }
+        }
     }
 
     // grab the oldest frame from the buffer and write it to the display
@@ -250,8 +289,6 @@ namespace segmented_epaper {
 
         this->addressed_write(adds_com, new uint8_t[3] { 0xAB, 0xAA, 0xAF }, 3); // Turn on the second SRAM, Shut down the second SRAM, display on
     }
-
-
 
     void Segmented_ePaper::addressed_write(uint8_t address, const uint8_t* data, size_t len)
     {
@@ -294,13 +331,6 @@ namespace segmented_epaper {
     //     delay(10);
     //     Serial.println("e-Paper busy release");
     // }
-    void Segmented_ePaper::CompensateForTemperature(uint8_t currentTemp)
-    {
-        ESP_LOGD(TAG, "temp Compensation %d", currentTemp);
-        Current_EPD_Temperature_Compensation = currentTemp;
-        AddAction(&Segmented_ePaper::EPD_Temperature1, 10);
-        AddAction(&Segmented_ePaper::EPD_Temperature2, 10);
-    }
 
     void Segmented_ePaper::dump_config()
     {

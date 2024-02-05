@@ -76,6 +76,7 @@ namespace segmented_epaper {
 
         bool updatingDisplay = false;
         bool initting = false;
+        bool BufferOverflow = false;
         bool displayAsleep = false;
 
         float displayedUpper = 0;
@@ -92,6 +93,7 @@ namespace segmented_epaper {
 
         void AddAction(callback_function action, uint16_t delay, uint16_t Id = 0);
         void UpdateScreen(void);
+        void CleanupQueueAndRestart(void);
 
         void addressed_write(uint8_t address, const uint8_t* data, size_t len);
         void EPD_RST_ON() { this->Reset_pin_->digital_write(1); }
