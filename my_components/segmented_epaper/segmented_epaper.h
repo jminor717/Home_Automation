@@ -6,6 +6,7 @@
 #include "esphome/core/automation.h"
 #include "esphome/core/component.h"
 #include "esphome/core/hal.h"
+#include <limits>
 // using namespace i2c;
 
 namespace esphome {
@@ -16,10 +17,14 @@ namespace segmented_epaper {
     // typedef void (*callback_function)();
 
     typedef void (Segmented_ePaper::*callback_function)();
+    typedef uint8_t (Segmented_ePaper::*callback_withReturn_function)();
 
     struct DisplayAction {
+        bool UseReturn;
         callback_function function; // Function pointer to display callback function
+        callback_withReturn_function returnFunction;
         uint16_t delayAfter; // time to wait after this action before the next is performed
+        int16_t maxRunTime; // for a function with return specifies the maximum amount of time this function can run for;
         uint16_t actionId;
     };
 
@@ -70,6 +75,8 @@ namespace segmented_epaper {
         static const uint8_t queueModulus = 0b00011111;
 
         uint64_t canRunNextActionAt = 0;
+        uint8_t runningActionId = 0;
+        uint64_t currentActionStartedAt = 0;
         uint64_t InactiveSince = UINT_64_MAX;
         uint8_t UpdatesTillFullRefresh = UPDATES_BETWEEN_REFRESH;
         uint64_t TimeOfLastFullUpdate = 0;
@@ -91,7 +98,9 @@ namespace segmented_epaper {
 
         uint8_t Current_EPD_Temperature_Compensation = 25; // room temp 25 c
 
+        bool AddActionStart();
         void AddAction(callback_function action, uint16_t delay, uint16_t Id = 0);
+        void AddAction(callback_withReturn_function action, uint16_t delay, uint16_t Id = 0, int16_t MaxRunTime = -1); // numeric_limits<int16_t>::max()
         void UpdateScreen(void);
         void CleanupQueueAndRestart(void);
 
@@ -117,6 +126,7 @@ namespace segmented_epaper {
 
         void EPD_Write_Screen();
         void EPD_DEEP_SLEEP();
+        uint8_t EPD_ReadBusy();
         void AsyncDelay() { }
     };
 

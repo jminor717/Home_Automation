@@ -116,7 +116,6 @@ namespace segmented_epaper {
         // this->d1_pin_->attach_interrupt(Segmented_ePaperStore::d1_gpio_intr, &this->store_, gpio::INTERRUPT_FALLING_EDGE);
     }
 
-    // micros()
     void Segmented_ePaper::loop()
     {
         uint64_t currentTime = micros();
@@ -124,21 +123,42 @@ namespace segmented_epaper {
             DisplayAction runningAction = actionQueue[queueIndex];
             InactiveSince = UINT_64_MAX; // set to max val so that we don't unintentional sleep the display
 
+            if (runningActionId != runningAction.actionId){
+                runningActionId = runningAction.actionId;
+                currentActionStartedAt = currentTime;
+            }
+
             // ESP_LOGD(TAG, "running action %d at %d, %d remaining, next action in %d", queueIndex, currentTime, queueLength, runningAction.delayAfter);
 
-            // https://stackoverflow.com/questions/7869716/dereferencing-a-member-pointer-error-cannot-be-used-as-member-pointer
-            // https://www.reddit.com/r/Cplusplus/comments/9t8417/error_must_use_or_or_to_call_pointertomember/
-            (*this.*runningAction.function)();
+            bool actionComplete = true;
+            if (runningAction.UseReturn) {
+                actionComplete = (*this.*runningAction.returnFunction)();
+                if (runningAction.maxRunTime >= 0 && !actionComplete) {
+                     actionComplete = currentTime > currentActionStartedAt + (runningAction.maxRunTime * 1000);
+                     if(actionComplete){
+                         ESP_LOGD(TAG, "Polling action timed out");
+                     }
+                }
+            }else{
+                // https://stackoverflow.com/questions/7869716/dereferencing-a-member-pointer-error-cannot-be-used-as-member-pointer
+                // https://www.reddit.com/r/Cplusplus/comments/9t8417/error_must_use_or_or_to_call_pointertomember/
+                (*this.*runningAction.function)();
+            }
 
-            canRunNextActionAt = currentTime + (runningAction.delayAfter * 1000);
 
-            queueIndex = (queueIndex + 1) & queueModulus;
-            queueLength--;
-            if (queueLength == 0) {
-                InactiveSince = currentTime;
+            if(actionComplete){
+                currentTime = micros();
+                canRunNextActionAt = currentTime + (runningAction.delayAfter * 1000);
+
+                queueIndex = (queueIndex + 1) & queueModulus;
+                queueLength--;
+                if (queueLength == 0) {
+                    InactiveSince = currentTime;
+                }
             }
         }
         if (!displayAsleep && currentTime > InactiveSince + DISPLAY_TIMEOUT) {
+            // only sleep after a delay so that we don't have to constantly re-init the display as the user is slowly updating the setpoint
             Sleep_Display();
         }
     }
@@ -176,10 +196,10 @@ namespace segmented_epaper {
             ScreenBufferHead = (ScreenBufferHead + 1) & ScreenBufferModulus;
             ScreenBufferLength++;
 
-            AddAction(&Segmented_ePaper::EPD_Write_Screen, 1500);
-            // AddAction(&Segmented_ePaper::AsyncDelay, 2000); // replace with monitoring the busy pin
-            AddAction(&Segmented_ePaper::EPD_Screen_Sleep, 500);
-            // AddAction(&Segmented_ePaper::AsyncDelay, 500);
+            AddAction(&Segmented_ePaper::EPD_Write_Screen, 1);
+            AddAction(&Segmented_ePaper::EPD_ReadBusy, 10, 0, 1500);
+            AddAction(&Segmented_ePaper::EPD_Screen_Sleep, 1);
+            AddAction(&Segmented_ePaper::EPD_ReadBusy, 10, 500);
             CleanupQueueAndRestart();
         } else {
             memcpy(ScreenBuffer[ScreenBufferIndex], data, sizeof(uint8_t) * 16);
@@ -236,20 +256,47 @@ namespace segmented_epaper {
         CleanupQueueAndRestart();
     }
 
-    void Segmented_ePaper::AddAction(callback_function action, uint16_t delay, uint16_t Id)
+    bool Segmented_ePaper::AddActionStart()
     {
         if (BufferOverflow) {
-            return;
+            return false;
         }
         if (queueLength >= queueModulus) {
             // bork
             ESP_LOGE(TAG, "actionQueue overflow");
             BufferOverflow = true;
-            return;
+            return false;
         }
-        actionQueue[queueHead] = { action, delay, 0 };
-        queueHead = (queueHead + 1) & queueModulus;
-        queueLength++;
+        return true;
+    }
+
+    void Segmented_ePaper::AddAction(callback_function action, uint16_t delay, uint16_t Id)
+    {
+        if (AddActionStart()) {
+            DisplayAction _action;
+            _action.UseReturn = false;
+            _action.function = action;
+            _action.delayAfter = delay;
+            _action.actionId = Id;
+            actionQueue[queueHead] = _action;
+            queueHead = (queueHead + 1) & queueModulus;
+            queueLength++;
+        }
+    }
+
+    void Segmented_ePaper::AddAction(callback_withReturn_function action, uint16_t delay, uint16_t Id, int16_t MaxRunTime)
+    {
+        if (AddActionStart()) {
+            DisplayAction _action;
+            _action.UseReturn = true;
+            _action.returnFunction = action;
+            _action.delayAfter = delay;
+            _action.actionId = Id;
+            _action.maxRunTime = MaxRunTime;
+            actionQueue[queueHead] = _action;
+            queueHead = (queueHead + 1) & queueModulus;
+            queueLength++;
+        }
     }
 
     void Segmented_ePaper::CleanupQueueAndRestart()
@@ -263,13 +310,12 @@ namespace segmented_epaper {
             TimeOfLastFullUpdate = micros();
             Init_Display();
             canRunNextActionAt = micros();
-            if (ScreenBufferLength > 0){
+            if (ScreenBufferLength > 0) {
                 ScreenBufferLength = 1;
-                AddAction(&Segmented_ePaper::EPD_Write_Screen, 1500);
-                // AddAction(&Segmented_ePaper::AsyncDelay, 2000); // replace with monitoring the busy pin
-                AddAction(&Segmented_ePaper::EPD_Screen_Sleep, 500);
-                // AddAction(&Segmented_ePaper::AsyncDelay, 500);
-
+                AddAction(&Segmented_ePaper::EPD_Write_Screen, 1);
+                AddAction(&Segmented_ePaper::EPD_ReadBusy, 10, 0, 1500);
+                AddAction(&Segmented_ePaper::EPD_Screen_Sleep, 1);
+                AddAction(&Segmented_ePaper::EPD_ReadBusy, 10, 500);
             }
         }
     }
@@ -319,18 +365,16 @@ namespace segmented_epaper {
         this->addressed_write(adds_com, new uint8_t[1] { 0xAD }, 1); // DEEP_SLEEP
     }
 
-    // void EPD_1in9_ReadBusy(void)
-    // {
-    //     Serial.println("e-Paper busy");
-    //     delay(10);
-    //     while (1) { //=1 BUSY;
-    //         if (digitalRead(EPD_BUSY_PIN) == 1)
-    //             break;
-    //         delay(1);
-    //     }
-    //     delay(10);
-    //     Serial.println("e-Paper busy release");
-    // }
+    uint8_t Segmented_ePaper::EPD_ReadBusy()
+    {
+        // busy pin high indicates display is not busy and the next action can start
+        return Busy_pin_->digital_read();
+        // while (1) { //=1 BUSY;
+        //     if (digitalRead(EPD_BUSY_PIN) == 1)
+        //         break;
+        //     delay(1);
+        // }
+    }
 
     void Segmented_ePaper::dump_config()
     {

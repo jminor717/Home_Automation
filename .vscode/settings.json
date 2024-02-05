@@ -26,7 +26,11 @@
         "array": "cpp",
         "span": "cpp",
         "vector": "cpp",
-        "xstring": "cpp"
+        "xstring": "cpp",
+        "algorithm": "cpp",
+        "limits": "cpp",
+        "random": "cpp",
+        "utility": "cpp"
     },
     "cSpell.words": [
         "epaper"
