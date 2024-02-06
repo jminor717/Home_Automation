@@ -32,6 +32,12 @@ esp32:
 
 # Enable logging
 logger:
+  level: DEBUG
+  logs:
+    climate: INFO
+    sensor: INFO
+    esp32.preferences: INFO
+
 
 # Enable Home Assistant API
 api:

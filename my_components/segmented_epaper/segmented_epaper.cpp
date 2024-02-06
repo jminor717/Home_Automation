@@ -109,6 +109,7 @@ namespace segmented_epaper {
         this->Busy_pin_->setup();
         this->Reset_pin_->setup();
         Init_Display();
+        CompensateForTemperature(25);
         FullRefreshScreen();
         // this->store_.d0 = this->d0_pin_->to_isr();
         // this->store_.d1 = this->d1_pin_->to_isr();
@@ -128,7 +129,7 @@ namespace segmented_epaper {
                 currentActionStartedAt = currentTime;
             }
 
-            // ESP_LOGD(TAG, "running action %d at %d, %d remaining, next action in %d", queueIndex, currentTime, queueLength, runningAction.delayAfter);
+            ESP_LOGD(TAG, "running action %d at %d, %d remaining, next action in %d", queueIndex, currentTime, queueLength, runningAction.delayAfter);
 
             bool actionComplete = true;
             if (runningAction.UseReturn) {
@@ -196,13 +197,14 @@ namespace segmented_epaper {
             ScreenBufferHead = (ScreenBufferHead + 1) & ScreenBufferModulus;
             ScreenBufferLength++;
 
-            AddAction(&Segmented_ePaper::EPD_Write_Screen, 1);
-            AddAction(&Segmented_ePaper::EPD_ReadBusy, 10, 0, 1500);
-            AddAction(&Segmented_ePaper::EPD_Screen_Sleep, 1);
-            AddAction(&Segmented_ePaper::EPD_ReadBusy, 10, 500);
+            AddAction(&Segmented_ePaper::EPD_Write_Screen, 1500);
+            // AddAction(&Segmented_ePaper::EPD_ReadBusy, 10, 0, 1500);
+            AddAction(&Segmented_ePaper::EPD_Screen_Sleep, 500);
+            // AddAction(&Segmented_ePaper::EPD_ReadBusy, 10, 500);
             CleanupQueueAndRestart();
         } else {
             memcpy(ScreenBuffer[ScreenBufferIndex], data, sizeof(uint8_t) * 16);
+            ESP_LOGI(TAG, TAG, "Bypass Tasks");
         }
     }
 
@@ -215,7 +217,7 @@ namespace segmented_epaper {
             Reset_Display();
             AddAction(&Segmented_ePaper::EPD_PowerOn, 10);
             AddAction(&Segmented_ePaper::EPD_Boost, 10);
-            CompensateForTemperature(25);
+            //CompensateForTemperature(25);
         }
     }
 
@@ -281,6 +283,7 @@ namespace segmented_epaper {
             actionQueue[queueHead] = _action;
             queueHead = (queueHead + 1) & queueModulus;
             queueLength++;
+            ESP_LOGI(TAG, TAG, "insert  action %d at %d, running index %d", queueHead, queueLength, queueIndex);
         }
     }
 
@@ -312,10 +315,10 @@ namespace segmented_epaper {
             canRunNextActionAt = micros();
             if (ScreenBufferLength > 0) {
                 ScreenBufferLength = 1;
-                AddAction(&Segmented_ePaper::EPD_Write_Screen, 1);
-                AddAction(&Segmented_ePaper::EPD_ReadBusy, 10, 0, 1500);
-                AddAction(&Segmented_ePaper::EPD_Screen_Sleep, 1);
-                AddAction(&Segmented_ePaper::EPD_ReadBusy, 10, 500);
+                AddAction(&Segmented_ePaper::EPD_Write_Screen, 1500);
+                // AddAction(&Segmented_ePaper::EPD_ReadBusy, 10, 0, 1500);
+                AddAction(&Segmented_ePaper::EPD_Screen_Sleep, 500);
+                // AddAction(&Segmented_ePaper::EPD_ReadBusy, 10, 500);
             }
         }
     }
