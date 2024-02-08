@@ -1,13 +1,11 @@
 esphome:
   name: $device_name
-  includes:
-    - ../my_components/Segmented_E_paper1.h
 
 external_components:
   # use all components from a local folder
   - source:
       type: local
-      path: ../my_components
+      path: ../my_components # path relative to Devices folder
 
 esp32:
   board: esp32-c3-devkitm-1
@@ -49,12 +47,10 @@ ota:
 wifi:
   ssid: "MuskFi"
   password: "123456789"
-
   # Enable fallback hotspot (captive portal) in case wifi connection fails
   ap:
     ssid: "$device_name AP"
     password: "BiSG9yrKP394"
-
 captive_portal:
 
 i2c:
@@ -62,14 +58,6 @@ i2c:
     sda: $sda_pin
     scl: $scl_pin
     scan: true
-
-# custom_component:
-#   - lambda: |-
-#       auto ePaper_display = new SegmentedEPaper(id(bus_a));
-#       //ePaper_display->SetPins($disp_rst_pin, $disp_busy_pin);
-#       return {ePaper_display};
-#     components:
-#       - id: segmented_e_paper
 
 segmented_epaper:
   - id: segmented_e_paper
@@ -86,9 +74,9 @@ time:
           - lambda: |-
               auto ptr = id(segmented_e_paper);
               auto tempVal = id(temp).state;
-              ptr->SetUpperDisplayFloat( ((tempVal) * (9.0/5.0)) + 32 );
+              ptr->SetUpperDisplayFloat( ((tempVal) * (9.0/5.0)) + 32, false);
               auto setpoint = id(therm).target_temperature;
-              ptr->SetLowerDisplayInt( ((setpoint) * (9.0/5.0)) + 32 );
+              ptr->SetLowerDisplayInt( ((setpoint) * (9.0/5.0)) + 32, true );
 
 sensor:
   - platform: sht4x
@@ -114,7 +102,7 @@ sensor:
       - lambda: auto newTemp = id(therm).target_temperature + (5.0/9.0);
           ESP_LOGD("ccw", "old, %f,  new; %f", id(therm).target_temperature, newTemp);
           auto ptr = id(segmented_e_paper);
-          ptr->SetLowerDisplayInt( ((newTemp) * (9.0/5.0)) + 32 );
+          ptr->SetLowerDisplayInt( ((newTemp) * (9.0/5.0)) + 32, true );
           auto call = id(therm).make_call();
           call.set_target_temperature(newTemp);
           call.perform();
@@ -122,7 +110,7 @@ sensor:
       - lambda: auto newTemp = id(therm).target_temperature - (5.0/9.0);
           ESP_LOGD("ccw", "old, %f,  new; %f", id(therm).target_temperature, newTemp);
           auto ptr = id(segmented_e_paper);
-          ptr->SetLowerDisplayInt( ((newTemp) * (9.0/5.0)) + 32 );
+          ptr->SetLowerDisplayInt( ((newTemp) * (9.0/5.0)) + 32, true );
           auto call = id(therm).make_call();
           call.set_target_temperature(newTemp);
           call.perform();

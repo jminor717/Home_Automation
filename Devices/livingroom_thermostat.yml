@@ -9,9 +9,9 @@ substitutions:
   relay_pin: GPIO4
   disp_rst_pin: GPIO5
   disp_busy_pin: GPIO3
-# unused 23, 18, 17, 16, 13 4, 2
+# unused 0, 10, 19, 20, 21
 
-<<: !include ThermostatBase.yml
+<<: !include BaseDevices/ThermostatBase.yml
 
 
 # CONF_TIMEOUT  CONF_BUSY_PIN   CONF_RESET_PIN

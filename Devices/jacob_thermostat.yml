@@ -11,7 +11,7 @@ substitutions:
   relay_pin: GPIO10
   relay_pin2: GPIO19
   # strapping 2, 8, 9  
-<<: !include ThermostatBase.yml
+<<: !include BaseDevices/ThermostatBase.yml
 
 
 #   sda_pin: GPIO21

@@ -34,5 +34,6 @@
     },
     "cSpell.words": [
         "epaper"
-    ]
+    ],
+    "C_Cpp.errorSquiggles": "disabled"
 }

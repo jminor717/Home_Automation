@@ -2,14 +2,12 @@ substitutions:
   sda_pin: GPIO21
   scl_pin: GPIO22
   disp_rst_pin: GPIO19
+  disp_busy_pin: GPIO20
   encode_pin_1: GPIO34
   encode_pin_2: GPIO35
   
 esphome:
   name: e_paper_tester
-  includes:
-    - ../my_components/Segmented_Epaper.h
-    - ../my_components/segment_E_papaer/EPD_1in9.h
 
 esp32:
   board: esp32dev
@@ -27,8 +25,8 @@ ota:
   password: ""
 
 wifi:
-  ssid: "MuskFi"
-  password: "123456789"
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
 
   # Enable fallback hotspot (captive portal) in case wifi connection fails
   ap:
@@ -42,7 +40,7 @@ external_components:
   # use all components from a local folder
   - source:
       type: local
-      path: ../my_components
+      path: my_components
 
 i2c:
    - id: bus_a
@@ -50,12 +48,11 @@ i2c:
      scl: $scl_pin
      scan: true
 
-custom_component:
-- lambda: |-
-    auto ePaper_display = new SegmentedEPaper(id(bus_a));
-    return {ePaper_display};
-  components:
+segmented_epaper:
   - id: segmented_e_paper
+    reset_pin: $disp_rst_pin
+    busy_pin: $disp_busy_pin
+    i2c_id: bus_a
 
 sensor:
   - platform: rotary_encoder
@@ -69,8 +66,8 @@ sensor:
     on_clockwise:
       - lambda:
           auto ptr = id(segmented_e_paper);
-          static_cast<SegmentedEPaper*>(ptr)->IncrementTest();
+          ptr->IncrementTest();
     on_anticlockwise:
       - lambda:
           auto ptr = id(segmented_e_paper);
-          static_cast<SegmentedEPaper*>(ptr)->DecrementTest();
+          ptr->DecrementTest();

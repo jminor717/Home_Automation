@@ -38,21 +38,20 @@ namespace segmented_epaper {
         void set_Busy_pin_pin(InternalGPIOPin* pin) { this->Busy_pin_ = pin; };
         void set_Reset_pin_pin(InternalGPIOPin* pin) { this->Reset_pin_ = pin; };
 
-        void SetUpperDisplayFloat(float Num);
-        void SetLowerDisplayInt(float setpoint);
+        void SetUpperDisplayFloat(float Num, bool flushToScreen = true);
+        void SetLowerDisplayInt(float Num, bool flushToScreen = true);
 
         void Init_Display(void);
         void Sleep_Display(void);
         void Reset_Display(void);
-        void FullRefreshScreen(void);
+        void FullRefreshScreen(bool forceFullRefresh = false);
         void CompensateForTemperature(uint8_t currentTemp);
-        void WriteScreen(uint8_t* data, bool fullBlack = false);
+        void WriteScreen(uint8_t* data, bool fullBlack = false, bool ForceSerialWrites = false);
 
     protected:
         static const uint64_t UINT_64_MAX = 0xfffffffffffffff; // one byte short because we are adding ~10 seconds worth of uS to this value when the screen is active and dont want an overflow
 
-        static const uint8_t UPDATES_BETWEEN_REFRESH = 20;
-        static const uint64_t TIME_BETWEEN_FULL_UPDATES = 60 * 1000 * 1000; // 1 minute timeout
+        static const uint8_t UPDATES_BETWEEN_REFRESH = 10;
         static const uint32_t DISPLAY_TIMEOUT = 30 * 1000 * 1000; // 30 second timeout
 
         static const uint8_t adds_com = 0x3C;
@@ -62,11 +61,11 @@ namespace segmented_epaper {
         InternalGPIOPin* Reset_pin_;
 
         uint8_t ScreenBuffer[8][16];
+        bool ScreenDataRequired[8];
         uint8_t ScreenBufferIndex = 0;
         uint8_t ScreenBufferHead = 0;
         uint8_t ScreenBufferLength = 0;
         static const uint8_t ScreenBufferModulus = 0b0111;
-        uint8_t CurrentDisplay[16] = { 0 };
 
         DisplayAction actionQueue[32];
         uint8_t queueIndex = 0;
@@ -88,11 +87,14 @@ namespace segmented_epaper {
 
         float displayedUpper = 0;
         uint8_t displayedLower = 0;
+        bool DisplayOutOfDate = true;
 
         uint8_t Upper_tenthsPlace = 0;
         uint8_t Upper_onesPlace = 0;
         uint8_t Upper_tensPlace = 0;
+        uint8_t Upper_HundredsPlace = 0;
 
+        uint8_t Lower_tenthsPlace = 0;
         uint8_t Lower_onesPlace = 0;
         uint8_t Lower_tensPlace = 0;
 
@@ -101,18 +103,20 @@ namespace segmented_epaper {
         bool AddActionStart();
         void AddAction(callback_function action, uint16_t delay, uint16_t Id = 0);
         void AddAction(callback_withReturn_function action, uint16_t delay, uint16_t Id = 0, int16_t MaxRunTime = -1); // numeric_limits<int16_t>::max()
-        void UpdateScreen(void);
+        void FlushToScreen(void);
         void CleanupQueueAndRestart(void);
+        void AddScreenUpdateActions(void);
 
         void addressed_write(uint8_t address, const uint8_t* data, size_t len);
         void EPD_RST_ON() { this->Reset_pin_->digital_write(1); }
+        /// @brief setting reset low with the WaveShare provided dev board will remove power from the display module
         void EPD_RST_OFF() { this->Reset_pin_->digital_write(0); }
 
         void EPD_PowerOn() { this->addressed_write(adds_com, new uint8_t[1] { 0x2B }, 1); }
         void EPD_POWER_OFF() { this->addressed_write(adds_com, new uint8_t[1] { 0x28 }, 3); }
 
         void EPD_Boost() { this->addressed_write(adds_com, new uint8_t[2] { 0xA7, 0xE0 }, 2); } // boost, TSON
-        void EPD_Temperature1() { this->addressed_write(adds_com, new uint8_t[3] { 0x7E, 0x81, 0xB4 }, 3); }
+        void EPD_Temperature1();
         void EPD_Temperature2();
 
         /* 5 waveform better ghosting, Boot waveform EPD_1in9_lut_5S*/

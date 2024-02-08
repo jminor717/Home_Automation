@@ -10,4 +10,4 @@ substitutions:
   relay_pin2: GPIO16
   disp_rst_pin: GPIO17
 
-<<: !include ThermostatBase.yml
+<<: !include BaseDevices/ThermostatBase.yml
