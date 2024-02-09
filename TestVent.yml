@@ -1,0 +1,71 @@
+esphome:
+  name: e_paper_tester
+
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+logger:
+  level: DEBUG
+
+# Enable Home Assistant API
+api:
+  password: ""
+
+ota:
+  password: ""
+
+wifi:
+  ssid: "MuskFi"
+  password: "123456789"
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "$device_name AP"
+    password: "BiSG9yrKP394"
+captive_portal:
+
+cover:
+  - platform: template
+    device_class: damper
+    id: vent
+    name: Vent
+    open_action:
+      - lambda: 'ESP_LOGD("damper", "Open Requested");'
+    close_action:
+      - lambda: 'ESP_LOGD("damper", "Closed Requested");'
+    stop_action:
+      - lambda: 'ESP_LOGD("damper", "Stop Requested");'
+    tilt_action:
+      - lambda: 'ESP_LOGD("damper", "Tilt Requested: %f", tilt); '
+    # tilt_lambda: 'return remap(id(vent_servo_potentiometer).state, id(opened_potentiometer_position), id(closed_potentiometer_position), float(1), float(0));'
+    lambda: 'return id(closed_limit_switch).state ? COVER_CLOSED : COVER_OPEN;'
+
+
+
+binary_sensor:
+  - platform: gpio
+    pin: 
+      number: 5
+      mode:
+        input: true
+        pulldown: true
+    id: closed_limit_switch
+
+sensor:
+  - platform: adc
+    id: vent_servo_potentiometer
+    pin: GPIO32
+    update_interval: 250ms
+
+servo:
+  - id: vent_servo
+    output: vent_servo_output
+    transition_length: 7s
+    auto_detach_time: 200ms
+    
+output:
+  - platform: ledc
+    id: vent_servo_output
+    pin: GPIO1
+    frequency: 50 Hz

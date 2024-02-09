@@ -68,6 +68,16 @@ segmented_epaper:
 time:
   - platform: sntp
     on_time:
+      # 2 am every day perform a full refresh, as per manufacturer recommendation
+      - seconds: 0
+        minutes: 0
+        hours: 2
+        then:
+          - lambda: |-
+              auto ptr = id(segmented_e_paper);
+              ptr->Init_Display();
+              ptr->FullRefreshScreen(true);
+              ptr->FlushToScreen();
       # Every 15s
       - seconds: 0,15,30,45
         then:
@@ -99,7 +109,8 @@ sensor:
       number: $encode_pin_2
       mode: INPUT_PULLUP # _PULLUP external pull up resistor required
     on_anticlockwise:
-      - lambda: auto newTemp = id(therm).target_temperature + (5.0/9.0);
+      - lambda: |-
+          auto newTemp = id(therm).target_temperature + (5.0/9.0);
           ESP_LOGD("ccw", "old, %f,  new; %f", id(therm).target_temperature, newTemp);
           auto ptr = id(segmented_e_paper);
           ptr->SetLowerDisplayInt( ((newTemp) * (9.0/5.0)) + 32, true );
@@ -107,7 +118,8 @@ sensor:
           call.set_target_temperature(newTemp);
           call.perform();
     on_clockwise:
-      - lambda: auto newTemp = id(therm).target_temperature - (5.0/9.0);
+      - lambda: |-
+          auto newTemp = id(therm).target_temperature - (5.0/9.0);
           ESP_LOGD("ccw", "old, %f,  new; %f", id(therm).target_temperature, newTemp);
           auto ptr = id(segmented_e_paper);
           ptr->SetLowerDisplayInt( ((newTemp) * (9.0/5.0)) + 32, true );

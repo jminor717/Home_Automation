@@ -17,7 +17,7 @@ namespace segmented_epaper {
     static const uint8_t LOWER_ONES = 7;
     static const uint8_t LOWER_TENTHS = 9;
     // clang-format off
-    static uint8_t DSPNUM_1in9_on[]   = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00,      };  // all black
+    static uint8_t DSPNUM_1in9_on[]   = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x03,      };  // all black
     static uint8_t DSPNUM_1in9_off[]  = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,      };  // all white
     static uint8_t DSPNUM_1in9_W3[]   = {0x00, 0xf5, 0x1f, 0xf5, 0x1f, 0xf5, 0x1f, 0xf5, 0x1f, 0xf5, 0x1f, 0xf5, 0x1f, 0x00, 0x00, 0x00,      };  // 3
 
@@ -37,14 +37,6 @@ namespace segmented_epaper {
     } ;
     // clang-format on
 
-    struct DisplayFurnishings {
-        bool TempSymbol;
-        bool TempIsFahrenheit;
-        bool UpperDecimalPoint;
-        bool LowerDecimalPoint;
-        bool Humidity;
-    } _displayFurnishings;
-
     // void HOT IRAM_ATTR Segmented_ePaperStore::d0_gpio_intr(Segmented_ePaperStore* arg)
     // {
     //     if (arg->d0.digital_read())
@@ -63,6 +55,11 @@ namespace segmented_epaper {
             return number;
     }
 
+    void Segmented_ePaper::SetDisplayFurnishings(DisplayFurnishings val)
+    {
+        _displayFurnishings = val;
+    }
+
     void Segmented_ePaper::SetUpperDisplayFloat(float Num, bool flush)
     {
         float dif = absVal(displayedUpper - Num);
@@ -74,9 +71,9 @@ namespace segmented_epaper {
             Upper_onesPlace = ((uint16_t)Num) % 10;
             Upper_tensPlace = ((uint16_t)(Num / 10.0)) % 10;
 
-            _displayFurnishings.UpperDecimalPoint = true;
-            _displayFurnishings.TempSymbol = true;
-            _displayFurnishings.TempIsFahrenheit = true;
+            _displayFurnishings.show_upper_decimal_point = true;
+            _displayFurnishings.show_temp_symbol = true;
+            _displayFurnishings.temp_is_fahrenheit = true;
 
             displayedUpper = Num;
             DisplayOutOfDate = true;
@@ -98,7 +95,7 @@ namespace segmented_epaper {
             Lower_tensPlace = ((uint16_t)(intNum / 10)) % 10;
             Lower_tenthsPlace = DIGIT_OFF;
 
-            _displayFurnishings.LowerDecimalPoint = false;
+            _displayFurnishings.show_lower_decimal_point = false;
 
             displayedLower = intNum;
             DisplayOutOfDate = true;
@@ -122,17 +119,17 @@ namespace segmented_epaper {
         memcpy(dispVal + LOWER_TENTHS,   SegmentNumbers[Lower_tenthsPlace],       sizeof(uint8_t) * 2);
         // clang-format on
 
-        if (_displayFurnishings.TempSymbol) {
-            if (_displayFurnishings.TempIsFahrenheit)
+        if (_displayFurnishings.show_temp_symbol) {
+            if (_displayFurnishings.temp_is_fahrenheit)
                 dispVal[13] = 0x06; // fahrenheit symbol 0b0000_0110
             else
                 dispVal[13] = 0x05; // Celsius symbol    0b0000_0101
         }
-        if (_displayFurnishings.LowerDecimalPoint)
+        if (_displayFurnishings.show_lower_decimal_point)
             dispVal[8] |= 0xf0; // lower decimal place
-        if (_displayFurnishings.UpperDecimalPoint)
+        if (_displayFurnishings.show_upper_decimal_point)
             dispVal[4] |= 0xf0; // upper decimal place
-        if (_displayFurnishings.Humidity)
+        if (_displayFurnishings.show_humidity_symbol)
             dispVal[10] |= 0xf0; // humidity symbol
 
         ESP_LOGD(TAG, "FlushToScreen: Up:%d|%d|%d|.|%d  Low:%d|%d|.|%d ", Upper_HundredsPlace, Upper_tensPlace, Upper_onesPlace, Upper_tenthsPlace, Lower_tensPlace, Lower_onesPlace, Lower_tenthsPlace);
@@ -152,7 +149,7 @@ namespace segmented_epaper {
         this->Busy_pin_->setup();
         this->Reset_pin_->setup();
         Init_Display();
-        CompensateForTemperature(25);
+        // CompensateForTemperature(25);
         FullRefreshScreen(true);
         // this->store_.d0 = this->d0_pin_->to_isr();
         // this->store_.d1 = this->d1_pin_->to_isr();
@@ -205,11 +202,7 @@ namespace segmented_epaper {
         }
     }
 
-    /// @brief writes the display buffer data to the screen
-    /// @param data full 16 byte array of data representing the state of the entire display
-    /// @param fullBlack weird detail from the driver provided by WaveShare when we are writing DSPNUM_1in9_on to the screen
-    /// @param ForceSerialWrites if false will overwrite any inflight display data that has not been flushed to the display so that we skip frames instead of performing back to back writes
-    void Segmented_ePaper::WriteScreen(uint8_t* data, bool fullBlack, bool ForceSerialWrites)
+    void Segmented_ePaper::WriteScreen(uint8_t* data, bool ForceSerialWrites)
     {
         bool SetBrushBackToDefault = false;
         if (displayAsleep) {
@@ -217,7 +210,8 @@ namespace segmented_epaper {
             Init_Display();
             // first write after init should be made with the with the clear screen brush
             AddAction(&Segmented_ePaper::EPD_ClearScreen_Brush2, 0);
-            UpdatesTillFullRefresh = UPDATES_BETWEEN_REFRESH; // using this brush effectively clears any ghosting so a full refresh can be pushed back
+            // using this brush effectively clears any ghosting so a full refresh can be pushed back a bit
+            UpdatesTillFullRefresh = std::min((uint8_t)(UpdatesTillFullRefresh + 2), UPDATES_BETWEEN_REFRESH);
             SetBrushBackToDefault = true;
         }
 
@@ -225,16 +219,11 @@ namespace segmented_epaper {
         bool updateNeeded = UpdatesTillFullRefresh <= 1;
         if (updateNeeded) {
             // after a ceratin number of partial updates we should perform a full refresh to clear any artifacts that may have built up
-            TimeOfLastFullUpdate = esp_timer_get_time();
             FullRefreshScreen(false);
         }
 
-        if (fullBlack) {
-            data[15] = 0x03;
-        } else {
-            data[15] = 0x00;
-        }
-
+        // updates done as part of a refresh have to be displayed sequentially but if we are just sending multiple content updates in a row
+        // then we only care about the most up to date one so that we can cut down on the number of display updates required
         int8_t overWriteableScreen = -1;
         for (size_t i = 0; i < ScreenBufferLength; i++) {
             uint8_t index = (i + ScreenBufferIndex) & ScreenBufferModulus;
@@ -244,12 +233,10 @@ namespace segmented_epaper {
             }
         }
 
-        // if we are forcing serial writes 
-        // or not already in the middle of updating the display 
+        // if we are forcing serial writes
         // or if none the in flight updates can be overriden
         // then add this update to the head of the screen buffer
-        if (ForceSerialWrites || !updatingDisplay || overWriteableScreen == -1) {
-            updatingDisplay = true;
+        if (ForceSerialWrites || overWriteableScreen == -1) {
             if (ScreenBufferLength >= ScreenBufferModulus) {
                 // bork
                 ESP_LOGE(TAG, "ScreenBuffer overflow");
@@ -268,7 +255,7 @@ namespace segmented_epaper {
             memcpy(ScreenBuffer[overWriteableScreen], data, sizeof(uint8_t) * 16);
             ESP_LOGI(TAG, "Bypass display update tasks Tasks");
         }
-        if (SetBrushBackToDefault){
+        if (SetBrushBackToDefault) {
             AddAction(&Segmented_ePaper::EPD_Default_Brush, 0);
         }
     }
@@ -290,11 +277,10 @@ namespace segmented_epaper {
             Reset_Display();
             AddAction(&Segmented_ePaper::EPD_PowerOn, 10);
             AddAction(&Segmented_ePaper::EPD_Boost, 10);
-            // CompensateForTemperature(25);
+            CompensateForTemperature(25);
         }
     }
 
-    /// @brief puts the screen to sleep then removes power from the display
     void Segmented_ePaper::Sleep_Display()
     {
         AddAction(&Segmented_ePaper::EPD_POWER_OFF, 2000);
@@ -304,7 +290,6 @@ namespace segmented_epaper {
         CleanupQueueAndRestart();
     }
 
-    /// @brief powers the screen on off then on again
     void Segmented_ePaper::Reset_Display()
     {
         AddAction(&Segmented_ePaper::EPD_RST_ON, 200);
@@ -313,23 +298,22 @@ namespace segmented_epaper {
         CleanupQueueAndRestart();
     }
 
-    /// @brief will flash the screen between white and black to clear any artifacts or ghosting
-    /// @param forceFullRefresh if true will perform more flashes to better clear the screen at the expense of taking longer
     void Segmented_ePaper::FullRefreshScreen(bool forceFullRefresh)
     {
         UpdatesTillFullRefresh = UPDATES_BETWEEN_REFRESH; // make sure we dont call full refresh again when calling write screen
         if (forceFullRefresh) {
             AddAction(&Segmented_ePaper::EPD_ClearScreen_Brush1, 0);
-            WriteScreen(DSPNUM_1in9_off, false, true);
+            WriteScreen(DSPNUM_1in9_off, true);
             AddAction(&Segmented_ePaper::EPD_ClearScreen_Brush2, 0);
-            WriteScreen(DSPNUM_1in9_on, true, true);
-            WriteScreen(DSPNUM_1in9_off, false, true);
-        }else{
+            WriteScreen(DSPNUM_1in9_on, true);
+            WriteScreen(DSPNUM_1in9_off, true);
+        } else {
             AddAction(&Segmented_ePaper::EPD_ClearScreen_Brush2, 0);
-            WriteScreen(DSPNUM_1in9_off, false, true);
+            WriteScreen(DSPNUM_1in9_off, true);
         }
         AddAction(&Segmented_ePaper::EPD_Default_Brush, 0);
         CleanupQueueAndRestart();
+        UpdatesTillFullRefresh = UPDATES_BETWEEN_REFRESH; // don't count any of the write screens in this function against the total
     }
 
     void Segmented_ePaper::CompensateForTemperature(uint8_t currentTemp)
@@ -355,10 +339,6 @@ namespace segmented_epaper {
         return true;
     }
 
-    /// @brief add an action to be performed sequentially in the order they were added
-    /// @param action (callback_function) action to be performed for this entry
-    /// @param delay amount of time to wait after this action has completed before the next action acn run
-    /// @param Id optional identifier for this specific action
     void Segmented_ePaper::AddAction(callback_function action, uint16_t delay, uint16_t Id)
     {
         if (AddActionStart()) {
@@ -374,11 +354,6 @@ namespace segmented_epaper {
         }
     }
 
-    /// @brief add an action to be performed sequentially in the order they were added
-    /// @param action (callback_withReturn_function) action to be performed for this entry, will be called repeatedly until it returns true
-    /// @param delay amount of time to wait after this action has completed before the next action acn run
-    /// @param Id optional identifier for this specific action
-    /// @param MaxRunTime if set to a positive number will not allow this task to run for longer than the specified time
     void Segmented_ePaper::AddAction(callback_withReturn_function action, uint16_t delay, uint16_t Id, int16_t MaxRunTime)
     {
         if (AddActionStart()) {
@@ -394,8 +369,6 @@ namespace segmented_epaper {
         }
     }
 
-    /// @brief call after adding to the action queue to clean up any potential buffer overflows
-    /// @details if the buffer overflowed empties it then calls init display and if there were any screen updates buffered writes the last update to the screen
     void Segmented_ePaper::CleanupQueueAndRestart()
     {
         if (BufferOverflow) {
@@ -414,14 +387,10 @@ namespace segmented_epaper {
         }
     }
 
-    /// @brief grab the oldest frame from the buffer write it to the display and advance the buffer index
     void Segmented_ePaper::EPD_Write_Screen()
     {
-        if (ScreenBufferLength <= 1) {
-            // if this is the last remaining update set updatingDisplay to false
-            updatingDisplay = false;
-        }
-
+        // once we start the process of writing to the display mark the frame as required
+        ScreenDataRequired[ScreenBufferIndex] = true;
         this->addressed_write(adds_com, new uint8_t[5] { 0xAC, 0x2B, 0x40, 0xA9, 0xA8 }, 5); // Close the sleep, turn on the power,  Write RAM address, Turn on the first SRAM, Shut down the first SRAM
 
         // ESP_LOGD(TAG, "WRITE:   %d,%d,%d,%d,%d,%d,%d,%d,%d", dispNumber, dispVal[0], dispVal[1], dispVal[2], dispVal[3], dispVal[4], dispVal[5], dispVal[6], dispVal[7], dispVal[8]);
@@ -435,10 +404,6 @@ namespace segmented_epaper {
         this->addressed_write(adds_com, new uint8_t[3] { 0xAB, 0xAA, 0xAF }, 3); // Turn on the second SRAM, Shut down the second SRAM, display on
     }
 
-    /// @brief the E-Paper has 2 separate i2c addresses so before each i2c write set the address to the correct one
-    /// @param address the i2c address needed for this operation
-    /// @param data pointer to an array to store the bytes
-    /// @param len length of the buffer = number of bytes to send
     void Segmented_ePaper::addressed_write(uint8_t address, const uint8_t* data, size_t len)
     {
         this->set_i2c_address(address);
