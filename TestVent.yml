@@ -1,13 +1,25 @@
 esphome:
-  name: e_paper_tester
+  name: vent-tester
+
+external_components:
+  # use all components from a local folder
+  - source:
+      type: local
+      path: my_components # path relative to Devices folder
 
 esp32:
   board: esp32dev
   framework:
     type: arduino
 
+# Enable logging
 logger:
   level: DEBUG
+  logs:
+    cover: INFO
+    sensor: INFO
+    esp32.preferences: INFO
+
 
 # Enable Home Assistant API
 api:
@@ -21,36 +33,66 @@ wifi:
   password: "123456789"
   # Enable fallback hotspot (captive portal) in case wifi connection fails
   ap:
-    ssid: "$device_name AP"
+    ssid: "e-paper-tester AP"
     password: "BiSG9yrKP394"
 captive_portal:
+
+
+
 
 cover:
   - platform: template
     device_class: damper
     id: vent
-    name: Vent
+    name: Test Vent
+    has_position: true
     open_action:
       - lambda: 'ESP_LOGD("damper", "Open Requested");'
     close_action:
       - lambda: 'ESP_LOGD("damper", "Closed Requested");'
     stop_action:
       - lambda: 'ESP_LOGD("damper", "Stop Requested");'
-    tilt_action:
-      - lambda: 'ESP_LOGD("damper", "Tilt Requested: %f", tilt); '
-    # tilt_lambda: 'return remap(id(vent_servo_potentiometer).state, id(opened_potentiometer_position), id(closed_potentiometer_position), float(1), float(0));'
-    lambda: 'return id(closed_limit_switch).state ? COVER_CLOSED : COVER_OPEN;'
+    position_action:
+      - lambda: 'ESP_LOGD("damper", "position Requested: %f", pos); '
+    # position:
+    #  - lambda: 'return id(vent_servo_potentiometer).state'
 
+time:
+  - platform: sntp
+    on_time:
+      # Every 15s
+      - seconds: 0,15,30,45
+        then:
+          - cover.template.publish:
+              id: vent
+              position:  !lambda  'return id(vent_servo_potentiometer).state;'
+    # lambda: 'return id(closed_limit_switch).state ? COVER_CLOSED : COVER_OPEN;'
 
+# cover:
+#   - platform: feedback
+#     device_class: damper
+#     name: "Test Vent"
+
+#     open_action:
+#       - lambda: 'ESP_LOGD("damper", "Open Requested");'
+#     open_duration: 10s
+#     # open_endstop: open_limit_switch
+
+#     close_action:
+#       - lambda: 'ESP_LOGD("damper", "Closed Requested");'
+#     close_duration: 10s
+#     # close_endstop: closed_limit_switch
+
+#     stop_action:
+#       - lambda: 'ESP_LOGD("damper", "Stop Requested");'
 
 binary_sensor:
   - platform: gpio
-    pin: 
-      number: 5
-      mode:
-        input: true
-        pulldown: true
+    pin: GPIO5
     id: closed_limit_switch
+  - platform: gpio
+    pin: GPIO5
+    id: open_limit_switch
 
 sensor:
   - platform: adc
