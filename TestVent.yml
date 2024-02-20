@@ -26,7 +26,7 @@ api:
   password: ""
 
 ota:
-  password: ""
+  password: "12345"
 
 wifi:
   ssid: "MuskFi"
@@ -60,8 +60,8 @@ cover:
 time:
   - platform: sntp
     on_time:
-      # Every 15s
-      - seconds: 0,15,30,45
+      # Every 10s
+      - seconds: 0,10,20,30,40,50
         then:
           - cover.template.publish:
               id: vent
@@ -98,7 +98,8 @@ sensor:
   - platform: adc
     id: vent_servo_potentiometer
     pin: GPIO32
-    update_interval: 250ms
+    update_interval: 10s
+    # 250ms
 
 servo:
   - id: vent_servo
