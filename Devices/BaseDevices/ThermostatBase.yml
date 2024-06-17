@@ -2,37 +2,102 @@ esphome:
   name: $device_name
 
 external_components:
-  # use all components from a local folder
+  # fix for logger from luar123 (thanks!)
+  # - source: github://luar123/esphome@fix_logger
+  #   components: [ logger ]
+  #   refresh: never
+  # - source:
+  #     type: git
+  #     url: github://luar123/esphome
+  #     ref: fix_logger
+  #   components: [ logger ]
+  #   refresh: never
   - source:
       type: local
       path: ../my_components # path relative to Devices folder
 
-esp32:
-  board: esp32-c3-devkitm-1
+# external_components:
+# # fix for logger from luar123 (thanks!)
+#   - source: 
+#       type: git
+#       url: github://luar123/esphome@fix_logger
+#     components: [ logger ]
+#       # refresh: never
+# # use all components from a local folder
+#   - source:
+#       type: local
+#       path: ../my_components # path relative to Devices folder
+
+# esp32:
+#   board: esp32-c3-devkitm-1
   # board: esp32dev
   # board: esp32-c6-devkitc-1
   # variant: esp32c6
   # variant: esp32c3
   # framework:
   #   type: esp-idf
-    # sdkconfig_options:
-    #   CONFIG_FREERTOS_UNICORE: y
-    # advanced:
-    #   ignore_efuse_mac_crc: true
+  #   sdkconfig_options:
+  #     CONFIG_FREERTOS_UNICORE: y
+  #   advanced:
+  #     ignore_efuse_mac_crc: true
   # framework:
   #   type: esp-idf
-    # version: 5.1.0
+  #   version: 5.2.1
+  #   platform_version: 6.6.0
     # platform_version: https://github.com/stintel/platform-espressif32#esp32-c6-test
+  # framework:
+  #   type: arduino
+
+
+# esp32:
+#   board: esp32-c3-devkitm-1
+#   framework:
+#     type: arduino
+
+esp32:
+  board: esp32-c6-devkitc-1
+  flash_size: 8MB
+  # board: esp32-c3-devkitm-1
   framework:
-    type: arduino
+    platform_version: 6.7.0
+    type: esp-idf
+    version: 5.2.1
+    # type: arduino
+    # version: "2.0.17"
+  variant: esp32c6
+
+# platform = https://github.com/platformio/platform-espressif32.git
+# framework = arduino
+# board = esp32-c6-devkitc-1
+# platform_packages =
+#     framework-arduinoespressif32 @ https://github.com/espressif/arduino-esp32#master
+
+# 3.20017.0
+
+#       CONFIG_OPENTHREAD_ENABLED: n
+#       CONFIG_ENABLE_WIFI_STATION: y
+#       CONFIG_USE_MINIMAL_MDNS: y
+#       CONFIG_ESPTOOLPY_FLASHSIZE_8MB: y
+
+# esp32:
+#   board: esp32-c6-devkitc-1
+#   flash_size: 8MB
+#   # partitions: partitions_zb.csv
+#   framework:
+#     platform_version: 6.6.0
+#     type: esp-idf
+#     version: 5.2.1
+#     sdkconfig_options:
+#       CONFIG_ESPTOOLPY_FLASHSIZE_4MB: y
+#   variant: esp32c6
 
 # Enable logging
-logger:
-  level: DEBUG
-  logs:
-    climate: INFO
-    sensor: INFO
-    esp32.preferences: INFO
+# logger:
+#   level: DEBUG
+#   logs:
+#     climate: INFO
+#     sensor: INFO
+#     esp32.preferences: INFO
 
 
 # Enable Home Assistant API
@@ -63,28 +128,28 @@ segmented_epaper:
     busy_pin: $disp_busy_pin
     i2c_id: bus_a
 
-time:
-  - platform: sntp
-    on_time:
-      # 2 am every day perform a full refresh, as per manufacturer recommendation
-      - seconds: 0
-        minutes: 0
-        hours: 2
-        then:
-          - lambda: |-
-              auto ptr = id(segmented_e_paper);
-              ptr->Init_Display();
-              ptr->FullRefreshScreen(true);
-              ptr->FlushToScreen();
-      # Every 15s
-      - seconds: 0,15,30,45
-        then:
-          - lambda: |-
-              auto ptr = id(segmented_e_paper);
-              auto tempVal = id(temp).state;
-              ptr->SetUpperDisplayFloat( ((tempVal) * (9.0/5.0)) + 32, false);
-              auto setpoint = id(therm).target_temperature;
-              ptr->SetLowerDisplayInt( ((setpoint) * (9.0/5.0)) + 32, true );
+# time:
+#   - platform: sntp
+#     on_time:
+#       # 2 am every day perform a full refresh, as per manufacturer recommendation
+#       - seconds: 0
+#         minutes: 0
+#         hours: 2
+#         then:
+#           - lambda: |-
+#               auto ptr = id(segmented_e_paper);
+#               ptr->Init_Display();
+#               ptr->FullRefreshScreen(true);
+#               ptr->FlushToScreen();
+#       # Every 15s
+#       - seconds: 0,15,30,45
+#         then:
+#           - lambda: |-
+#               auto ptr = id(segmented_e_paper);
+#               auto tempVal = id(temp).state;
+#               ptr->SetUpperDisplayFloat( ((tempVal) * (9.0/5.0)) + 32, false);
+#               auto setpoint = id(therm).target_temperature;
+#               ptr->SetLowerDisplayInt( ((setpoint) * (9.0/5.0)) + 32, true );
 
 sensor:
   - platform: sht4x

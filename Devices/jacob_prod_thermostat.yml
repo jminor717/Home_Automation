@@ -1,0 +1,33 @@
+substitutions:
+  device_name: jacob-prod-thermostat
+  thermostat_name: "Jacob Prod Thermostat"
+  sda_pin: GPIO6
+  scl_pin: GPIO7
+  encode_pin_1: GPIO18
+  encode_pin_2: GPIO1
+  # encode_sw_pin: GPIO14
+  relay_pin: GPIO4
+  disp_rst_pin: GPIO5
+  disp_busy_pin: GPIO3
+# unused 0, 10, 19, 20, 21
+
+<<: !include BaseDevices/ThermostatBase.yml
+
+
+# CONF_TIMEOUT  CONF_BUSY_PIN   CONF_RESET_PIN
+
+
+# substitutions:
+#   devicename: livingroom_thermostat
+#   thermostat_name: "Livingroom Thermostat"
+#   sda_pin: GPIO21
+#   scl_pin: GPIO22
+#   encode_pin_1: GPIO35
+#   encode_pin_2: GPIO34
+#   # encode_sw_pin: GPIO14
+#   relay_pin: GPIO26
+#   relay_pin2: GPIO25
+#   disp_rst_pin: GPIO19
+# # unused 23, 18, 17, 16, 13 4, 2
+
+# <<: !include ThermostatBase.yml

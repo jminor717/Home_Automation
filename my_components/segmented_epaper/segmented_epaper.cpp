@@ -159,7 +159,7 @@ namespace segmented_epaper {
 
     void Segmented_ePaper::loop()
     {
-        uint64_t currentTime = esp_timer_get_time();
+        uint64_t currentTime = 50; //! esp_timer_get_time();
         if (queueLength > 0 && currentTime > canRunNextActionAt) {
             DisplayAction runningAction = actionQueue[queueIndex];
             InactiveSince = UINT_64_MAX; // set to max val so that we don't unintentional sleep the display
@@ -186,7 +186,7 @@ namespace segmented_epaper {
             }
 
             if (actionComplete) {
-                currentTime = esp_timer_get_time();
+                currentTime = 50; //! esp_timer_get_time();
                 canRunNextActionAt = currentTime + (runningAction.delayAfter * 1000);
 
                 queueIndex = (queueIndex + 1) & queueModulus;
@@ -378,7 +378,7 @@ namespace segmented_epaper {
             queueHead = 0;
             queueLength = 0;
             Init_Display();
-            canRunNextActionAt = esp_timer_get_time();
+            canRunNextActionAt = 50; //!esp_timer_get_time();
             if (ScreenBufferLength > 0) {
                 ScreenBufferIndex = (ScreenBufferHead - 1) & ScreenBufferModulus;
                 ScreenBufferLength = 1;
