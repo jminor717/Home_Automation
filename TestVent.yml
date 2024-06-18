@@ -58,7 +58,7 @@ cover:
     #  - lambda: 'return id(vent_servo_potentiometer).state'
 
 time:
-  - platform: sntp
+  - platform: homeassistant
     on_time:
       # Every 10s
       - seconds: 0,10,20,30,40,50

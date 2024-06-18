@@ -129,7 +129,7 @@ segmented_epaper:
     i2c_id: bus_a
 
 # time:
-#   - platform: sntp
+#   - platform: homeassistant
 #     on_time:
 #       # 2 am every day perform a full refresh, as per manufacturer recommendation
 #       - seconds: 0

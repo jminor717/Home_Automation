@@ -1,0 +1,53 @@
+# esphome:
+#   name: dockerroom
+
+# esp32:
+#   board: esp32-c3-devkitm-1
+#   framework:
+#     type: arduino
+
+esphome:
+  name: dockerroom
+  friendly_name: Docker Room
+
+esp32:
+  board: esp32-c6-devkitc-1
+  flash_size: 8MB
+  variant: esp32c6
+  framework:
+    type: esp-idf
+    version: "5.2.1"
+    platform_version: 6.6.0
+    sdkconfig_options:
+      CONFIG_OPENTHREAD_ENABLED: n
+      CONFIG_ENABLE_WIFI_STATION: y
+      CONFIG_USE_MINIMAL_MDNS: y
+      CONFIG_ESPTOOLPY_FLASHSIZE_8MB: y
+
+# fix for logger from luar123 (thanks!)
+# external_components:
+#     - source: github://luar123/esphome@fix_logger
+#       components: [ logger ]
+#       refresh: never
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  password: "123456789"
+
+ota:
+  password: "123456789"
+
+wifi:
+  ssid: "MuskFi"
+  password: "123456789"
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Dockerroom Fallback Hotspot"
+    password: "bwdb8Q0ttlUB"
+
+captive_portal:
+    
