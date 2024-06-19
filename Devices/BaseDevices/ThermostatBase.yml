@@ -139,6 +139,11 @@ segmented_epaper:
     busy_pin: $disp_busy_pin
     i2c_id: bus_a
 
+pic_programer:
+  - id: pic_prog
+    reset_pin: GPIO14
+    busy_pin: GPIO15
+
 time:
   - platform: homeassistant
     on_time:
