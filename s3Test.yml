@@ -1,0 +1,34 @@
+esphome:
+  name: s3test
+  platformio_options:
+    board_build.flash_mode: dio
+
+
+esp32:
+  board: esp32-s3-devkitc-1
+  variant: esp32s3
+  flash_size: 8MB
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESPTOOLPY_FLASHSIZE_8MB: y
+
+
+logger:
+
+api:
+  password: ""
+
+ota:
+  password: ""
+
+
+
+wifi:
+  ssid: "MuskFi"
+  password: "123456789"
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "s3test AP"
+    password: "BiSG9yrKP394"
+captive_portal:

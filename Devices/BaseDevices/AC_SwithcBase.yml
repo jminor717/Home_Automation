@@ -1,0 +1,53 @@
+esphome:
+  name: $device_name
+
+external_components:
+  - source:
+      type: local
+      path: ../my_components # path relative to Devices folder
+
+esp32:
+  board: esp32-c6-devkitc-1
+  variant: esp32c6
+  flash_size: 4MB
+  framework:
+    platform_version: 6.5.0
+    type: esp-idf
+    version: 5.1.2
+    sdkconfig_options:
+      CONFIG_OPENTHREAD_ENABLED: n
+      CONFIG_ENABLE_WIFI_STATION: y
+      CONFIG_USE_MINIMAL_MDNS: y
+
+# Enable Home Assistant API
+api:
+  password: ""
+
+ota:
+  password: ""
+
+wifi:
+  ssid: "MuskFi"
+  password: "123456789"
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "$device_name AP"
+    password: "BiSG9yrKP394"
+captive_portal:
+
+i2c:
+  - id: bus_a
+    sda: $sda_pin
+    scl: $scl_pin
+    scan: true
+
+segmented_epaper:
+  - id: segmented_e_paper
+    reset_pin: $disp_rst_pin
+    busy_pin: $disp_busy_pin
+    i2c_id: bus_a
+
+pic_programer:
+  - id: pic_prog
+    reset_pin: GPIO14
+    busy_pin: GPIO15

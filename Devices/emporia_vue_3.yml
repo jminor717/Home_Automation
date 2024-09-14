@@ -41,7 +41,7 @@ i2c:
   frequency: 200kHz  # recommended range is 50-200kHz
   id: i2c_a
 
-switch:
+button:
   - platform: restart
     name: Restart  
 

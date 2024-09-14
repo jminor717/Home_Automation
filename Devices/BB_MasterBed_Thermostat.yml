@@ -1,0 +1,11 @@
+substitutions:
+  device_name: master-bed-thermostat
+  thermostat_name: "Master Bed Thermostat"
+  sda_pin: GPIO3
+  scl_pin: GPIO4
+  encode_pin_1: GPIO5
+  encode_pin_2: GPIO6
+  disp_rst_pin: GPIO7
+  disp_busy_pin: GPIO8
+
+<<: !include BaseDevices/Per_Room_Thermostat.yml
