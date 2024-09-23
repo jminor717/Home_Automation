@@ -88,7 +88,7 @@ sensor:
     phases:
       - id: phase_a  # Verify that this specific phase/leg is connected to correct input wire color on device listed below
         input: BLACK  # Vue device wire color
-        calibration: 0.0194  # 0.022 is used as the default as starting point but may need adjusted to ensure accuracy
+        calibration: 0.01914  # 0.022 is used as the default as starting point but may need adjusted to ensure accuracy
         # To calculate new calibration value use the formula <in-use calibration value> * <accurate voltage> / <reporting voltage>
         voltage:
           name: "Phase A Voltage"
@@ -98,7 +98,7 @@ sensor:
           filters: [*moving_avg, *pos]
       - id: phase_b  # Verify that this specific phase/leg is connected to correct input wire color on device listed below
         input: RED  # Vue device wire color
-        calibration: 0.0194  # 0.022 is used as the default as starting point but may need adjusted to ensure accuracy
+        calibration: 0.01914  # 0.022 is used as the default as starting point but may need adjusted to ensure accuracy
         # To calculate new calibration value use the formula <in-use calibration value> * <accurate voltage> / <reporting voltage>
         voltage:
           name: "Phase B Voltage"
@@ -107,20 +107,8 @@ sensor:
           name: "Phase B Phase Angle"
           filters: [*moving_avg, *pos]
     ct_clamps:
-      - phase_id: phase_a
-        input: "C"  # Verify the CT going to this device input also matches the phase/leg
-        power:
-          name: "Phase R Power"
-          id: phase_a_power
-          device_class: power
-          filters: [*moving_avg]
-      - phase_id: phase_b
-        input: "B"  # Verify the CT going to this device input also matches the phase/leg
-        power:
-          name: "Phase L Power"
-          id: phase_b_power
-          device_class: power
-          filters: [*moving_avg]
+      - { phase_id: phase_a, input:  "A", power: { name:  "Phase A Power", id:  phase_a_power, device_class: power, filters: [ *moving_avg ] } }
+      - { phase_id: phase_b, input:  "B", power: { name:  "Phase B Power", id:  phase_b_power, device_class: power, filters: [ *moving_avg ] } }
       # Pay close attention to set the phase_id for each breaker by matching it to the phase/leg it connects to in the panel
 #      - { phase_id: phase_b, input:  "5", power: { name:  "Circuit 5 Power", id:  cir5, filters: [ *moving_avg, *pos, multiply: 2 ] } }
       - { phase_id: phase_b, input:  "1", power: { name:  "Washer_Hood Power", id:  cir1, filters: [ *moving_avg ] } }
@@ -140,9 +128,8 @@ sensor:
       - { phase_id: phase_b, input: "15", power: { name: "Lights_Storage Power", id: cir15, filters: [ *moving_avg ] } } # , *invert
       - { phase_id: phase_a, input: "16", power: { name: "Bedroom_Garage Power", id: cir16, filters: [ *moving_avg ] } } # , *invert
       # CURRENT
-      - { phase_id: phase_a, input:  "C", current: { name:  "Phase C Current", id:  current_r, device_class: current, filters: [ *moving_avg ] } }
-      - { phase_id: phase_b, input:  "B", current: { name:  "Phase B Current", id:  current_l, device_class: current, filters: [ *moving_avg ] } }
-      - { phase_id: phase_b, input:  "A", current: { name:  "Phase A Current", id:  current_x, device_class: current, filters: [ *moving_avg ] } }
+      - { phase_id: phase_a, input:  "A", current: { name:  "Phase A Current", id:  current_a, device_class: current, filters: [ *moving_avg ] } }
+      - { phase_id: phase_b, input:  "B", current: { name:  "Phase B Current", id:  current_b, device_class: current, filters: [ *moving_avg ] } }
       - { phase_id: phase_b, input:  "1", current: { name:  "Washer_Hood Current", id:  cur1, filters: [ *moving_avg ] } }
       - { phase_id: phase_b, input:  "2", current: { name:  "Well Pump Current", id:  cur2, filters: [ *moving_avg, multiply: 2 ] } } # , *invert
       - { phase_id: phase_a, input:  "3", current: { name:  "Fridge Current", id:  cur3, filters: [ *moving_avg ] } } # , *invert
