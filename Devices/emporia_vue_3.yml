@@ -26,8 +26,12 @@ ota:
   password: ""
 
 logger:
+  level: VERY_VERBOSE
   logs:
-    sensor: VERY_VERBOSE
+    wifi: INFO
+    captive_portal: INFO
+    button: INFO
+    time: INFO
 
 wifi:
   ssid: !secret wifi_ssid
