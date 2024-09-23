@@ -49,7 +49,7 @@ button:
 
 time:
   - platform: sntp
-    id: sntp_time    
+    id: sntp_time
 
 # these are called references in YAML. They allow you to reuse
 # this configuration in each sensor, while only defining it once
@@ -109,20 +109,20 @@ sensor:
 #      - { phase_id: phase_b, input:  "5", power: { name:  "Circuit 5 Power", id:  cir5, filters: [ *moving_avg, *pos, multiply: 2 ] } }
       - { phase_id: phase_b, input:  "1", power: { name:  "Washer_Hood Power", id:  cir1, filters: [ *moving_avg ] } }
       - { phase_id: phase_b, input:  "2", power: { name:  "Well Pump Power", id:  cir2, filters: [ *moving_avg, multiply: 2 ] } }
-      - { phase_id: phase_a, input:  "3", power: { name:  "Fridge Power", id:  cir3, filters: [ *moving_avg ] } }
+      - { phase_id: phase_a, input:  "3", power: { name:  "Fridge Power", id:  cir3, filters: [ *moving_avg, *invert ] } }
       - { phase_id: phase_b, input:  "4", power: { name:  "Water Heater Power", id:  cir4, filters: [ *moving_avg, multiply: 2 ] } }
       - { phase_id: phase_b, input:  "5", power: { name:  "AC compressor Power", id:  cir5, filters: [ *moving_avg, multiply: 2 ] } }
       - { phase_id: phase_b, input:  "6", power: { name:  "Dryer Power", id:  cir6, filters: [ *moving_avg, multiply: 2 ] } }
       - { phase_id: phase_b, input:  "7", power: { name:  "Septic Power", id:  cir7, filters: [ *moving_avg, multiply: 2 ] } }
       - { phase_id: phase_b, input:  "8", power: { name:  "Air Handler Power", id:  cir8, filters: [ *moving_avg, multiply: 2 ] } }
       - { phase_id: phase_b, input:  "9", power: { name:  "Cook Top Power", id:  cir9, filters: [ *moving_avg, multiply: 2 ] } }
-      - { phase_id: phase_b, input: "10", power: { name: "Network Power", id: cir10, filters: [ *moving_avg ] } }
+      - { phase_id: phase_b, input: "10", power: { name: "Network Power", id: cir10, filters: [ *moving_avg, *invert ] } }
 #      - { phase_id: phase_b, input: "11", power: { name: "Circuit 11 Power", id: cir11, filters: [ *moving_avg ] } }
       - { phase_id: phase_b, input: "12", power: { name: "Dishwasher_Microwave Power", id: cir12, filters: [ *moving_avg ] } }
-      - { phase_id: phase_a, input: "13", power: { name: "Living Recps Power", id: cir13, filters: [ *moving_avg ] } }
-      - { phase_id: phase_b, input: "14", power: { name: "Oven Power", id: cir14, filters: [ *moving_avg, multiply: 2 ] } }
+      - { phase_id: phase_a, input: "13", power: { name: "Living Recps Power", id: cir13, filters: [ *moving_avg, *invert ] } }
+      - { phase_id: phase_b, input: "14", power: { name: "Oven Power", id: cir14, filters: [ *moving_avg, *invert, multiply: 2 ] } }
       - { phase_id: phase_b, input: "15", power: { name: "Lights_Storage Power", id: cir15, filters: [ *moving_avg ] } }
-      - { phase_id: phase_a, input: "16", power: { name: "Bedroom_Garage Power", id: cir16, filters: [ *moving_avg ] } }
+      - { phase_id: phase_a, input: "16", power: { name: "Bedroom_Garage Power", id: cir16, filters: [ *moving_avg, *invert ] } }
   - platform: template
     name: "Total Power"
     lambda: return id(phase_a_power).state + id(phase_b_power).state;
@@ -149,3 +149,23 @@ sensor:
   - { power_id: cir14, platform: total_daily_energy, accuracy_decimals: 0, name: "Oven Energy" }
   - { power_id: cir15, platform: total_daily_energy, accuracy_decimals: 0, name: "Lights_Storage Energy" }
   - { power_id: cir16, platform: total_daily_energy, accuracy_decimals: 0, name: "Bedroom_Garage Energy" }
+
+
+# light:
+#   - platform: status_led
+#     #name: "D3_LED"
+#     id: wifi_led
+#     #pin: 2
+#     pin:
+#       number: 2
+#       ignore_strapping_warning: true
+#     #restore_mode: ALWAYS_ON
+#     restore_mode: RESTORE_DEFAULT_ON
+#     #entity_category: config
+#   - platform: status_led
+#     #name: "D31_LED"
+#     id: ethernet_led
+#     pin: 4
+#     #restore_mode: ALWAYS_ON
+#     restore_mode: RESTORE_DEFAULT_ON
+#     #entity_category: config
