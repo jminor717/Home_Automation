@@ -140,8 +140,9 @@ sensor:
       - { phase_id: phase_b, input: "15", power: { name: "Lights_Storage Power", id: cir15, filters: [ *moving_avg ] } } # , *invert
       - { phase_id: phase_a, input: "16", power: { name: "Bedroom_Garage Power", id: cir16, filters: [ *moving_avg ] } } # , *invert
       # CURRENT
-      - { phase_id: phase_a, input:  "C", current: { name:  "Phase R Current", id:  current_r, device_class: current, filters: [ *moving_avg ] } }
-      - { phase_id: phase_b, input:  "B", current: { name:  "Phase L Current", id:  current_l, device_class: current, filters: [ *moving_avg ] } }
+      - { phase_id: phase_a, input:  "C", current: { name:  "Phase C Current", id:  current_r, device_class: current, filters: [ *moving_avg ] } }
+      - { phase_id: phase_b, input:  "B", current: { name:  "Phase B Current", id:  current_l, device_class: current, filters: [ *moving_avg ] } }
+      - { phase_id: phase_b, input:  "A", current: { name:  "Phase A Current", id:  current_x, device_class: current, filters: [ *moving_avg ] } }
       - { phase_id: phase_b, input:  "1", current: { name:  "Washer_Hood Current", id:  cur1, filters: [ *moving_avg ] } }
       - { phase_id: phase_b, input:  "2", current: { name:  "Well Pump Current", id:  cur2, filters: [ *moving_avg, multiply: 2 ] } } # , *invert
       - { phase_id: phase_a, input:  "3", current: { name:  "Fridge Current", id:  cur3, filters: [ *moving_avg ] } } # , *invert
