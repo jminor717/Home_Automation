@@ -113,44 +113,68 @@ sensor:
 #      - { phase_id: phase_b, input:  "5", power: { name:  "Circuit 5 Power", id:  cir5, filters: [ *moving_avg, *pos, multiply: 2 ] } }
       - { phase_id: phase_b, input:  "1", power: { name:  "Washer_Hood Power", id:  cir1, filters: [ *moving_avg ] } }
       - { phase_id: phase_b, input:  "2", power: { name:  "Well Pump Power", id:  cir2, filters: [ *moving_avg, multiply: 2 ] } } # , *invert
-      - { phase_id: phase_a, input:  "3", power: { name:  "Fridge Power", id:  cir3, filters: [ *moving_avg ] } } # , *invert
+      - { phase_id: phase_a, input:  "3", power: { name:  "Fridge Power", id:  cir3, filters: [ *moving_avg, *invert ] } }
       - { phase_id: phase_b, input:  "4", power: { name:  "Water Heater Power", id:  cir4, filters: [ *moving_avg, multiply: 2 ] } }
       - { phase_id: phase_b, input:  "5", power: { name:  "AC compressor Power", id:  cir5, filters: [ *moving_avg, multiply: 2 ] } }
       - { phase_id: phase_b, input:  "6", power: { name:  "Dryer Power", id:  cir6, filters: [ *moving_avg, multiply: 2 ] } }
       - { phase_id: phase_b, input:  "7", power: { name:  "Septic Power", id:  cir7, filters: [ *moving_avg, multiply: 2 ] } }
-      - { phase_id: phase_b, input:  "8", power: { name:  "Air Handler Power", id:  cir8, filters: [ *moving_avg, multiply: 2 ] } }
-      - { phase_id: phase_b, input:  "9", power: { name:  "Cook Top Power", id:  cir9, filters: [ *moving_avg, multiply: 2 ] } }
-      - { phase_id: phase_b, input: "10", power: { name: "Network Power", id: cir10, filters: [ *moving_avg ] } } # , *invert
+      - { phase_id: phase_b, input:  "8", power: { name:  "Cook Top Power", id:  cir8, filters: [ *moving_avg, multiply: 2, *invert ] } }
+      - { phase_id: phase_b, input:  "9", power: { name:  "Oven Power", id:  cir9, filters: [ *moving_avg, multiply: 2, *invert ] } }
+      - { phase_id: phase_b, input: "10", power: { name: "Network Power", id: cir10, filters: [ *moving_avg, *invert ] } }
 #      - { phase_id: phase_b, input: "11", power: { name: "Circuit 11 Power", id: cir11, filters: [ *moving_avg ] } }
       - { phase_id: phase_b, input: "12", power: { name: "Dishwasher_Microwave Power", id: cir12, filters: [ *moving_avg ] } }
       - { phase_id: phase_a, input: "13", power: { name: "Living Recps Power", id: cir13, filters: [ *moving_avg ] } } # , *invert
-      - { phase_id: phase_b, input: "14", power: { name: "Oven Power", id: cir14, filters: [ *moving_avg, multiply: 2 ] } } # , *invert
-      - { phase_id: phase_b, input: "15", power: { name: "Lights_Storage Power", id: cir15, filters: [ *moving_avg ] } } # , *invert
-      - { phase_id: phase_a, input: "16", power: { name: "Bedroom_Garage Power", id: cir16, filters: [ *moving_avg ] } } # , *invert
+      - { phase_id: phase_b, input: "14", power: { name: "Something Power", id: cir14, filters: [ *moving_avg, multiply: 2 ] } }
+      - { phase_id: phase_b, input: "15", power: { name: "Lights_Storage Power", id: cir15, filters: [ *moving_avg, *invert ] } }
+      - { phase_id: phase_a, input: "16", power: { name: "Bedroom_Garage Power", id: cir16, filters: [ *moving_avg, *invert ] } }
       # CURRENT
       - { phase_id: phase_a, input:  "A", current: { name:  "Phase A Current", id:  current_a, device_class: current, filters: [ *moving_avg ] } }
       - { phase_id: phase_b, input:  "B", current: { name:  "Phase B Current", id:  current_b, device_class: current, filters: [ *moving_avg ] } }
       - { phase_id: phase_b, input:  "1", current: { name:  "Washer_Hood Current", id:  cur1, filters: [ *moving_avg ] } }
-      - { phase_id: phase_b, input:  "2", current: { name:  "Well Pump Current", id:  cur2, filters: [ *moving_avg, multiply: 2 ] } } # , *invert
-      - { phase_id: phase_a, input:  "3", current: { name:  "Fridge Current", id:  cur3, filters: [ *moving_avg ] } } # , *invert
+      - { phase_id: phase_b, input:  "2", current: { name:  "Well Pump Current", id:  cur2, filters: [ *moving_avg, multiply: 2 ] } }
+      - { phase_id: phase_a, input:  "3", current: { name:  "Fridge Current", id:  cur3, filters: [ *moving_avg ] } }
       - { phase_id: phase_b, input:  "4", current: { name:  "Water Heater Current", id:  cur4, filters: [ *moving_avg, multiply: 2 ] } }
       - { phase_id: phase_b, input:  "5", current: { name:  "AC compressor Current", id:  cur5, filters: [ *moving_avg, multiply: 2 ] } }
       - { phase_id: phase_b, input:  "6", current: { name:  "Dryer Current", id:  cur6, filters: [ *moving_avg, multiply: 2 ] } }
       - { phase_id: phase_b, input:  "7", current: { name:  "Septic Current", id:  cur7, filters: [ *moving_avg, multiply: 2 ] } }
       - { phase_id: phase_b, input:  "8", current: { name:  "Air Handler Current", id:  cur8, filters: [ *moving_avg, multiply: 2 ] } }
       - { phase_id: phase_b, input:  "9", current: { name:  "Cook Top Current", id:  cur9, filters: [ *moving_avg, multiply: 2 ] } }
-      - { phase_id: phase_b, input: "10", current: { name: "Network Current", id: cur10, filters: [ *moving_avg ] } } # , *invert
+      - { phase_id: phase_b, input: "10", current: { name: "Network Current", id: cur10, filters: [ *moving_avg ] } }
 #      - { phase_id: phase_b, input: "11", current: { name: "Circuit 11 Current", id: cur11, filters: [ *moving_avg ] } }
       - { phase_id: phase_b, input: "12", current: { name: "Dishwasher_Microwave Current", id: cur12, filters: [ *moving_avg ] } }
-      - { phase_id: phase_a, input: "13", current: { name: "Living Recps Current", id: cur13, filters: [ *moving_avg ] } } # , *invert
-      - { phase_id: phase_b, input: "14", current: { name: "Oven Current", id: cur14, filters: [ *moving_avg, multiply: 2 ] } } # , *invert
-      - { phase_id: phase_b, input: "15", current: { name: "Lights_Storage Current", id: cur15, filters: [ *moving_avg ] } } # , *invert
-      - { phase_id: phase_a, input: "16", current: { name: "Bedroom_Garage Current", id: cur16, filters: [ *moving_avg ] } } # , *invert
+      - { phase_id: phase_a, input: "13", current: { name: "Living Recps Current", id: cur13, filters: [ *moving_avg ] } }
+      - { phase_id: phase_b, input: "14", current: { name: "Oven Current", id: cur14, filters: [ *moving_avg, multiply: 2 ] } }
+      - { phase_id: phase_b, input: "15", current: { name: "Lights_Storage Current", id: cur15, filters: [ *moving_avg ] } }
+      - { phase_id: phase_a, input: "16", current: { name: "Bedroom_Garage Current", id: cur16, filters: [ *moving_avg ] } }
   - platform: template
     name: "Total Power"
     lambda: return id(phase_a_power).state + id(phase_b_power).state;
-    update_interval: 10s
+    update_interval: 2s
     id: total_power
+    unit_of_measurement: "W"
+  - platform: template
+    name: "UnTracked Power"
+    lambda: |-
+      float totalPower = id(phase_a_power).state + id(phase_b_power).state;
+      float circuitPower = 
+        id(cir1).state + 
+        id(cir2).state + 
+        id(cir3).state + 
+        id(cir4).state + 
+        id(cir5).state + 
+        id(cir6).state + 
+        id(cir7).state + 
+        id(cir8).state + 
+        id(cir9).state + 
+        id(cir10).state + 
+        id(cir12).state + 
+        id(cir13).state + 
+        id(cir14).state + 
+        id(cir15).state + 
+        id(cir16).state;
+        return totalPower - circuitPower;
+    update_interval: 2s
+    id: untracked_power
     unit_of_measurement: "W"
   - platform: total_daily_energy
     name: "Total Daily Energy"
