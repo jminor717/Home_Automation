@@ -22,6 +22,8 @@ preferences:
 
 api:
 ota:
+  platform: esphome
+  password: ""
 
 logger:
   logs:
