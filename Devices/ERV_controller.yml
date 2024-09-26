@@ -74,17 +74,43 @@ tca9548a:
         channel: 3
       - bus_id: mux0_c4
         channel: 4
+      - bus_id: mux0_c5
+        channel: 5
 
 binary_sensor:
   - platform: gpio
-    pin: 5
+    pin:
+      number: 5
+      mode:
+        input: true
+        pulldown: true
     name: "Bathroom Exaust Switch"
+    filters:
+      - delayed_on_off: 2s
+    on_press:
+      then:
+        - switch.turn_on: erv_high_speed
+    on_release:
+      then:
+        - switch.turn_off: erv_high_speed
   - platform: gpio
-    pin: 5
+    pin:
+      number: 6
+      mode:
+        input: true
+        pulldown: true
     name: "Kitchen Exaust Switch"
+    filters:
+      - delayed_on_off: 2s
   - platform: gpio
-    pin: 5
+    pin:
+      number: 7
+      mode:
+        input: true
+        pulldown: true
     name: "Shop Exaust Switch"
+    filters:
+      - delayed_on_off: 2s
 
 sensor:
   - platform: sht4x
@@ -118,49 +144,60 @@ sensor:
       name: "ERV Supply Humidity"
       id: erv_sup_humid
   - platform: sdp3x
+    update_interval: 30s
     name: "ERV Input Pressure drop"
     id: erv_input_pressure
     i2c_id: mux0_c3
   - platform: sdp3x
+    update_interval: 30s
     name: "ERV Output Pressure drop"
     id: erv_output_pressure
-    i2c_id: mux0_c3
+    i2c_id: mux0_c4
   - platform: sdp3x
+    update_interval: 30s
     name: "Indoor Pressure"
     id: house_pressure
-    i2c_id: mux0_c4
+    i2c_id: mux0_c5
 
 mcp4728:
   - id: dac_output
     i2c_id: bus_a
 
+switch:
+  - platform: gpio
+    pin: 8
+    name: "ERV High Speed"
+    id: erv_high_speed
+
 output:
-- platform: mcp4728
-  id: erv_in_h
-  mcp4728_id: dac_output
-  channel: A
-  vref: internal
-  gain: X1
-  power_down: gnd_1k
-- platform: mcp4728
-  id: erv_in_l
-  mcp4728_id: dac_output
-  channel: B
-  vref: internal
-  gain: X1
-  power_down: gnd_1k
-- platform: mcp4728
-  id: erv_out_h
-  channel: C
-  vref: internal
-  gain: X1
-  power_down: gnd_1k
-- platform: mcp4728
-  id: erv_out_l
-  channel: D
-  vref: internal
-  gain: X1
-  power_down: gnd_1k
+  - platform: mcp4728
+    id: erv_in_h
+    mcp4728_id: dac_output
+    min_power: 0.01
+    max_power: 0.75
+    channel: A
+    vref: internal
+    gain: X1
+    power_down: gnd_1k
+  - platform: mcp4728
+    id: erv_in_l
+    mcp4728_id: dac_output
+    channel: B
+    vref: internal
+    gain: X1
+    power_down: gnd_1k
+  - platform: mcp4728
+    id: erv_out_h
+    channel: C
+    vref: internal
+    gain: X1
+    power_down: gnd_1k
+  - platform: mcp4728
+    id: erv_out_l
+    channel: D
+    vref: internal
+    gain: X1
+    power_down: gnd_1k
 
 
 
