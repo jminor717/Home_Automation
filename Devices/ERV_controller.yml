@@ -1,0 +1,192 @@
+substitutions:
+  display_name: esphome-ERV
+
+esphome:
+  name: $device_name
+  platformio_options:
+    board_build.flash_mode: dio
+
+esp32:
+  board: esp32-s3-devkitc-1
+  variant: esp32s3
+  flash_size: 8MB
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESPTOOLPY_FLASHSIZE_8MB: y
+
+
+preferences:
+  # the default of 1min is far too short--flash chip is rated
+  # for approx 100k writes.
+  flash_write_interval: "48h"
+
+api:
+ota:
+#   platform: esphome
+  password: ""
+
+logger:
+  level: INFO
+  # logs:
+  #   wifi: INFO
+  #   captive_portal: INFO
+  #   button: INFO
+  #   time: INFO
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "$device_name AP"
+    password: "BiSG9yrKP394"
+captive_portal:
+
+time:
+  - platform: homeassistant
+
+button:
+  - platform: restart
+    name: "$device_name Restart"
+
+text_sensor:
+  - platform: version
+    name: "$device_name Version"
+
+i2c:
+  - id: bus_a
+    sda: 3
+    scl: 4
+    scan: true
+
+tca9548a:
+  - address: 0x70
+    id: multiplex0
+    i2c_id: bus_a
+    channels:
+      - bus_id: mux0_c0
+        channel: 0
+      - bus_id: mux0_c1
+        channel: 1
+      - bus_id: mux0_c2
+        channel: 2
+      - bus_id: mux0_c3
+        channel: 3
+      - bus_id: mux0_c4
+        channel: 4
+
+binary_sensor:
+  - platform: gpio
+    pin: 5
+    name: "Bathroom Exaust Switch"
+  - platform: gpio
+    pin: 5
+    name: "Kitchen Exaust Switch"
+  - platform: gpio
+    pin: 5
+    name: "Shop Exaust Switch"
+
+sensor:
+  - platform: sht4x
+    update_interval: 30s
+    i2c_id: mux0_c0
+    temperature:
+      name: "ERV Intake Temperature"
+      id: erv_in_temp
+      unit_of_measurement: "°C"
+    humidity:
+      name: "ERV Intake Humidity"
+      id: erv_in_humid
+  - platform: sht4x
+    update_interval: 30s
+    i2c_id: mux0_c1
+    temperature:
+      name: "ERV Exaust Temperature"
+      id: erv_ex_temp
+      unit_of_measurement: "°C"
+    humidity:
+      name: "ERV Exaust Humidity"
+      id: erv_ex_humid
+  - platform: sht4x
+    update_interval: 30s
+    i2c_id: mux0_c2
+    temperature:
+      name: "ERV Supply Temperature"
+      id: erv_sup_temp
+      unit_of_measurement: "°C"
+    humidity:
+      name: "ERV Supply Humidity"
+      id: erv_sup_humid
+  - platform: sdp3x
+    name: "ERV Input Pressure drop"
+    id: erv_input_pressure
+    i2c_id: mux0_c3
+  - platform: sdp3x
+    name: "ERV Output Pressure drop"
+    id: erv_output_pressure
+    i2c_id: mux0_c3
+  - platform: sdp3x
+    name: "Indoor Pressure"
+    id: house_pressure
+    i2c_id: mux0_c4
+
+mcp4728:
+  - id: dac_output
+    i2c_id: bus_a
+
+output:
+- platform: mcp4728
+  id: erv_in_h
+  mcp4728_id: dac_output
+  channel: A
+  vref: internal
+  gain: X1
+  power_down: gnd_1k
+- platform: mcp4728
+  id: erv_in_l
+  mcp4728_id: dac_output
+  channel: B
+  vref: internal
+  gain: X1
+  power_down: gnd_1k
+- platform: mcp4728
+  id: erv_out_h
+  channel: C
+  vref: internal
+  gain: X1
+  power_down: gnd_1k
+- platform: mcp4728
+  id: erv_out_l
+  channel: D
+  vref: internal
+  gain: X1
+  power_down: gnd_1k
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
