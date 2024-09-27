@@ -1,10 +1,41 @@
 substitutions:
-  display_name: esphome-ERV
+  device_name: erv-controller
+  scl: GPIO4
+  sda: GPIO5
+  scl2: GPIO15
+  sda2: GPIO16
+  bathroom_switch: GPIO6
+  oven_switch: GPIO7
+  shop_switch: GPIO8
+  erv_speed: GPIO9
+  erv_in_l_pin: GPIO17
+  erv_in_h_pin: GPIO18
+  erv_out_l_pin: GPIO19
+  erv_out_h_pin: GPIO20
+
+
+
+
+
 
 esphome:
   name: $device_name
   platformio_options:
     board_build.flash_mode: dio
+  on_boot:
+    then:
+      - output.set_level:
+          id: erv_in_h
+          level: 80%
+      - output.set_level:
+          id: erv_in_l
+          level: 60%
+      - output.set_level:
+          id: erv_out_h
+          level: 70%
+      - output.set_level:
+          id: erv_out_l
+          level: 50%
 
 esp32:
   board: esp32-s3-devkitc-1
@@ -48,6 +79,12 @@ time:
 button:
   - platform: restart
     name: "$device_name Restart"
+  - platform: template
+    name: "PID Autotune"
+    on_press:
+      - climate.pid.autotune: pid_pressure
+
+
 
 text_sensor:
   - platform: version
@@ -55,9 +92,25 @@ text_sensor:
 
 i2c:
   - id: bus_a
-    sda: 3
-    scl: 4
+    sda: $sda
+    scl: $scl
     scan: true
+  - id: bus_b
+    sda: $sda2
+    scl: $scl2
+    scan: true
+
+climate:
+  - platform: pid
+    id: pid_pressure
+    name: "PID Climate Controller"
+    sensor: house_pressure_template
+    default_target_temperature: 50
+    heat_output: pid_out
+    control_parameters:
+      kp: 0.0
+      ki: 0.0
+      kd: 0.0
 
 tca9548a:
   - address: 0x70
@@ -80,7 +133,7 @@ tca9548a:
 binary_sensor:
   - platform: gpio
     pin:
-      number: 5
+      number: $bathroom_switch
       mode:
         input: true
         pulldown: true
@@ -88,6 +141,10 @@ binary_sensor:
     filters:
       - delayed_on_off: 2s
     on_press:
+    # - lambda: |-
+    #     auto call = id(pid_pressure).make_call();
+    #     call.set_target_temperature(80);
+    #     call.perform();
       then:
         - switch.turn_on: erv_high_speed
     on_release:
@@ -95,7 +152,7 @@ binary_sensor:
         - switch.turn_off: erv_high_speed
   - platform: gpio
     pin:
-      number: 6
+      number: $oven_switch
       mode:
         input: true
         pulldown: true
@@ -104,7 +161,7 @@ binary_sensor:
       - delayed_on_off: 2s
   - platform: gpio
     pin:
-      number: 7
+      number: $shop_switch
       mode:
         input: true
         pulldown: true
@@ -154,54 +211,99 @@ sensor:
     id: erv_output_pressure
     i2c_id: mux0_c4
   - platform: sdp3x
-    update_interval: 30s
+    update_interval: 1s
     name: "Indoor Pressure"
     id: house_pressure
-    i2c_id: mux0_c5
+    i2c_id: bus_b
+    filters:
+      # we capture a new sample every 1 seconds, so the time can
+      # be calculated from the number of samples as n * 1.
+      sliding_window_moving_average:
+        # we average over the past 10 seconds
+        window_size: 10
+        # we push a new value every 5 seconds
+        send_every: 5
+  - platform: template
+    name: "Indoor Pressure Template Sensor"
+    id: house_pressure_template
+    lambda: |-
+      return id(house_pressure).state
+    update_interval: 5s
 
-mcp4728:
-  - id: dac_output
-    i2c_id: bus_a
+
 
 switch:
   - platform: gpio
-    pin: 8
+    pin: $erv_speed
     name: "ERV High Speed"
     id: erv_high_speed
 
 output:
-  - platform: mcp4728
-    id: erv_in_h
-    mcp4728_id: dac_output
-    min_power: 0.01
-    max_power: 0.75
-    channel: A
-    vref: internal
-    gain: X1
-    power_down: gnd_1k
-  - platform: mcp4728
+  - platform: ledc
+    pin: $erv_in_l_pin
     id: erv_in_l
-    mcp4728_id: dac_output
-    channel: B
-    vref: internal
-    gain: X1
-    power_down: gnd_1k
-  - platform: mcp4728
-    id: erv_out_h
-    channel: C
-    vref: internal
-    gain: X1
-    power_down: gnd_1k
-  - platform: mcp4728
+    frequency: 19531Hz
+  - platform: ledc
+    pin: $erv_in_h_pin
+    id: erv_in_h
+    frequency: 19531Hz
+  - platform: ledc
+    pin: $erv_out_l_pin
     id: erv_out_l
-    channel: D
-    vref: internal
-    gain: X1
-    power_down: gnd_1k
+    frequency: 19531Hz
+  - platform: ledc
+    pin: $erv_out_h_pin
+    id: erv_out_h
+    frequency: 19531Hz
+  - platform: template
+    id: pid_out
+    type: float
+    write_action:
+      - if:
+          condition:
+            lambda: return id(erv_high_speed).state;
+          then:
+            - output.set_level:
+                id: erv_in_h
+                level: !lambda return state;
+          else:
+            - output.set_level:
+                id: erv_in_l
+                level: !lambda return state;
+#   - platform: mcp4728
+#     id: erv_in_h
+#     mcp4728_id: dac_output
+#     min_power: 0.2
+#     max_power: 0.9
+#     channel: A
+#     vref: internal
+#     gain: X1
+#     power_down: gnd_1k
+#   - platform: mcp4728
+#     id: erv_in_l
+#     mcp4728_id: dac_output
+#     channel: B
+#     vref: internal
+#     gain: X1
+#     power_down: gnd_1k
+#   - platform: mcp4728
+#     id: erv_out_h
+#     mcp4728_id: dac_output
+#     channel: C
+#     vref: internal
+#     gain: X1
+#     power_down: gnd_1k
+#   - platform: mcp4728
+#     id: erv_out_l
+#     mcp4728_id: dac_output
+#     channel: D
+#     vref: internal
+#     gain: X1
+#     power_down: gnd_1k
 
-
-
-
+# mcp4728:
+#   - id: dac_output
+#     i2c_id: bus_a
 
 
 
