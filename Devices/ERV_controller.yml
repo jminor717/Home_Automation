@@ -14,10 +14,6 @@ substitutions:
   erv_out_h_pin: GPIO20
 
 
-
-
-
-
 esphome:
   name: $device_name
   platformio_options:
@@ -83,8 +79,6 @@ button:
     name: "PID Autotune"
     on_press:
       - climate.pid.autotune: pid_pressure
-
-
 
 text_sensor:
   - platform: version
@@ -227,7 +221,7 @@ sensor:
     name: "Indoor Pressure Template Sensor"
     id: house_pressure_template
     lambda: |-
-      return id(house_pressure).state
+      return id(house_pressure).state;
     update_interval: 5s
 
 
