@@ -8,10 +8,10 @@ substitutions:
   oven_switch: GPIO7
   shop_switch: GPIO8
   erv_speed: GPIO9
-  erv_in_l_pin: GPIO17
-  erv_in_h_pin: GPIO18
-  erv_out_l_pin: GPIO19
-  erv_out_h_pin: GPIO20
+  erv_in_l_pin: GPIO11
+  erv_in_h_pin: GPIO12
+  erv_out_l_pin: GPIO13
+  erv_out_h_pin: GPIO14
 
 
 esphome:
@@ -249,21 +249,25 @@ output:
     pin: $erv_out_h_pin
     id: erv_out_h
     frequency: 19531Hz
-  - platform: template
+  # - platform: template
+  #   id: pid_out
+  #   type: float
+  #   write_action:
+  #     - if:
+  #         condition:
+  #           lambda: return id(erv_high_speed).state;
+  #         then:
+  #           - output.set_level:
+  #               id: erv_in_h
+  #               level: !lambda return state;
+  #         else:
+  #           - output.set_level:
+  #               id: erv_in_l
+  #               level: !lambda return state;
+  - platform: ledc
+    pin: GPIO10
     id: pid_out
-    type: float
-    write_action:
-      - if:
-          condition:
-            lambda: return id(erv_high_speed).state;
-          then:
-            - output.set_level:
-                id: erv_in_h
-                level: !lambda return state;
-          else:
-            - output.set_level:
-                id: erv_in_l
-                level: !lambda return state;
+    frequency: 19531Hz
 #   - platform: mcp4728
 #     id: erv_in_h
 #     mcp4728_id: dac_output
@@ -301,7 +305,14 @@ output:
 
 
 
-
+light:
+  - platform: esp32_rmt_led_strip
+    rgb_order: GRB
+    pin: GPIO48
+    num_leds: 1
+    rmt_channel: 0
+    chipset: ws2812
+    name: "$device_name Light"
 
 
 
