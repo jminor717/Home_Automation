@@ -1,0 +1,126 @@
+substitutions:
+  device_name: dc-circuit-breaker
+  c1: chanel_1
+  c2: chanel_2
+  c3: chanel_3
+  c4: chanel_4
+
+external_components:
+  - source:
+      type: local
+      path: ..\..\my_components # path relative to Devices folder
+
+esphome:
+  name: $device_name
+  platformio_options:
+    board_build.flash_mode: dio
+
+esp32:
+  board: esp32-s3-devkitc-1
+  variant: esp32s3
+  flash_size: 8MB
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESPTOOLPY_FLASHSIZE_8MB: y
+
+preferences:
+  # the default of 1min is far too short--flash chip is rated
+  # for approx 100k writes.
+  flash_write_interval: "48h"
+
+api:
+  # password: ""
+ota:
+  platform: esphome
+  password: ""
+
+logger:
+  level: INFO
+
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "$device_name AP"
+    password: "BiSG9yrKP394"
+captive_portal:
+
+time:
+  - platform: homeassistant
+
+button:
+  - platform: restart
+    name: "$device_name Restart"
+
+text_sensor:
+  - platform: version
+    name: "$device_name Version"
+
+.defaultfilters:
+  - &moving_avg
+    # we capture a new sample every 0.5 seconds, so the time can
+    # be calculated from the number of samples as n * 0.5.
+    sliding_window_moving_average:
+      # we average over the past 10 seconds
+      window_size: 20
+      # we push a new value every 5 seconds
+      send_every: 10
+
+
+# i2c:
+#   - id: bus_a
+#     sda: GPIO36
+#     scl: GPIO35
+#     scan: true
+# segmented_epaper:
+#   - id: segmented_e_paper
+#     reset_pin: GPIO21
+#     busy_pin: GPIO20
+#     i2c_id: bus_a
+
+
+switch:
+  - platform: gpio
+    pin: GPIO11
+    id: relay_1
+    name: "relay"
+
+dc_relay:
+  - id: dc_breaker_a
+    v_in_sensor: vin_raw
+    uvlo: 42
+    voltage_divider_ratio: 18.808
+    circuits:
+      - { v_out_sensor:  c1_v, current_sensor:  c1_current, enable_pin: GPIO20, short_circuit_test_pin: GPIO21, power: { name: "Well Pump Power", id:  c1_pow, filters: [ *moving_avg ] } }
+
+sensor:
+# 18.808  on_value_range 
+  - platform: adc
+    name: "V In"
+    id: vin_raw
+    pin: GPIO4
+    update_interval: 5s
+    attenuation: 12db
+    unit_of_measurement: "V"
+    filters:
+      - multiply: 18.808
+    on_value_range:
+      - below: 24
+        then:
+          - switch.turn_on: relay_1
+  # - { name: "V In",        id: vin_raw,  pin: GPIO4, filters: [multiply: 18.808],             platform: adc,      update_interval: 5s, attenuation: 12db, unit_of_measurement: "V" }
+  - { name: "$c1 Raw",     id: c1_current, pin: GPIO5,                                            platform: adc,      update_interval: 5s, attenuation: 12db, internal: true }
+  - { name: "$c1 Voltage", id: c1_v,       pin: GPIO6, filters: [multiply: 18.808],               platform: adc,      update_interval: 5s, attenuation: 12db, unit_of_measurement: "V" }
+  - { name: "$c1 Power",   id: c1_power,   lambda: return id(c1_current).state * id(c1_v).state;, platform: template, update_interval: 5s,                    unit_of_measurement: "W"}
+  - { name: "$c2 Raw",     id: c2_current, pin: GPIO7,                                            platform: adc,      update_interval: 5s, attenuation: 12db, internal: true }
+  - { name: "$c2 Voltage", id: c2_v,       pin: GPIO8, filters: [multiply: 18.808],               platform: adc,      update_interval: 5s, attenuation: 12db, unit_of_measurement: "V" }
+  - { name: "$c2 Power",   id: c2_power,   lambda: return id(c2_current).state * id(c2_v).state;, platform: template, update_interval: 5s,                    unit_of_measurement: "W"}
+  - { name: "$c3 Raw",     id: c3_current, pin: GPIO9,                                            platform: adc,      update_interval: 5s, attenuation: 12db, internal: true }
+  - { name: "$c3 Voltage", id: c3_v,       pin: GPIO10, filters: [multiply: 18.808],              platform: adc,      update_interval: 5s, attenuation: 12db, unit_of_measurement: "V" }
+  - { name: "$c3 Power",   id: c3_power,   lambda: return id(c3_current).state * id(c3_v).state;, platform: template, update_interval: 5s,                    unit_of_measurement: "W"}
+  - { name: "$c4 Raw",     id: c4_current, pin: GPIO1,                                            platform: adc,      update_interval: 5s, attenuation: 12db, internal: true }
+  - { name: "$c4 Voltage", id: c4_v,       pin: GPIO2, filters: [multiply: 18.808],               platform: adc,      update_interval: 5s, attenuation: 12db, unit_of_measurement: "V" }
+  - { name: "$c4 Power",   id: c4_power,   lambda: return id(c4_current).state * id(c4_v).state;, platform: template, update_interval: 5s,                    unit_of_measurement: "W"}
+
