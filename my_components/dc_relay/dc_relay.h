@@ -2,6 +2,7 @@
 
 #include "esphome.h"
 // #include "esphome/components/button/button.h"
+#include "esphome/components/ledc/ledc_output.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/switch/switch.h"
 #include "esphome/components/voltage_sampler/voltage_sampler.h"
@@ -22,6 +23,11 @@ namespace dc_relay {
 
     class Dc_Relay;
     class CircuitConfig;
+    class customLEDCOutput : public ledc::LEDCOutput {
+    public:
+        uint8_t get_channel() { return this->channel_; }
+    };
+
 
     class Dc_Relay : public PollingComponent {
     public:
@@ -33,10 +39,17 @@ namespace dc_relay {
         // setters for code gen
         void set_Vin_Sensor(voltage_sampler::VoltageSampler* sen) { this->Vin_Sensor = sen; };
         // assumes a 5% hysteresis for coming out of UVLO
-        void set_UVLO(float uvlo) { this->UVLO = uvlo; this->Hysteresis = uvlo *0.05; };
+        void set_UVLO(float uvlo)
+        {
+            this->UVLO = uvlo;
+            this->Hysteresis = uvlo * 0.05;
+        };
         void set_Voltage_Divider_Ratio(float val) { this->Voltage_Divider_Ratio = val; };
         void set_Current_Calibration(float val) { this->Current_Calibration = val; };
         void set_circuits(std::vector<CircuitConfig*> _circuits) { this->circuits = std::move(_circuits); }
+        void set_Short_Circuit_Test_Chanel(ledc::LEDCOutput* chan) {
+            this->SC_Test_Chanel = static_cast<customLEDCOutput*>(chan);
+        };
 
         void update() override;
 
@@ -46,10 +59,13 @@ namespace dc_relay {
         QueueHandle_t circuit_event_queue;
         float UVLO;
         float Hysteresis;
+        float V_Open_Circuit = 48.0;
         float Voltage_Divider_Ratio;
         float Current_Calibration;
+
     protected:
         voltage_sampler::VoltageSampler* Vin_Sensor;
+        customLEDCOutput* SC_Test_Chanel;
         std::vector<CircuitConfig*> circuits;
 
         bool inLockOut;
@@ -64,7 +80,6 @@ namespace dc_relay {
     protected:
         void write_state(bool state) override;
     };
-
 
     class CircuitConfig : public sensor::Sensor, public Parented<Dc_Relay> {
     public:
@@ -95,7 +110,8 @@ namespace dc_relay {
         sensor::Sensor* power_sensor { nullptr };
         sensor::Sensor* current_sensor { nullptr };
         switch_::Switch* Enable_Circuit_switch;
+        float I_Max = 5.0;
+        float I_SC_Test_Max = 1.2;
     };
-
 } // namespace dc_relay
 } // namespace esphome

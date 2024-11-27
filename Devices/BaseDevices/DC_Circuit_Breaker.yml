@@ -90,6 +90,11 @@ button:
   - platform: restart
     name: "$device_name Restart"
 
+output:
+  - platform: ledc
+    pin: GPIO34
+    id: short_circuit_chanel
+    frequency: 19531Hz
 
 dc_relay:
   - id: dc_breaker_a
@@ -97,6 +102,7 @@ dc_relay:
     uvlo: 42
     voltage_divider_ratio: 18.808
     current_calibration: 2.15
+    short_circuit_test_chanel: short_circuit_chanel
     circuits:
       - { enable_circuit: { name: "Garage Power Enabled" }, v_out_sensor:  c1_v, current_sensor:  c1_i, enable_pin: GPIO20, short_circuit_test_pin: GPIO21, 
               power: { name: "garage power", id:  c1_pow, filters: [ *moving_avg ] } }

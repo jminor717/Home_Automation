@@ -1,4 +1,4 @@
-from esphome.components import sensor, voltage_sampler, switch#, i2c
+from esphome.components import sensor, voltage_sampler, switch, output#, i2c
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome import pins
@@ -30,6 +30,7 @@ CONF_CIRCUITS = "circuits"
 CONF_V_IN_SENSOR = "v_in_sensor"
 CONF_V_OUT_SENSOR = "v_out_sensor"
 CONF_CURRENT_SENSOR = "current_sensor"
+CONF_SHORT_CIRCUIT_TEST_CHANEL = "short_circuit_test_chanel"
 CONF_UVLO = "uvlo"
 CONF_VOLTAGE_RATIO = "voltage_divider_ratio"
 CONF_CURRENT_RATIO = "current_calibration"
@@ -46,6 +47,9 @@ CircuitConfig = dc_relay_ns.class_("CircuitConfig")
 
 EnableCircuitSwitch = dc_relay_ns.class_("CircuitEnable", switch.Switch)
 
+# LEDCOutput = dc_relay_ns.class_("customLEDCOutput", output.FloatOutput, cg.Component)
+ledc_ns = cg.esphome_ns.namespace("ledc")
+LEDCOutput = ledc_ns.class_("LEDCOutput", output.FloatOutput, cg.Component)
 
 SCHEMA_CIRCUIT = {
     cv.GenerateID(): cv.declare_id(CircuitConfig),
@@ -84,6 +88,8 @@ CONFIG_SCHEMA = cv.All(
             cv.Optional(CONF_VOLTAGE_RATIO, default=1): cv.positive_float,
             cv.Optional(CONF_CURRENT_RATIO, default=1): cv.positive_float,
             cv.Required(CONF_CIRCUITS): cv.ensure_list(SCHEMA_CIRCUIT),
+            cv.Optional(CONF_SHORT_CIRCUIT_TEST_CHANEL): cv.use_id(LEDCOutput),
+            
         }
     )
     .extend(cv.polling_component_schema("500ms")),
@@ -102,6 +108,9 @@ async def to_code(config):
 
     vin_sens = await cg.get_variable(config[CONF_V_IN_SENSOR])
     cg.add(var.set_Vin_Sensor(vin_sens))
+
+    chan = await cg.get_variable(config[CONF_SHORT_CIRCUIT_TEST_CHANEL])
+    cg.add(var.set_Short_Circuit_Test_Chanel(chan))
 
     circuits = []
     for circuit_config in config[CONF_CIRCUITS]:
