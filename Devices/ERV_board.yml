@@ -1,0 +1,151 @@
+substitutions:
+  device_name: erv-board
+
+esphome:
+  name: $device_name
+  platformio_options:
+    board_build.flash_mode: dio
+
+esp32:
+  board: esp32-s3-devkitc-1
+  variant: esp32s3
+  flash_size: 8MB
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESPTOOLPY_FLASHSIZE_8MB: y
+
+
+
+preferences:
+  # the default of 1min is far too short--flash chip is rated
+  # for approx 100k writes.
+  flash_write_interval: "48h"
+
+api:
+  # password: ""
+ota:
+  platform: esphome
+  password: ""
+
+logger:
+  level: debug
+
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "$device_name AP"
+    password: "BiSG9yrKP394"
+captive_portal:
+
+time:
+  - platform: homeassistant
+
+button:
+  - platform: restart
+    name: "$device_name Restart"
+
+text_sensor:
+  - platform: version
+    name: "$device_name Version"
+
+
+cover:
+  - platform: template
+    device_class: damper
+    id: vent
+    name: attic vent
+    open_action:
+      - servo.write:
+          id: vent_servo
+          # level: !lambda 'return id(opened_position);'
+          level: !lambda 'return 1;'
+    close_action:
+      - servo.write:
+          id: vent_servo
+          # level: !lambda 'return id(closed_position);'
+          level: !lambda 'return 0;'
+    # stop_action:
+    #   - servo.write:
+    #       id: vent_servo
+    #       # level: !lambda 'return remap(id(vent_servo_potentiometer).state, id(opened_potentiometer_position), id(closed_potentiometer_position), id(opened_position), id(closed_position));'
+    #       level: !lambda 'return value;'
+    tilt_action:
+      - servo.write:
+          id: vent_servo
+          # level: !lambda 'return remap(tilt, float(1), float(0), id(opened_position), id(closed_position));'
+          level: !lambda 'return tilt;'
+    # tilt_lambda: 'return remap(id(vent_servo_potentiometer).state, id(opened_potentiometer_position), id(closed_potentiometer_position), float(1), float(0));'
+    tilt_lambda: 'return id(vent_servo_potentiometer).state;'
+    # lambda: 'return id(closed_limit_switch).state ? COVER_CLOSED : COVER_OPEN;'
+  - platform: template
+    device_class: damper
+    id: vent2
+    name: bathroom vent
+    open_action:
+      - servo.write:
+          id: vent_servo2
+          level: !lambda 'return 1;'
+    close_action:
+      - servo.write:
+          id: vent_servo2
+          level: !lambda 'return 0;'
+    tilt_action:
+      - servo.write:
+          id: vent_servo2
+          level: !lambda 'return tilt;'
+    tilt_lambda: 'return id(vent_servo2_potentiometer).state;'
+
+
+sensor:
+  - platform: adc
+    id: vent_servo_potentiometer
+    pin: GPIO4
+    update_interval: 250ms
+    attenuation: 12db
+  - platform: adc
+    id: vent_servo2_potentiometer
+    pin: GPIO5
+    update_interval: 250ms
+    attenuation: 12db
+
+servo:
+  - id: vent_servo
+    output: vent_servo_output
+    transition_length: 1s
+    auto_detach_time: 200ms
+  - id: vent_servo2
+    output: vent_servo2_output
+    transition_length: 1s
+    auto_detach_time: 200ms
+
+
+
+output:
+  - platform: ledc
+    id: vent_servo_output
+    pin: GPIO14
+    frequency: 50 Hz
+  - platform: ledc
+    id: vent_servo2_output
+    pin: GPIO13
+    frequency: 50 Hz
+
+
+
+
+# status_led:
+#   pin: $led
+
+light:
+  - platform: esp32_rmt_led_strip
+    rgb_order: GRB
+    pin: GPIO48
+    num_leds: 1
+    rmt_channel: 0
+    chipset: ws2812
+    name: "$device_name Light"
+
+
