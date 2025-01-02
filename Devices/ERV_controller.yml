@@ -50,7 +50,7 @@ preferences:
 
 api:
 ota:
-#   platform: esphome
+  platform: esphome
   password: ""
 
 logger:
@@ -76,7 +76,7 @@ button:
   - platform: restart
     name: "$device_name Restart"
   - platform: template
-    name: "PID Autotune"
+    name: "PID AutoTune"
     on_press:
       - climate.pid.autotune: pid_pressure
 
@@ -131,7 +131,7 @@ binary_sensor:
       mode:
         input: true
         pulldown: true
-    name: "Bathroom Exaust Switch"
+    name: "Bathroom Exhaust Switch"
     filters:
       - delayed_on_off: 2s
     on_press:
@@ -150,7 +150,7 @@ binary_sensor:
       mode:
         input: true
         pulldown: true
-    name: "Kitchen Exaust Switch"
+    name: "Kitchen Exhaust Switch"
     filters:
       - delayed_on_off: 2s
   - platform: gpio
@@ -159,7 +159,7 @@ binary_sensor:
       mode:
         input: true
         pulldown: true
-    name: "Shop Exaust Switch"
+    name: "Shop Exhaust Switch"
     filters:
       - delayed_on_off: 2s
 
@@ -178,11 +178,11 @@ sensor:
     update_interval: 30s
     i2c_id: mux0_c1
     temperature:
-      name: "ERV Exaust Temperature"
+      name: "ERV Exhaust Temperature"
       id: erv_ex_temp
       unit_of_measurement: "°C"
     humidity:
-      name: "ERV Exaust Humidity"
+      name: "ERV Exhaust Humidity"
       id: erv_ex_humid
   - platform: sht4x
     update_interval: 30s
@@ -231,6 +231,21 @@ switch:
     pin: $erv_speed
     name: "ERV High Speed"
     id: erv_high_speed
+
+fan:
+  - platform: speed
+    output: erv_in_l
+    name: "ERV input low"
+  - platform: speed
+    output: erv_in_h
+    name: "ERV input high"
+  - platform: speed
+    output: erv_out_l
+    name: "ERV output low"
+  - platform: speed
+    output: erv_out_h
+    name: "ERV output high"
+
 
 output:
   - platform: ledc

@@ -2,6 +2,8 @@ substitutions:
   device_name: intake-air-temp
   scl: GPIO4
   sda: GPIO5
+  sda2: GPIO6
+  scl2: GPIO7
   led: GPIO48 
 
 esphome:
@@ -28,11 +30,11 @@ preferences:
 api:
   # password: ""
 ota:
-#   platform: esphome
+  platform: esphome
   password: ""
 
 logger:
-  level: INFO
+  level: info
 
 
 wifi:
@@ -59,6 +61,10 @@ i2c:
     sda: $sda
     scl: $scl
     scan: true
+  - id: bus_b
+    sda: $sda2
+    scl: $scl2
+    scan: true
 
 sensor:
   - platform: sht4x
@@ -71,7 +77,16 @@ sensor:
     humidity:
       name: "ERV Intake Humidity"
       id: erv_in_humid
-
+  - platform: sht4x
+    update_interval: 30s
+    i2c_id: bus_b
+    temperature:
+      name: "Garage Attic Temperature"
+      id: garage_attic_temp
+      unit_of_measurement: "°C"
+    humidity:
+      name: "Garage Attic Humidity"
+      id: garage_attic_humid
 
 # status_led:
 #   pin: $led
