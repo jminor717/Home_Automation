@@ -71,7 +71,8 @@
         "xstddef": "cpp"
     },
     "cSpell.words": [
-        "epaper"
+        "epaper",
+        "LEDC"
     ],
     "C_Cpp.errorSquiggles": "disabled"
 }

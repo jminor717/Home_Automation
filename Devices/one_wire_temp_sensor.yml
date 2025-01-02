@@ -1,6 +1,6 @@
 substitutions:
   device_name: sub-grade-temp-sensor
-  one_wire_a: GPIO4
+  one_wire_a: GPIO8
   one_wire_b: GPIO5
 
 esphome:
@@ -22,26 +22,26 @@ preferences:
   # for approx 100k writes.
   flash_write_interval: "48h"
 
-api:
-  # password: ""
-ota:
-  platform: esphome
-  password: ""
+# api:
+#   # password: ""
+# ota:
+#   platform: esphome
+#   password: ""
 
 logger:
-  level: INFO
+  level: debug
 
 
-wifi:
-  ssid: !secret wifi_ssid
-  password: !secret wifi_password
-  ap:
-    ssid: "$device_name AP"
-    password: "BiSG9yrKP394"
-captive_portal:
+# wifi:
+#   ssid: !secret wifi_ssid
+#   password: !secret wifi_password
+#   ap:
+#     ssid: "$device_name AP"
+#     password: "BiSG9yrKP394"
+# captive_portal:
 
-time:
-  - platform: homeassistant
+# time:
+#   - platform: homeassistant
 
 button:
   - platform: restart
@@ -54,11 +54,11 @@ text_sensor:
 
 one_wire:
   - platform: gpio
-    pin: $one_wire_a
+    pin: GPIO8
     id: one_wire_bus_a
-  - platform: gpio
-    pin: $one_wire_b
-    id: one_wire_bus_b
+  # - platform: gpio
+  #   pin: $one_wire_b
+  #   id: one_wire_bus_b
 
 sensor:
   - platform: dallas_temp
@@ -66,13 +66,13 @@ sensor:
     name: "near wall temp 12 in"
     resolution: 10
     one_wire_id: one_wire_bus_a
-    update_interval: 300s
-  - platform: dallas_temp
-    # address: 0x1234567812345628
-    name: "near wall temp 1 in"
-    resolution: 10
-    one_wire_id: one_wire_bus_b
-    update_interval: 300s
+    update_interval: 5s
+  # - platform: dallas_temp
+  #   # address: 0x1234567812345628
+  #   name: "near wall temp 1 in"
+  #   resolution: 10
+  #   one_wire_id: one_wire_bus_b
+  #   update_interval: 5s
 
 
 
@@ -80,3 +80,22 @@ sensor:
 
 
 
+# sensor:
+#   - platform: dallas_temp
+#     name: "Temperature alimentation 5Vdc Fontaine"
+#     id: alim5v_temperature
+#     address: 0xf30000000b2ebf28
+
+# switch:
+#   - platform: gpio
+#     id: dallas_power
+#     pin: GPIO10
+    
+# one_wire:
+#   - platform: gpio
+#     pin:
+#       number: GPIO8
+#       mode:
+#         input: true
+#         output: true
+#         pullup: true
