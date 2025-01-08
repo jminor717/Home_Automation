@@ -18,7 +18,7 @@ esp32:
 preferences:
   # the default of 1min is far too short--flash chip is rated
   # for approx 100k writes.
-  flash_write_interval: "48h"
+  flash_write_interval: "96h"
 
 api:
 ota:
@@ -189,10 +189,10 @@ sensor:
   - { power_id:  cir2, platform: total_daily_energy, restore: false, accuracy_decimals: 0, name:  "Well Pump Energy" }
   - { power_id:  cir3, platform: total_daily_energy, restore: false, accuracy_decimals: 0, name:  "Fridge Energy" }
   - { power_id:  cir4, platform: total_daily_energy, restore: false, accuracy_decimals: 0, name:  "Water Heater Energy" }
-  - { power_id:  cir5, platform: total_daily_energy, restore: false, accuracy_decimals: 0, name:  "AC compressor Energy" }
+  # - { power_id:  cir5, platform: total_daily_energy, restore: false, accuracy_decimals: 0, name:  "AC compressor Energy" }
   - { power_id:  cir6, platform: total_daily_energy, restore: false, accuracy_decimals: 0, name:  "Dryer Energy" }
   - { power_id:  cir7, platform: total_daily_energy, restore: false, accuracy_decimals: 0, name:  "Septic Energy" }
-  - { power_id:  cir8, platform: total_daily_energy, restore: false, accuracy_decimals: 0, name:  "Air Handler Energy" }
+  # - { power_id:  cir8, platform: total_daily_energy, restore: false, accuracy_decimals: 0, name:  "Air Handler Energy" }
   - { power_id:  cir9, platform: total_daily_energy, restore: false, accuracy_decimals: 0, name:  "Cook Top Energy" }
   - { power_id: cir10, platform: total_daily_energy, restore: false, accuracy_decimals: 0, name: "Network Energy" }
 #  - { power_id: cir11, platform: total_daily_energy, accuracy_decimals: 0, name: "Circuit 11 Daily Energy" }
@@ -201,6 +201,8 @@ sensor:
   - { power_id: cir14, platform: total_daily_energy, restore: false, accuracy_decimals: 0, name: "Oven Energy" }
   - { power_id: cir15, platform: total_daily_energy, restore: false, accuracy_decimals: 0, name: "Lights_Storage Energy" }
   - { power_id: cir16, platform: total_daily_energy, restore: false, accuracy_decimals: 0, name: "Bedroom_Garage Energy" }
+  - { power_id: ac_power, platform: total_daily_energy, restore: false, accuracy_decimals: 0, name: "AC Energy" }
+  - { power_id: untracked_power, platform: total_daily_energy, restore: false, accuracy_decimals: 0, name: "Untracked Energy" }
 
 
 # light:

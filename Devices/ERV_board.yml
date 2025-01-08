@@ -51,6 +51,39 @@ text_sensor:
   - platform: version
     name: "$device_name Version"
 
+web_server:
+  version: 3
+  sorting_groups:
+    - id: sorting_group_time_settings
+      name: "Time Settings"
+      sorting_weight: 10
+    - id: sorting_group_number_settings
+      name: "Number settings"
+      sorting_weight: 20
+
+datetime:
+  - platform: template
+    id: my_datetime_time
+    type: time
+    name: "Pick a Time"
+    optimistic: yes
+    initial_value: "12:34:56"
+    restore_value: true
+    web_server:
+      sorting_group_id: sorting_group_time_settings
+
+number:
+  - platform: template
+    id: my_number
+    name: "vent speed"
+    optimistic: true
+    min_value: 20
+    max_value: 100
+    step: 1
+    web_server:
+      sorting_group_id: sorting_group_number_settings
+
+
 
 cover:
   - platform: template
@@ -78,8 +111,8 @@ cover:
           # level: !lambda 'return remap(tilt, float(1), float(0), id(opened_position), id(closed_position));'
           level: !lambda 'return tilt;'
     # tilt_lambda: 'return remap(id(vent_servo_potentiometer).state, id(opened_potentiometer_position), id(closed_potentiometer_position), float(1), float(0));'
-    tilt_lambda: 'return id(vent_servo_potentiometer).state;'
-    # lambda: 'return id(closed_limit_switch).state ? COVER_CLOSED : COVER_OPEN;'
+    tilt_lambda: 'return remap(id(vent_servo_potentiometer).state, float(2.5), float(0.5), float(1), float(0));'
+    lambda: 'return id(vent_servo_potentiometer).state < 0.5 ? COVER_CLOSED : COVER_OPEN;'
   - platform: template
     device_class: damper
     id: vent2
@@ -99,6 +132,17 @@ cover:
     tilt_lambda: 'return id(vent_servo2_potentiometer).state;'
 
 
+fan:
+  - platform: speed
+    output: erv_in_l
+    name: "ERV input low"
+    internal: true
+  - platform: speed
+    output: erv_out_l
+    name: "ERV output low"
+    internal: true
+
+
 sensor:
   - platform: adc
     id: vent_servo_potentiometer
@@ -114,12 +158,16 @@ sensor:
 servo:
   - id: vent_servo
     output: vent_servo_output
-    transition_length: 1s
-    auto_detach_time: 200ms
+    transition_length: 5s
+    auto_detach_time: 1000ms
+    max_level: 60%
+    min_level: 5%
   - id: vent_servo2
     output: vent_servo2_output
-    transition_length: 1s
-    auto_detach_time: 200ms
+    transition_length: 5s
+    auto_detach_time: 1000ms
+    max_level: 60%
+    min_level: 5%
 
 
 
@@ -127,13 +175,19 @@ output:
   - platform: ledc
     id: vent_servo_output
     pin: GPIO14
-    frequency: 50 Hz
+    frequency: 200 Hz
   - platform: ledc
     id: vent_servo2_output
     pin: GPIO13
-    frequency: 50 Hz
-
-
+    frequency: 200 Hz
+  - platform: ledc
+    pin: GPIO12
+    id: erv_in_l
+    frequency: 19531Hz
+  - platform: ledc
+    pin: GPIO11
+    id: erv_out_l
+    frequency: 19531Hz
 
 
 # status_led:
