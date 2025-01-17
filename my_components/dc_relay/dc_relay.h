@@ -101,6 +101,7 @@ namespace dc_relay {
         void set_Enable_Circuit_Switch(switch_::Switch* _switch_) { this->Enable_Circuit_switch = _switch_; };
 
         uint8_t id;
+        customLEDCOutput* SC_Test_Chanel;
 
     protected:
         voltage_sampler::VoltageSampler* V_out_Sensor;

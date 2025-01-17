@@ -68,7 +68,8 @@
         "xlocbuf": "cpp",
         "xlocinfo": "cpp",
         "xmemory": "cpp",
-        "xstddef": "cpp"
+        "xstddef": "cpp",
+        "future": "cpp"
     },
     "cSpell.words": [
         "epaper",

@@ -18,6 +18,7 @@ namespace dc_relay {
         for (CircuitConfig* circuit : this->circuits) {
             circuit->setup();
             circuit->id = i;
+            circuit->SC_Test_Chanel = this->SC_Test_Chanel;
             i++;
         }
 
@@ -171,6 +172,7 @@ namespace dc_relay {
             uint8_t i = 0;
             for (float duty = 0; duty < maxDuty; duty += 0.5) {
                 // TODO: set duty v = ir
+                this->SC_Test_Chanel->get_channel();
                 // wait for the output to settle
                 delay(1);
                 float V_sum = 0, I_sum = 0;
