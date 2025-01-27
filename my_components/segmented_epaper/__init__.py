@@ -4,7 +4,7 @@ from esphome import pins
 from esphome.components import i2c
 from esphome.const import CONF_ID, CONF_RESET_PIN, CONF_BUSY_PIN
 
-CODEOWNERS = ["@ssieb"]
+CODEOWNERS = ["@jacob"]
 
 MULTI_CONF = True
 

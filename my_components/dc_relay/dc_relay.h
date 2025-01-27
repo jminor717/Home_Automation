@@ -31,16 +31,16 @@ namespace dc_relay {
 
     class Dc_Relay : public PollingComponent {
     public:
-        float get_setup_priority() const override { return setup_priority::HARDWARE; }
+        float get_setup_priority() const override { return setup_priority::DATA; }
         void setup() override;
         // void loop() override;
         void dump_config() override;
 
         // setters for code gen
         void set_Vin_Sensor(voltage_sampler::VoltageSampler* sen) { this->Vin_Sensor = sen; };
-        // assumes a 5% hysteresis for coming out of UVLO
         void set_UVLO(float uvlo)
         {
+            // assumes a 5% hysteresis for coming out of UVLO
             this->UVLO = uvlo;
             this->Hysteresis = uvlo * 0.05;
         };

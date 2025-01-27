@@ -4,10 +4,28 @@ substitutions:
 
 # <<: !include one_wire_sensor_list.yml
 
+external_components:
+  - source:
+      type: local
+      path: ..\my_components # path relative to Devices folder
+
 globals:
   - id: vent_3_setpoint
     type: float
-    # initial_value: '0'
+  - id: servo_upper_travel
+    type: float
+    initial_value: '2.5'
+  - id: servo_lower_travel
+    type: float
+    initial_value: '0'
+  - id: opened_position
+    type: float
+    initial_value: '1'
+  - id: closed_position
+    type: float
+    initial_value: '0'
+
+
 
 esphome:
   name: $device_name
@@ -96,7 +114,20 @@ number:
     web_server:
       sorting_group_id: sorting_group_number_settings
 
+# dc_relay:
+#   - id: dc_breaker_a
+#     v_in_sensor: vin_raw
 
+hard_stop_damper:
+  - id: hard_damper
+    upper_limit: servo_upper_travel
+    lower_limit: servo_lower_travel
+    open_position: opened_position
+    close_position: closed_position
+    servo_position_sensor: vent_servo_potentiometer
+    servo: vent_servo
+    open_at_center: true
+    switch_open_and_close: false
 
 cover:
   - platform: template
@@ -106,13 +137,13 @@ cover:
     open_action:
       - servo.write:
           id: vent_servo
-          # level: !lambda 'return id(opened_position);'
-          level: !lambda 'return 1;'
+          level: !lambda 'return id(opened_position);'
+          # level: !lambda 'return 1;'
     close_action:
       - servo.write:
           id: vent_servo
-          # level: !lambda 'return id(closed_position);'
-          level: !lambda 'return 0;'
+          level: !lambda 'return id(closed_position);'
+          # level: !lambda 'return 0;'
     # stop_action:
     #   - servo.write:
     #       id: vent_servo
@@ -121,10 +152,10 @@ cover:
     tilt_action:
       - servo.write:
           id: vent_servo
-          # level: !lambda 'return remap(tilt, float(1), float(0), id(opened_position), id(closed_position));'
-          level: !lambda 'return tilt;'
+          level: !lambda 'return remap(tilt, float(1), float(0), id(opened_position), id(closed_position));'
+          # level: !lambda 'return tilt;'
     # tilt_lambda: 'return remap(id(vent_servo_potentiometer).state, id(opened_potentiometer_position), id(closed_potentiometer_position), float(1), float(0));'
-    tilt_lambda: 'return remap(id(vent_servo_potentiometer).state, float(2.5), float(0.5), float(1), float(0));'
+    tilt_lambda: 'return remap(id(vent_servo_potentiometer).state, id(servo_upper_travel), id(servo_lower_travel), float(1), float(0));'
     lambda: 'return id(vent_servo_potentiometer).state < 0.5 ? COVER_CLOSED : COVER_OPEN;'
   - platform: template
     device_class: damper

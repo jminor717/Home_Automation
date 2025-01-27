@@ -1,0 +1,66 @@
+import esphome.codegen as cg
+import esphome.config_validation as cv
+from esphome import pins
+from esphome.const import CONF_ID, CONF_RESET_PIN, CONF_BUSY_PIN
+from esphome.components import voltage_sampler, servo
+
+# from esphome.types import char_ptr
+
+
+CODEOWNERS = ["@jacob"]
+
+MULTI_CONF = True
+
+CONF_UPPER_LIMIT = "upper_limit"
+CONF_LOWER_LIMIT = "lower_limit"
+CONF_OPEN_POSITION = "open_position"
+CONF_CLOSE_POSITION = "close_position"
+CONF_POSITION_SENSOR = "servo_position_sensor"
+CONF_SERVO = "servo"
+CONF_OPEN_AT_CENTER = "open_at_center"
+CONF_FLIP_OPEN = "switch_open_and_close"
+
+hard_stop_damper_ns = cg.esphome_ns.namespace("hard_stop_damper")
+
+HardStopDamper = hard_stop_damper_ns.class_("HardStopDamper", cg.Component)
+
+CONFIG_SCHEMA = cv.Schema(
+    {
+        cv.GenerateID(): cv.declare_id(HardStopDamper),
+        cv.Required(CONF_UPPER_LIMIT): cv.use_id(cg.global_ns.namespace("float *")),
+        cv.Required(CONF_LOWER_LIMIT): cv.use_id(cg.global_ns.namespace("float *")),
+        cv.Required(CONF_OPEN_POSITION): cv.use_id(cg.global_ns.namespace("float *")),
+        cv.Required(CONF_CLOSE_POSITION): cv.use_id(cg.global_ns.namespace("float *")),
+        cv.Required(CONF_POSITION_SENSOR): cv.use_id(voltage_sampler.VoltageSampler),
+        cv.Required(CONF_SERVO): cv.use_id(servo.Servo),
+        cv.Optional(CONF_OPEN_AT_CENTER, default=False): cv.boolean,
+        cv.Optional(CONF_FLIP_OPEN, default=False): cv.boolean,
+    }
+)
+
+
+async def to_code(config):
+    var = cg.new_Pvariable(config[CONF_ID])
+    await cg.register_component(var, config)
+    cg.add(var.set_open_at_center(config[CONF_OPEN_AT_CENTER]))
+    cg.add(var.set_switch_open_and_close(config[CONF_FLIP_OPEN]))
+
+
+    vMax = await cg.get_variable(config[CONF_UPPER_LIMIT])
+    cg.add(var.set_upper_limit(vMax))
+    vMin = await cg.get_variable(config[CONF_LOWER_LIMIT])
+    cg.add(var.set_lower_limit(vMin))
+
+    openPos = await cg.get_variable(config[CONF_OPEN_POSITION])
+    cg.add(var.set_open_position(openPos))
+    closePos = await cg.get_variable(config[CONF_CLOSE_POSITION])
+    cg.add(var.set_close_position(closePos))
+
+    sensor = await cg.get_variable(config[CONF_POSITION_SENSOR])
+    cg.add(var.set_v_servo_sensor(sensor))
+    servo = await cg.get_variable(config[CONF_SERVO])
+    cg.add(var.set_servo(servo))
+
+
+    # pin = await cg.gpio_pin_expression(config[CONF_BUSY_PIN])
+    # cg.add(var.set_Busy_pin(pin))
