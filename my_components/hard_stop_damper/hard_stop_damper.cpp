@@ -14,6 +14,8 @@ namespace hard_stop_damper {
 
     Position HardStopDamper::move_to_hard_stop(float increment, float startingPosition, float lowerLimit, float upperLimit)
     {
+        this->servo_control->write(startingPosition);
+        delay(3000);
         float reachedPosition = this->v_servo_sensor->sample();
         float reachedMapped = startingPosition;
         float commandedPosition = startingPosition;
@@ -26,9 +28,11 @@ namespace hard_stop_damper {
                 break;
             }
             this->servo_control->write(commandedPosition);
-            delay(250);
+            delay(500);
             reachedPosition = this->v_servo_sensor->sample();
+            // reachedMapped = remap(reachedPosition, float(0.5), float(2.5), float(0.0), float(1.0));
             reachedMapped = remap(reachedPosition, float(0.0), float(3.3), float(0.0), float(1.0));
+            ESP_LOGI(TAG, "commanded: %f, reached: %f, mapped: %f, diff: %f", commandedPosition, reachedPosition, reachedMapped, abs(commandedPosition - reachedMapped));
             if (abs(commandedPosition - reachedMapped) > 0.075) {
                 break;
             }
@@ -43,10 +47,12 @@ namespace hard_stop_damper {
     {
         HardStopDamper* local_this = (HardStopDamper*)params;
 
-        local_this->servo_control->write(0.5);
         delay(2000);
         auto ZERO_ = local_this->move_to_hard_stop(-0.025, 0.5, 0, 1);
-        auto ONE_ = local_this->move_to_hard_stop(+0.025, 0, 0, 1);
+        ESP_LOGI(TAG, "stop 0: %f, %f", ZERO_.voltage_read, ZERO_.comand_position);
+        auto ONE_ = local_this->move_to_hard_stop(+0.025, 0.5, 0, 1);
+        ESP_LOGI(TAG, "stop 1: %f, %f", ONE_.voltage_read, ONE_.comand_position);
+
 
         if (local_this->open_at_center) {
             if (local_this->switch_open_and_close){
