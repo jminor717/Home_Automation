@@ -18,7 +18,7 @@ namespace hard_stop_damper {
         delay(3000);
         float reachedPosition = this->v_servo_sensor->sample();
         float lastReached = reachedPosition;
-        float reachedMapped = startingPosition;
+        // float reachedMapped = startingPosition;
         float commandedPosition = startingPosition;
         while (true) {
             commandedPosition += increment;
@@ -29,9 +29,9 @@ namespace hard_stop_damper {
             delay(500);
             reachedPosition = this->v_servo_sensor->sample();
             // reachedMapped = remap(reachedPosition, float(0.5), float(2.5), float(0.0), float(1.0));
-            reachedMapped = remap(reachedPosition, float(0.0), float(3.3), float(0.0), float(1.0));
-            ESP_LOGI(TAG, "commanded: %f, reached: %f, last: %f, mid dif: %f, mapped: %f, diff: %f", commandedPosition, reachedPosition, lastReached, abs(reachedPosition - lastReached), reachedMapped, abs(commandedPosition - reachedMapped));
-            if (abs(reachedPosition - lastReached) < abs(increment)) {
+            // reachedMapped = remap(reachedPosition, float(0.0), float(3.3), float(0.0), float(1.0));
+            // ESP_LOGI(TAG, "commanded: %f, reached: %f, last: %f, mid dif: %f, mapped: %f, diff: %f", commandedPosition, reachedPosition, lastReached, abs(reachedPosition - lastReached), reachedMapped, abs(commandedPosition - reachedMapped));
+            if (abs(reachedPosition - lastReached) < abs(increment * 0.33)) {
                 break; // when the distance moved gets small
             }
             lastReached = reachedPosition;
@@ -61,8 +61,8 @@ namespace hard_stop_damper {
                 local_this->close_position->value() = ZERO_.comand_position;
             }
 
-            local_this->servo_upper_limit->value() = ZERO_.voltage_read + (ONE_.voltage_read - ZERO_.voltage_read);
-            local_this->open_position->value() = ZERO_.comand_position + (ONE_.comand_position - ZERO_.comand_position);
+            local_this->servo_upper_limit->value() = ZERO_.voltage_read + ((ONE_.voltage_read - ZERO_.voltage_read)/2.0);
+            local_this->open_position->value() = ZERO_.comand_position + ((ONE_.comand_position - ZERO_.comand_position)/2.0);
 
         } else if (local_this->switch_open_and_close) {
             local_this->servo_lower_limit->value() = ONE_.voltage_read;

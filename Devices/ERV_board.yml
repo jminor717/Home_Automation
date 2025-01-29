@@ -156,7 +156,7 @@ hard_stop_damper:
     close_position: closed_position
     servo_position_sensor: vent_servo_potentiometer
     servo: vent_servo
-    open_at_center: false
+    open_at_center: true
     switch_open_and_close: false
 
 cover:
@@ -182,12 +182,12 @@ cover:
     tilt_action:
       - servo.write:
           id: vent_servo
-          # level: !lambda 'return remap(tilt, float(1), float(0), id(opened_position), id(closed_position));'
-          level: !lambda 'return tilt;'
+          level: !lambda 'return remap(tilt, float(1), float(0), id(opened_position), id(closed_position));'
+          # level: !lambda 'return tilt;'
     # tilt_lambda: 'return remap(id(vent_servo_potentiometer).state, id(opened_potentiometer_position), id(closed_potentiometer_position), float(1), float(0));'
-    # tilt_lambda: 'return remap(id(vent_servo_potentiometer).state, id(servo_upper_travel), id(servo_lower_travel), float(1), float(0));'
-    tilt_lambda: 'return remap(id(vent_servo_potentiometer).state, float(0.0), float(3.3), float(0), float(1));'
-    lambda: 'return id(vent_servo_potentiometer).state < 0.5 ? COVER_CLOSED : COVER_OPEN;'
+    tilt_lambda: 'return remap(id(vent_servo_potentiometer).state, id(servo_upper_travel), id(servo_lower_travel), float(1), float(0));'
+    # tilt_lambda: 'return remap(id(vent_servo_potentiometer).state, float(0.0), float(3.3), float(0), float(1));'
+    lambda: 'return id(vent_servo_potentiometer).state < ( id(servo_lower_travel) + float(0.1))  ? COVER_CLOSED : COVER_OPEN;'
   - platform: template
     device_class: damper
     id: vent2
@@ -255,18 +255,6 @@ sensor:
     pin: GPIO5
     update_interval: 250ms
     attenuation: 12db
-  - platform: template
-    name: "map 1"
-    lambda: |-
-      return remap(id(vent_servo_potentiometer).state, float(0.0), float(3.3), float(0.0), float(1.0));
-    update_interval: 250ms
-    accuracy_decimals: 3
-  - platform: template
-    name: "map 2"
-    lambda: |-
-      return remap(id(vent_servo_potentiometer).state, float(0.5), float(2.5), float(0.0), float(1.0));
-    update_interval: 250ms
-    accuracy_decimals: 3
   # - platform: dallas_temp
   #   address: $DS18B20_01
   #   name: "near wall temp 12 in"
