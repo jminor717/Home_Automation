@@ -19,6 +19,8 @@ CONF_POSITION_SENSOR = "servo_position_sensor"
 CONF_SERVO = "servo"
 CONF_OPEN_AT_CENTER = "open_at_center"
 CONF_FLIP_OPEN = "switch_open_and_close"
+CONF_OPEN_OFFSET = "open_offset"
+CONF_CLOSE_OFFSET = "close_offset"
 
 hard_stop_damper_ns = cg.esphome_ns.namespace("hard_stop_damper")
 
@@ -35,6 +37,8 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Required(CONF_SERVO): cv.use_id(servo.Servo),
         cv.Optional(CONF_OPEN_AT_CENTER, default=False): cv.boolean,
         cv.Optional(CONF_FLIP_OPEN, default=False): cv.boolean,
+        cv.Optional(CONF_OPEN_OFFSET, default=0.0): cv.float_range(min=-1, max=1),
+        cv.Optional(CONF_CLOSE_OFFSET, default=0.0): cv.float_range(min=-1, max=1),
     }
 )
 
@@ -44,7 +48,8 @@ async def to_code(config):
     await cg.register_component(var, config)
     cg.add(var.set_open_at_center(config[CONF_OPEN_AT_CENTER]))
     cg.add(var.set_switch_open_and_close(config[CONF_FLIP_OPEN]))
-
+    cg.add(var.set_open_offset(config[CONF_OPEN_OFFSET]))
+    cg.add(var.set_close_offset(config[CONF_CLOSE_OFFSET]))
 
     vMax = await cg.get_variable(config[CONF_UPPER_LIMIT])
     cg.add(var.set_upper_limit(vMax))

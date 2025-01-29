@@ -158,6 +158,7 @@ hard_stop_damper:
     servo: vent_servo
     open_at_center: true
     switch_open_and_close: false
+    open_offset: -0.1
 
 cover:
   - platform: template
@@ -168,17 +169,10 @@ cover:
       - servo.write:
           id: vent_servo
           level: !lambda 'return id(opened_position);'
-          # level: !lambda 'return 1;'
     close_action:
       - servo.write:
           id: vent_servo
           level: !lambda 'return id(closed_position);'
-          # level: !lambda 'return 0;'
-    # stop_action:
-    #   - servo.write:
-    #       id: vent_servo
-    #       # level: !lambda 'return remap(id(vent_servo_potentiometer).state, id(opened_potentiometer_position), id(closed_potentiometer_position), id(opened_position), id(closed_position));'
-    #       level: !lambda 'return value;'
     tilt_action:
       - servo.write:
           id: vent_servo

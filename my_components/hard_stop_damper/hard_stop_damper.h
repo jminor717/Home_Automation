@@ -36,6 +36,8 @@ namespace hard_stop_damper {
 
         void set_open_at_center(bool val) { this->open_at_center = val; };
         void set_switch_open_and_close(bool val) { this->switch_open_and_close = val; };
+        void set_open_offset(bool val) { this->open_offset = val; };
+        void set_close_offset(bool val) { this->close_offset = val; };
 
     protected:
         voltage_sampler::VoltageSampler* v_servo_sensor;
@@ -47,10 +49,13 @@ namespace hard_stop_damper {
         TaskHandle_t task_handle { nullptr };
         bool open_at_center;
         bool switch_open_and_close;
+        float open_offset;
+        float close_offset;
 
         static void find_hard_stops(void* params);
 
         Position move_to_hard_stop(float increment, float startingPosition, float lowerLimit, float upperLimit);
+        void setPositions(Position _zero, Position _one);
     };
 } // namespace hard_stop_damper
 } // namespace esphome
