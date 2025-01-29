@@ -14,18 +14,16 @@ globals:
     type: float
   - id: servo_upper_travel
     type: float
-    initial_value: '2.5'
+    initial_value: "2.5"
   - id: servo_lower_travel
     type: float
-    initial_value: '0'
+    initial_value: "0"
   - id: opened_position
     type: float
-    initial_value: '1'
+    initial_value: "1"
   - id: closed_position
     type: float
-    initial_value: '0'
-
-
+    initial_value: "0"
 
 esphome:
   name: $device_name
@@ -68,8 +66,6 @@ esp32:
     sdkconfig_options:
       CONFIG_ESPTOOLPY_FLASHSIZE_8MB: y
 
-
-
 preferences:
   # the default of 1min is far too short--flash chip is rated
   # for approx 100k writes.
@@ -83,7 +79,6 @@ ota:
 
 logger:
   level: info
-
 
 wifi:
   ssid: !secret wifi_ssid
@@ -104,9 +99,8 @@ button:
     name: "home vent servo"
     on_press:
       then:
-        lambda: !lambda |- 
+        lambda: !lambda |-
           id(hard_damper)->setup();
-
 
 text_sensor:
   - platform: version
@@ -165,57 +159,11 @@ cover:
     device_class: damper
     id: vent
     name: attic vent
-    open_action:
-      - servo.write:
-          id: vent_servo
-          level: !lambda 'return id(opened_position);'
-    close_action:
-      - servo.write:
-          id: vent_servo
-          level: !lambda 'return id(closed_position);'
-    tilt_action:
-      - servo.write:
-          id: vent_servo
-          level: !lambda 'return remap(tilt, float(1), float(0), id(opened_position), id(closed_position));'
-          # level: !lambda 'return tilt;'
-    # tilt_lambda: 'return remap(id(vent_servo_potentiometer).state, id(opened_potentiometer_position), id(closed_potentiometer_position), float(1), float(0));'
-    tilt_lambda: 'return remap(id(vent_servo_potentiometer).state, id(servo_upper_travel), id(servo_lower_travel), float(1), float(0));'
-    # tilt_lambda: 'return remap(id(vent_servo_potentiometer).state, float(0.0), float(3.3), float(0), float(1));'
-    lambda: 'return id(vent_servo_potentiometer).state < ( id(servo_lower_travel) + float(0.1))  ? COVER_CLOSED : COVER_OPEN;'
-  - platform: template
-    device_class: damper
-    id: vent2
-    name: bathroom vent
-    open_action:
-      - servo.write:
-          id: vent_servo2
-          level: !lambda 'return 1;'
-    close_action:
-      - servo.write:
-          id: vent_servo2
-          level: !lambda 'return 0;'
-    tilt_action:
-      - servo.write:
-          id: vent_servo2
-          level: !lambda 'return tilt;'
-    tilt_lambda: 'return id(vent_servo2_potentiometer).state;'
-  - platform: template
-    device_class: damper
-    id: vent3
-    name: template vent
-    open_action:
-    - globals.set:
-        id: vent_3_setpoint
-        value: !lambda 'return float(1);'
-    close_action:
-    - globals.set:
-        id: vent_3_setpoint
-        value: !lambda 'return float(0);'
-    tilt_action:
-    - globals.set:
-        id: vent_3_setpoint
-        value: !lambda 'return tilt;'
-    tilt_lambda: 'return id(vent_servo2_potentiometer).state;'
+    open_action: { servo.write: { id: vent_servo, level: !lambda "return id(opened_position);" } }
+    close_action: { servo.write: { id: vent_servo, level: !lambda "return  id(closed_position);" } }
+    tilt_action: { servo.write: { id: vent_servo, level: !lambda "return remap(tilt, float(1), float(0), id(opened_position), id(closed_position));" }  }
+    tilt_lambda: !lambda "return remap(id(vent_servo_potentiometer).state, id(servo_upper_travel), id(servo_lower_travel), float(1), float(0));"
+    lambda: "return id(vent_servo_potentiometer).state < ( id(servo_lower_travel) + float(0.1))  ? COVER_CLOSED : COVER_OPEN;"
 
 
 fan:
@@ -232,10 +180,9 @@ fan:
 #   - platform: gpio
 #     pin: GPIO8
 #     id: one_wire_bus_a
-  # - platform: gpio
-  #   pin: $one_wire_b
-  #   id: one_wire_bus_b
-
+# - platform: gpio
+#   pin: $one_wire_b
+#   id: one_wire_bus_b
 
 sensor:
   - platform: adc
@@ -256,7 +203,6 @@ sensor:
   #   one_wire_id: one_wire_bus_a
   #   update_interval: 5s
 
-
 servo:
   - id: vent_servo
     output: vent_servo_output
@@ -270,8 +216,6 @@ servo:
     auto_detach_time: 1000ms
     max_level: 60%
     min_level: 5%
-
-
 
 output:
   - platform: ledc
@@ -291,7 +235,6 @@ output:
     id: erv_out_l
     frequency: 19531Hz
 
-
 # status_led:
 #   pin: $led
 
@@ -303,5 +246,3 @@ light:
     rmt_channel: 0
     chipset: ws2812
     name: "$device_name Light"
-
-
