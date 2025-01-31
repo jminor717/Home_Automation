@@ -1,8 +1,7 @@
 substitutions:
   device_name: erv-board
+  switch_name: test_restore
   DS18B20_01: "0x0a3c01d6077f2128"
-
-# <<: !include one_wire_sensor_list.yml
 
 external_components:
   - source:
@@ -29,33 +28,22 @@ esphome:
   name: $device_name
   platformio_options:
     board_build.2flash_mode: dio
-  # on_boot:
-  #   priority: -100
-  #   then:
-  #     lambda: !lambda |-
-  #       // auto ven = id(vent);
-  #       // ven->make_call().set_tilt(0.2);
+  on_boot:
+    - priority: -100.0
+      then:
+        - delay: 10s
+        - if:
+            condition:
+              api.connected:
+            then:
+            - if:
+                condition:
+                  - binary_sensor.is_on: esphome_${switch_name}
+                then:
+                  - switch.turn_on: plg_1
+                else:
+                  - switch.turn_off: plg_1
 
-  #       TaskHandle_t xHandle = NULL;
-  #       auto fun = [](void* params) -> void {
-  #         float current_position = 0.5;
-  #         id(vent_servo)->write(current_position);
-  #         // delay(1000);
-  #         // auto movingDown = true;
-  #         // while(movingDown){
-  #         //   current_position -= 0.025;
-  #         //   id(vent_servo)->write(current_position);
-  #         //   delay(250);
-  #         // }
-  #       };
-
-  #       xTaskCreate(fun, "circuit_task", 8192 * 2, (void*)NULL, 0, &xHandle);
-
-  on_loop:
-    lambda: !lambda |-
-      if (id(vent_3_setpoint) > 0.25) {
-      } else {
-      }
 
 esp32:
   board: esp32-s3-devkitc-1
@@ -176,15 +164,10 @@ fan:
     name: "ERV output low"
     internal: true
 
-# one_wire:
-#   - platform: gpio
-#     pin: GPIO8
-#     id: one_wire_bus_a
-# - platform: gpio
-#   pin: $one_wire_b
-#   id: one_wire_bus_b
-
 sensor:
+  - platform: uptime
+    type: seconds
+    name: "$device_name Uptime"
   - platform: adc
     id: vent_servo_potentiometer
     name: "servo feedback"
@@ -196,12 +179,6 @@ sensor:
     pin: GPIO5
     update_interval: 250ms
     attenuation: 12db
-  # - platform: dallas_temp
-  #   address: $DS18B20_01
-  #   name: "near wall temp 12 in"
-  #   resolution: 10
-  #   one_wire_id: one_wire_bus_a
-  #   update_interval: 5s
 
 servo:
   - id: vent_servo
@@ -246,3 +223,27 @@ light:
     rmt_channel: 0
     chipset: ws2812
     name: "$device_name Light"
+
+
+# https://community.home-assistant.io/t/retain-switch-states-on-a-power-failure/181602/11
+switch:
+  - platform: gpio
+    name: 'test plug'
+    pin: GPIO10
+    id: plg_1
+    on_turn_on:
+     - homeassistant.service:
+        service: homeassistant.turn_on
+        data:
+         entity_id: input_boolean.esphome_${switch_name}
+    on_turn_off:
+     - homeassistant.service:
+        service: homeassistant.turn_off
+        data:
+         entity_id: input_boolean.esphome_${switch_name}
+
+
+binary_sensor:
+  - platform: homeassistant
+    entity_id: input_boolean.esphome_${switch_name}
+    id: esphome_${switch_name}

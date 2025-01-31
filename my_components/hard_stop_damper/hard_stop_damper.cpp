@@ -102,8 +102,6 @@ namespace hard_stop_damper {
     void HardStopDamper::dump_config()
     {
         ESP_LOGCONFIG(TAG, "Hard_stop_damper reader:");
-        //     LOG_PIN("  Reset pin: ", this->Reset_pin_);
-        //     LOG_PIN("  Busy : ", this->Busy_pin_);
     }
 
 } // namespace hard_stop_damper

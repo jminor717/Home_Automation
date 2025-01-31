@@ -1,9 +1,20 @@
 #include "dc_relay.h"
 #include "esphome/core/helpers.h"
 #include "esphome/core/log.h"
+#include <driver/ledc.h>
 
 namespace esphome {
 namespace dc_relay {
+// copied from ledc_output.cpp
+#if SOC_LEDC_SUPPORT_HS_MODE
+    // Only ESP32 has LEDC_HIGH_SPEED_MODE
+    inline ledc_mode_t get_speed_mode(uint8_t channel) { return channel < 8 ? LEDC_HIGH_SPEED_MODE : LEDC_LOW_SPEED_MODE; }
+#else
+    // S2, C3, S3 only support LEDC_LOW_SPEED_MODE
+    // See
+    // https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/api-reference/peripherals/ledc.html#functionality-overview
+    inline ledc_mode_t get_speed_mode(uint8_t) { return LEDC_LOW_SPEED_MODE; }
+#endif
 
     // can have at most 5 circuits on 3sp32-s3 plus plenty of extra room for future expansion
     static const size_t BUFFER_COUNT = 15;
@@ -156,11 +167,18 @@ namespace dc_relay {
                 this->Short_Circuit_Test_pin->digital_write(0);
             this->Enable_pin_->digital_write(0);
         } else if (this->Short_Circuit_Test_pin) {
-            // float V = this->V_out_Sensor->sample() * this->parent_->Voltage_Divider_Ratio;
+            // set pwm to zero before switching the pin
+            this->SC_Test_Chanel->write_state(0.0);
+
+
+            auto chan = static_cast<ledc_channel_t>(this->SC_Test_Chanel->get_channel());
+            auto ledc_mode = get_speed_mode(chan);
+            auto pinNum = this->Short_Circuit_Test_pin->get_pin();
+            ledc_set_pin(pinNum, ledc_mode, chan);
 
             // increase the duty through the short circuit buck converter while monitoring output current and voltage
             // look at the current and voltage to figure out if there is a short, or a failing component that is causing a breakdown at higher voltage
-            const uint8_t maxDuty = 75;
+            const uint8_t maxDuty = 0.75;
             float V[maxDuty * 2] = { 0.0 };
             float I[maxDuty * 2] = { 0.0 };
             float R[maxDuty * 2] = { 0.0 };
@@ -170,9 +188,9 @@ namespace dc_relay {
             float Delta_I[maxDuty * 2] = { 0.0 };
             float EMA_alpha = 2.0 / (5.0 + 1.0); // exponential moving average over last ~5 datapoints
             uint8_t i = 0;
-            for (float duty = 0; duty < maxDuty; duty += 0.5) {
+            for (float duty = 0; duty < maxDuty; duty += 0.005) {
                 // TODO: set duty v = ir
-                this->SC_Test_Chanel->get_channel();
+                this->SC_Test_Chanel->write_state(duty);
                 // wait for the output to settle
                 delay(1);
                 float V_sum = 0, I_sum = 0;
@@ -226,7 +244,11 @@ namespace dc_relay {
                 }
             }
 
-            // TODO disable pwm
+            // set pwm to 0 and set the LEDC output pin back to its original value
+            this->SC_Test_Chanel->write_state(0.0);
+            auto pinNumReset = this->SC_Test_Chanel->get_pinNum();
+            ledc_set_pin(pinNumReset, ledc_mode, chan);
+
             this->Enable_pin_->digital_write(!shortCircuit);
             this->Short_Circuit_Test_pin->digital_write(0);
 

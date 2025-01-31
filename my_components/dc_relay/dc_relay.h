@@ -26,6 +26,7 @@ namespace dc_relay {
     class customLEDCOutput : public ledc::LEDCOutput {
     public:
         uint8_t get_channel() { return this->channel_; }
+        uint8_t get_pinNum() { return this->pin_->get_pin(); }
     };
 
 
