@@ -50,18 +50,22 @@ namespace hard_stop_damper {
 
         if (abs(local_this->close_offset) > 0.05) {
             float close_pos = local_this->close_position->value() + local_this->close_offset;
+            ESP_LOGI(TAG, "find close offset, initial: %f, offset: %f, new: %f", local_this->close_position->value(), local_this->close_offset, close_pos);
             local_this->servo_control->write(close_pos);
             delay(2000);
             auto reached = local_this->v_servo_sensor->sample();
+            ESP_LOGI(TAG, "found close offset, old: %f, new: %f", local_this->servo_lower_limit->value(), reached);
             local_this->close_position->value() = close_pos;
             local_this->servo_lower_limit->value() = reached;
         }
 
         if (abs(local_this->open_offset) > 0.05) {
             float open_pos = local_this->open_position->value() + local_this->open_offset;
+            ESP_LOGI(TAG, "find open offset, initial: %f, offset: %f, new: %f", local_this->open_position->value(), local_this->open_offset, open_pos);
             local_this->servo_control->write(open_pos);
             delay(2000);
             auto reached = local_this->v_servo_sensor->sample();
+            ESP_LOGI(TAG, "found open offset, old: %f, new: %f", local_this->servo_upper_limit->value(), reached);
             local_this->open_position->value() = open_pos;
             local_this->servo_upper_limit->value() = reached;
         }

@@ -9,20 +9,14 @@ external_components:
       path: ..\my_components # path relative to Devices folder
 
 globals:
-  - id: vent_3_setpoint
-    type: float
-  - id: servo_upper_travel
-    type: float
-    initial_value: "2.5"
-  - id: servo_lower_travel
-    type: float
-    initial_value: "0"
-  - id: opened_position
-    type: float
-    initial_value: "1"
-  - id: closed_position
-    type: float
-    initial_value: "0"
+  - { id: attic_return_upper, type: float, initial_value: "2.5"}
+  - { id: attic_return_lower, type: float, initial_value: "0"}
+  - { id: attic_return_opened, type: float, initial_value: "1"}
+  - { id: attic_return_closed, type: float, initial_value: "0"}
+  - { id: attic_supply_upper, type: float, initial_value: "2.5"}
+  - { id: attic_supply_lower, type: float, initial_value: "0"}
+  - { id: attic_supply_opened, type: float, initial_value: "1"}
+  - { id: attic_supply_closed, type: float, initial_value: "0"}
 
 esphome:
   name: $device_name
@@ -36,13 +30,13 @@ esphome:
             condition:
               api.connected:
             then:
-            - if:
-                condition:
-                  - binary_sensor.is_on: esphome_${switch_name}
-                then:
-                  - switch.turn_on: plg_1
-                else:
-                  - switch.turn_off: plg_1
+              - if:
+                  condition:
+                    - binary_sensor.is_on: esphome_${switch_name}
+                  then:
+                    - switch.turn_on: plg_1
+                  else:
+                    - switch.turn_off: plg_1
 
 
 esp32:
@@ -88,7 +82,7 @@ button:
     on_press:
       then:
         lambda: !lambda |-
-          id(hard_damper)->setup();
+          id(attic_return_damper)->setup();
 
 text_sensor:
   - platform: version
@@ -111,7 +105,7 @@ datetime:
     name: "Pick a Time"
     optimistic: yes
     initial_value: "12:34:56"
-    restore_value: true
+    restore_value: false
     web_server:
       sorting_group_id: sorting_group_time_settings
 
@@ -126,33 +120,47 @@ number:
     web_server:
       sorting_group_id: sorting_group_number_settings
 
-# dc_relay:
-#   - id: dc_breaker_a
-#     v_in_sensor: vin_raw
-
 hard_stop_damper:
-  - id: hard_damper
-    upper_limit: servo_upper_travel
-    lower_limit: servo_lower_travel
-    open_position: opened_position
-    close_position: closed_position
-    servo_position_sensor: vent_servo_potentiometer
-    servo: vent_servo
+  - id: attic_return_damper
+    upper_limit: attic_return_upper
+    lower_limit: attic_return_lower
+    open_position: attic_return_opened
+    close_position: attic_return_closed
+    servo_position_sensor: attic_return_servo_potentiometer
+    servo: attic_return_servo
     open_at_center: true
     switch_open_and_close: false
-    open_offset: -0.1
+    # open_offset: -0.1
+  - id: attic_supply_damper
+    upper_limit: attic_supply_upper
+    lower_limit: attic_supply_lower
+    open_position: attic_supply_opened
+    close_position: attic_supply_closed
+    servo_position_sensor: attic_supply_servo_potentiometer
+    servo: attic_supply_servo
+    open_at_center: true
+    switch_open_and_close: false
+    # open_offset: -0.1
 
 cover:
   - platform: template
     device_class: damper
-    id: vent
-    name: attic vent
-    open_action: { servo.write: { id: vent_servo, level: !lambda "return id(opened_position);" } }
-    close_action: { servo.write: { id: vent_servo, level: !lambda "return  id(closed_position);" } }
-    tilt_action: { servo.write: { id: vent_servo, level: !lambda "return remap(tilt, float(1), float(0), id(opened_position), id(closed_position));" }  }
-    tilt_lambda: !lambda "return remap(id(vent_servo_potentiometer).state, id(servo_upper_travel), id(servo_lower_travel), float(1), float(0));"
-    lambda: "return id(vent_servo_potentiometer).state < ( id(servo_lower_travel) + float(0.1))  ? COVER_CLOSED : COVER_OPEN;"
-
+    id: attic_return_vent
+    name: attic return vent
+    open_action: { servo.write: { id: attic_return_servo, level: !lambda "return id(attic_return_opened);" } }
+    close_action: { servo.write: { id: attic_return_servo, level: !lambda "return  id(attic_return_closed);" } }
+    tilt_action: { servo.write: { id: attic_return_servo, level: !lambda "return remap(tilt, float(1), float(0), id(attic_return_opened), id(attic_return_closed));" }  }
+    tilt_lambda: !lambda "return remap(id(attic_return_servo_potentiometer).state, id(attic_return_upper), id(attic_return_lower), float(1), float(0));"
+    lambda: "return id(attic_return_servo_potentiometer).state < ( id(attic_return_lower) + float(0.1))  ? COVER_CLOSED : COVER_OPEN;"
+  - platform: template
+    device_class: damper
+    id: attic_supply_vent
+    name: attic supply vent
+    open_action: { servo.write: { id: attic_supply_servo, level: !lambda "return id(attic_supply_opened);" } }
+    close_action: { servo.write: { id: attic_supply_servo, level: !lambda "return  id(attic_supply_closed);" } }
+    tilt_action: { servo.write: { id: attic_supply_servo, level: !lambda "return remap(tilt, float(1), float(0), id(attic_supply_opened), id(attic_supply_closed));" }  }
+    tilt_lambda: !lambda "return remap(id(attic_supply_servo_potentiometer).state, id(attic_supply_upper), id(attic_supply_lower), float(1), float(0));"
+    lambda: "return id(attic_supply_servo_potentiometer).state < ( id(attic_supply_lower) + float(0.1))  ? COVER_CLOSED : COVER_OPEN;"
 
 fan:
   - platform: speed
@@ -169,26 +177,26 @@ sensor:
     type: seconds
     name: "$device_name Uptime"
   - platform: adc
-    id: vent_servo_potentiometer
+    id: attic_return_servo_potentiometer
     name: "servo feedback"
     pin: GPIO4
     update_interval: 250ms
     attenuation: 12db
   - platform: adc
-    id: vent_servo2_potentiometer
+    id: attic_supply_servo_potentiometer
     pin: GPIO5
     update_interval: 250ms
     attenuation: 12db
 
 servo:
-  - id: vent_servo
-    output: vent_servo_output
+  - id: attic_return_servo
+    output: attic_return_servo_output
     transition_length: 5s
     auto_detach_time: 1000ms
     max_level: 60%
     min_level: 5%
-  - id: vent_servo2
-    output: vent_servo2_output
+  - id: attic_supply_servo
+    output: attic_supply_servo_output
     transition_length: 5s
     auto_detach_time: 1000ms
     max_level: 60%
@@ -196,11 +204,11 @@ servo:
 
 output:
   - platform: ledc
-    id: vent_servo_output
+    id: attic_return_servo_output
     pin: GPIO14
     frequency: 200 Hz
   - platform: ledc
-    id: vent_servo2_output
+    id: attic_supply_servo_output
     pin: GPIO13
     frequency: 200 Hz
   - platform: ledc
