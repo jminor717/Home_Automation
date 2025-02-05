@@ -69,10 +69,12 @@
         "xlocinfo": "cpp",
         "xmemory": "cpp",
         "xstddef": "cpp",
-        "future": "cpp"
+        "future": "cpp",
+        "*.tcc": "cpp"
     },
     "cSpell.words": [
         "epaper",
+        "esphome",
         "LEDC"
     ],
     "C_Cpp.errorSquiggles": "disabled"

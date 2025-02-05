@@ -37,8 +37,8 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Required(CONF_SERVO): cv.use_id(servo.Servo),
         cv.Optional(CONF_OPEN_AT_CENTER, default=False): cv.boolean,
         cv.Optional(CONF_FLIP_OPEN, default=False): cv.boolean,
-        cv.Optional(CONF_OPEN_OFFSET, default=0.0): cv.float_range(min=-1, max=1),
-        cv.Optional(CONF_CLOSE_OFFSET, default=0.0): cv.float_range(min=-1, max=1),
+        cv.Optional(CONF_OPEN_OFFSET, default=0.0): cv.float_range(min=-1.0, max=1.0),
+        cv.Optional(CONF_CLOSE_OFFSET, default=0.0): cv.float_range(min=-1.0, max=1.0),
     }
 )
 

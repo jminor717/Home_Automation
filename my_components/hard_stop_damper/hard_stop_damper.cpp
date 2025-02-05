@@ -48,7 +48,9 @@ namespace hard_stop_damper {
         ESP_LOGI(TAG, "stop 1: %f, %f", _one.voltage_read, _one.comand_position);
         local_this->setPositions(_zero, _one);
 
-        if (abs(local_this->close_offset) > 0.05) {
+        ESP_LOGI(TAG, "open offset: %f, close offset: %f", local_this->open_offset, local_this->close_offset);
+
+        if (abs(local_this->close_offset) > 0.02) {
             float close_pos = local_this->close_position->value() + local_this->close_offset;
             ESP_LOGI(TAG, "find close offset, initial: %f, offset: %f, new: %f", local_this->close_position->value(), local_this->close_offset, close_pos);
             local_this->servo_control->write(close_pos);
@@ -59,7 +61,7 @@ namespace hard_stop_damper {
             local_this->servo_lower_limit->value() = reached;
         }
 
-        if (abs(local_this->open_offset) > 0.05) {
+        if (abs(local_this->open_offset) > 0.02) {
             float open_pos = local_this->open_position->value() + local_this->open_offset;
             ESP_LOGI(TAG, "find open offset, initial: %f, offset: %f, new: %f", local_this->open_position->value(), local_this->open_offset, open_pos);
             local_this->servo_control->write(open_pos);

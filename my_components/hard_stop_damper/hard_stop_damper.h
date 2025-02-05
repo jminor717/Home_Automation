@@ -36,8 +36,8 @@ namespace hard_stop_damper {
 
         void set_open_at_center(bool val) { this->open_at_center = val; };
         void set_switch_open_and_close(bool val) { this->switch_open_and_close = val; };
-        void set_open_offset(bool val) { this->open_offset = val; };
-        void set_close_offset(bool val) { this->close_offset = val; };
+        void set_open_offset(float val) { this->open_offset = val; };
+        void set_close_offset(float val) { this->close_offset = val; };
 
     protected:
         voltage_sampler::VoltageSampler* v_servo_sensor;
