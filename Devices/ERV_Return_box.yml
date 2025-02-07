@@ -1,0 +1,213 @@
+substitutions:
+  device_name: return-air-box
+
+external_components:
+  - source:
+      type: local
+      path: ..\my_components # path relative to Devices folder
+
+esphome:
+  name: $device_name
+  platformio_options:
+    board_build.2flash_mode: dio
+
+esp32:
+  board: esp32-s3-devkitc-1
+  variant: esp32s3
+  flash_size: 8MB
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESPTOOLPY_FLASHSIZE_8MB: y
+
+preferences:
+  # the default of 1min is far too short--flash chip is rated
+  # for approx 100k writes.
+  flash_write_interval: "48h"
+
+api:
+  # password: ""
+ota:
+  platform: esphome
+  password: ""
+
+logger:
+  level: info
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "$device_name AP"
+    password: "BiSG9yrKP394"
+captive_portal:
+
+time:
+  - platform: homeassistant
+
+button:
+  - platform: restart
+    name: "$device_name Restart"
+
+text_sensor:
+  - platform: version
+    name: "$device_name Version"
+
+i2c:
+  - id: bus_a
+    sda: GPIO20
+    scl: GPIO21
+    scan: true
+
+sensor:
+  - platform: uptime
+    type: seconds
+    name: "$device_name Uptime"
+  - { platform: adc, id: bathroom_servo_potentiometer, pin: GPIO4, update_interval: 250ms, attenuation: 12db }
+  - { platform: adc, id: kitchen_servo_potentiometer, pin: GPIO5, update_interval: 250ms, attenuation: 12db }
+  - { platform: adc, id: shop_servo_potentiometer, pin: GPIO6, update_interval: 250ms, attenuation: 12db }
+  - platform: sht4x
+    update_interval: 30s
+    i2c_id: bus_a
+    temperature:
+      name: "Bathroom Temperature"
+      id: bathroom_temp
+      unit_of_measurement: "°C"
+    humidity:
+      name: "Bathroom Humidity"
+      id: bathroom_humid
+      on_value_range:
+        - below: 55.0
+          then:
+            - output.turn_off: bathroom_vent_call
+        - above: 65
+          then:
+            - output.turn_on: bathroom_vent_call
+
+globals:
+  - { id: bathroom_upper, type: float, initial_value: "2.5"}
+  - { id: bathroom_lower, type: float, initial_value: "0"}
+  - { id: bathroom_opened, type: float, initial_value: "1"}
+  - { id: bathroom_closed, type: float, initial_value: "0"}
+  - { id: kitchen_upper, type: float, initial_value: "2.5"}
+  - { id: kitchen_lower, type: float, initial_value: "0"}
+  - { id: kitchen_opened, type: float, initial_value: "1"}
+  - { id: kitchen_closed, type: float, initial_value: "0"}
+  - { id: shop_upper, type: float, initial_value: "2.5"}
+  - { id: shop_lower, type: float, initial_value: "0"}
+  - { id: shop_opened, type: float, initial_value: "1"}
+  - { id: shop_closed, type: float, initial_value: "0"}
+
+hard_stop_damper:
+  - {id: bathroom_damper, upper_limit: bathroom_upper, lower_limit: bathroom_lower, open_position: bathroom_opened, close_position: bathroom_closed,
+    servo_position_sensor: bathroom_servo_potentiometer, servo: bathroom_servo, open_at_center: true, switch_open_and_close: false, open_offset: -0.075 }
+  - {id: kitchen_damper, upper_limit: kitchen_upper, lower_limit: kitchen_lower, open_position: kitchen_opened, close_position: kitchen_closed,
+    servo_position_sensor: kitchen_servo_potentiometer, servo: kitchen_servo, open_at_center: true, switch_open_and_close: false, open_offset: 0 }
+  - {id: shop_damper, upper_limit: shop_upper, lower_limit: shop_lower, open_position: shop_opened, close_position: shop_closed,
+    servo_position_sensor: shop_servo_potentiometer, servo: shop_servo, open_at_center: true, switch_open_and_close: false, open_offset: 0 }
+
+
+cover:
+  - platform: template
+    device_class: damper
+    id: bathroom_vent
+    name: bathroom vent
+    open_action: { servo.write: { id: bathroom_servo, level: !lambda "return id(bathroom_opened);" } }
+    close_action: { servo.write: { id: bathroom_servo, level: !lambda "return  id(bathroom_closed);" } }
+    tilt_action: { servo.write: { id: bathroom_servo, level: !lambda "return remap(tilt, float(1), float(0), id(bathroom_opened), id(bathroom_closed));" }  }
+    tilt_lambda: !lambda "return remap(id(bathroom_servo_potentiometer).state, id(bathroom_upper), id(bathroom_lower), float(1), float(0));"
+    lambda: "return id(bathroom_servo_potentiometer).state < ( id(bathroom_lower) + float(0.1))  ? COVER_CLOSED : COVER_OPEN;"
+  - platform: template
+    device_class: damper
+    id: kitchen_vent
+    name: kitchen vent
+    open_action: { servo.write: { id: kitchen_servo, level: !lambda "return id(kitchen_opened);" } }
+    close_action: { servo.write: { id: kitchen_servo, level: !lambda "return  id(kitchen_closed);" } }
+    tilt_action: { servo.write: { id: kitchen_servo, level: !lambda "return remap(tilt, float(1), float(0), id(kitchen_opened), id(kitchen_closed));" }  }
+    tilt_lambda: !lambda "return remap(id(kitchen_servo_potentiometer).state, id(kitchen_upper), id(kitchen_lower), float(1), float(0));"
+    lambda: "return id(kitchen_servo_potentiometer).state < ( id(kitchen_lower) + float(0.1))  ? COVER_CLOSED : COVER_OPEN;"
+  - platform: template
+    device_class: damper
+    id: shop_vent
+    name: shop vent
+    open_action: { servo.write: { id: shop_servo, level: !lambda "return id(shop_opened);" } }
+    close_action: { servo.write: { id: shop_servo, level: !lambda "return  id(shop_closed);" } }
+    tilt_action: { servo.write: { id: shop_servo, level: !lambda "return remap(tilt, float(1), float(0), id(shop_opened), id(shop_closed));" }  }
+    tilt_lambda: !lambda "return remap(id(shop_servo_potentiometer).state, id(shop_upper), id(shop_lower), float(1), float(0));"
+    lambda: "return id(shop_servo_potentiometer).state < ( id(shop_lower) + float(0.1))  ? COVER_CLOSED : COVER_OPEN;"
+
+
+
+servo:
+  - { id: bathroom_servo, output: bathroom_servo_output, transition_length: 5s, auto_detach_time: 1000ms, max_level: 60%, min_level: 5%}
+  - { id: kitchen_servo, output: kitchen_servo_output, transition_length: 5s, auto_detach_time: 1000ms, max_level: 60%, min_level: 5%}
+  - { id: shop_servo, output: shop_servo_output, transition_length: 5s, auto_detach_time: 1000ms, max_level: 60%, min_level: 5%}
+
+
+
+output:
+  - {platform: ledc, id: bathroom_servo_output, pin: GPIO14, frequency: 200 Hz}
+  - {platform: ledc, id: kitchen_servo_output, pin: GPIO15, frequency: 200 Hz}
+  - {platform: ledc, id: shop_servo_output, pin: GPIO16, frequency: 200 Hz}
+  - platform: template
+    id: bathroom_vent_call
+    type: binary
+    write_action:
+      - if:
+          condition:
+            lambda: return state;
+          then: { canbus.send: { data: [0b1000_0001] } }
+          else: { canbus.send: { data: [0b0000_0001] } }
+  - platform: template
+    id: kitchen_vent_call
+    type: binary
+    write_action:
+      - if:
+          condition:
+            lambda: return state;
+          then: { canbus.send: { data: [0b1000_0010], can_id: 2 } }
+          else: { canbus.send: { data: [0b0000_0010], can_id: 2 } }
+  - platform: template
+    id: shop_vent_call
+    type: binary
+    write_action:
+      - if:
+          condition:
+            lambda: return state;
+          then: { canbus.send: { data: [0b1000_0100], can_id: 2 } }
+          else: { canbus.send: { data: [0b0000_0100], can_id: 2 } }
+
+binary_sensor:
+  - platform: gpio
+    pin: GPIO19
+    name: "bathroom vent switch"
+    id: bathroom_vent_switch
+    device_class: moisture
+    filters:
+      - delayed_on_off: 250ms
+    on_press:
+      then:
+        - output.turn_on: bathroom_vent_call
+    on_release:
+      then:
+        - output.turn_off: bathroom_vent_call
+
+canbus:
+  - platform: esp32_can
+    tx_pin: GPIO17
+    rx_pin: GPIO18
+    can_id: 2
+    bit_rate: 125KBPS
+
+# switch:
+  # - platform: template
+  #   name: "Bathroom Vent Call"
+  #   id: bathroom_vent_call
+  #   turn_on_action:
+  #     - canbus.send:
+  #         data: [ 0x01 ]
+  #         can_id: 2
+  #   turn_off_action:
+  #     - canbus.send:
+  #         data: [ 0x03 ]
+  #         can_id: 2

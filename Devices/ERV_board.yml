@@ -1,7 +1,6 @@
 substitutions:
   device_name: erv-board
   switch_name: test_restore
-  DS18B20_01: "0x0a3c01d6077f2128"
 
 external_components:
   - source:
@@ -17,6 +16,11 @@ globals:
   - { id: attic_supply_lower, type: float, initial_value: "0"}
   - { id: attic_supply_opened, type: float, initial_value: "1"}
   - { id: attic_supply_closed, type: float, initial_value: "0"}
+  - { id: erv_hs, type: bool, initial_value: "false" }
+  - { id: erv_hs_since, type: uint32_t, initial_value: "0" }
+  - { id: erv_hs_speed, type: int, initial_value: "80" }
+  - { id: erv_ls_speed, type: int, initial_value: "30" }
+
 
 esphome:
   name: $device_name
@@ -149,59 +153,29 @@ cover:
 fan:
   - platform: speed
     output: erv_in_l
-    name: "ERV input low"
-    internal: true
+    id: erv_fan_in
+    restore_mode: ALWAYS_ON 
   - platform: speed
     output: erv_out_l
-    name: "ERV output low"
-    internal: true
+    id: erv_fan_out
+    restore_mode: ALWAYS_ON 
 
 sensor:
   - platform: uptime
     type: seconds
     name: "$device_name Uptime"
-  - platform: adc
-    id: attic_return_servo_potentiometer
-    pin: GPIO4
-    update_interval: 250ms
-    attenuation: 12db
-  - platform: adc
-    id: attic_supply_servo_potentiometer
-    pin: GPIO5
-    update_interval: 250ms
-    attenuation: 12db
+  - { platform: adc, id: attic_return_servo_potentiometer, pin: GPIO4, update_interval: 250ms, attenuation: 12db }
+  - { platform: adc, id: attic_supply_servo_potentiometer, pin: GPIO5, update_interval: 250ms, attenuation: 12db }
 
 servo:
-  - id: attic_return_servo
-    output: attic_return_servo_output
-    transition_length: 5s
-    auto_detach_time: 1000ms
-    max_level: 60%
-    min_level: 5%
-  - id: attic_supply_servo
-    output: attic_supply_servo_output
-    transition_length: 5s
-    auto_detach_time: 1000ms
-    max_level: 60%
-    min_level: 5%
+  - { id: attic_return_servo, output: attic_return_servo_output, transition_length: 5s, auto_detach_time: 1000ms, max_level: 60%, min_level: 5%}
+  - { id: attic_supply_servo, output: attic_supply_servo_output, transition_length: 5s, auto_detach_time: 1000ms, max_level: 60%, min_level: 5%}
 
 output:
-  - platform: ledc
-    id: attic_return_servo_output
-    pin: GPIO14
-    frequency: 200 Hz
-  - platform: ledc
-    id: attic_supply_servo_output
-    pin: GPIO13
-    frequency: 200 Hz
-  - platform: ledc
-    pin: GPIO12
-    id: erv_in_l
-    frequency: 19531Hz
-  - platform: ledc
-    pin: GPIO11
-    id: erv_out_l
-    frequency: 19531Hz
+  - {platform: ledc, id: attic_return_servo_output, pin: GPIO14, frequency: 200Hz}
+  - {platform: ledc, id: attic_supply_servo_output, pin: GPIO13, frequency: 200Hz}
+  - {platform: ledc, id: erv_in_l, pin: GPIO12, frequency: 19531Hz}
+  - {platform: ledc, id: erv_out_l, pin: GPIO11, frequency: 19531Hz}
 
 # status_led:
 #   pin: $led
@@ -216,9 +190,72 @@ light:
     name: "$device_name Light"
 
 
+script:
+  - id: eval_erv_state
+    mode: single 
+    then:
+      - lambda: |-
+          if((id(bathroom_vent_call).state || id(kitchen_vent_call).state || id(shop_vent_call).state) && !id(erv_hs)){
+              id(erv_hs) = true;
+              id(erv_hs_since) = millis();
+              auto call = id(erv_fan_in).turn_on();
+              call.set_speed(id(erv_hs_speed));
+              call.perform();
+          }
+          if(id(erv_hs)){
+            auto now = millis();
+            if(now > id(erv_hs_since) + 14'400'000){ // 4 hours
+              auto call = id(erv_fan_in).turn_on();
+              call.set_speed(id(erv_ls_speed));
+              call.perform();
+            }
+          }
+
+
+
+canbus:
+  - platform: esp32_can
+    tx_pin: GPIO6
+    rx_pin: GPIO7
+    can_id: 1
+    bit_rate: 125KBPS
+    on_frame:
+      - can_id: 2
+        then:
+          - lambda: |-
+              if(x.size() > 0) {
+                switch(x[0]) {
+                  case 0b1000'0001:  // bathroom vent request start
+                    id(bathroom_vent_call).publish_state(true); break;
+                  case 0b0000'0001:  // bathroom vent request end
+                    id(bathroom_vent_call).publish_state(false); break;
+
+                  case 0b1000'0010:  // kitchen vent request start
+                    id(kitchen_vent_call).turn_on(); break;
+                  case 0b0000'0010:  // kitchen vent request end
+                    id(kitchen_vent_call).turn_off(); break;
+
+                  case 0b1000'0100:  // shop vent request start
+                    id(shop_vent_call).turn_on(); break;
+                  case 0b0000'0100:  // shop vent request end
+                    id(shop_vent_call).turn_off(); break;
+                }
+              }
+          - script.execute: eval_erv_state
+
 # https://community.home-assistant.io/t/retain-switch-states-on-a-power-failure/181602/11
 # add a toggle helper with the name esphome_${switch_name}
 switch:
+  - platform: template
+    name: kitchen vent call remote
+    id: kitchen_vent_call
+    turn_on_action: 
+      - script.execute: eval_erv_state
+  - platform: template
+    name: shop vent call remote
+    id: shop_vent_call
+    turn_on_action: 
+      - script.execute: eval_erv_state
   - platform: gpio
     name: 'test plug'
     pin: GPIO10
@@ -235,7 +272,11 @@ switch:
          entity_id: input_boolean.esphome_${switch_name}
 
 
+
 binary_sensor:
+  - platform: template
+    name: bathroom vent call remote
+    id: bathroom_vent_call
   - platform: homeassistant
     entity_id: input_boolean.esphome_${switch_name}
     id: esphome_${switch_name}

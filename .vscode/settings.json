@@ -73,9 +73,11 @@
         "*.tcc": "cpp"
     },
     "cSpell.words": [
+        "canbus",
         "epaper",
         "esphome",
-        "LEDC"
+        "LEDC",
+        "millis"
     ],
     "C_Cpp.errorSquiggles": "disabled"
 }
