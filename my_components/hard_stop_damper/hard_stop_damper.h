@@ -29,23 +29,20 @@ namespace hard_stop_damper {
         // setters for code gen
         void set_v_servo_sensor(voltage_sampler::VoltageSampler* sen) { this->v_servo_sensor = sen; };
         void set_servo(servo::Servo* ser) { this->servo_control = ser; };
-        void set_upper_limit(globals::GlobalsComponent<float>* lim) { this->servo_upper_limit = lim; };
-        void set_lower_limit(globals::GlobalsComponent<float>* lim) { this->servo_lower_limit = lim; };
-        void set_open_position(globals::GlobalsComponent<float>* lim) { this->open_position = lim; };
-        void set_close_position(globals::GlobalsComponent<float>* lim) { this->close_position = lim; };
 
         void set_open_at_center(bool val) { this->open_at_center = val; };
         void set_switch_open_and_close(bool val) { this->switch_open_and_close = val; };
         void set_open_offset(float val) { this->open_offset = val; };
         void set_close_offset(float val) { this->close_offset = val; };
 
+        float upper_limit;
+        float lower_limit;
+        float open_position;
+        float close_position;
+        bool homed;
     protected:
         voltage_sampler::VoltageSampler* v_servo_sensor;
         servo::Servo* servo_control;
-        globals::GlobalsComponent<float>* servo_upper_limit;
-        globals::GlobalsComponent<float>* servo_lower_limit;
-        globals::GlobalsComponent<float>* open_position;
-        globals::GlobalsComponent<float>* close_position;
         TaskHandle_t task_handle { nullptr };
         bool open_at_center;
         bool switch_open_and_close;

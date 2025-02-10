@@ -40,7 +40,7 @@ namespace hard_stop_damper {
     void HardStopDamper::find_hard_stops(void* params)
     {
         HardStopDamper* local_this = (HardStopDamper*)params;
-
+        local_this->homed = false;
         delay(2000);
         auto _zero = local_this->move_to_hard_stop(-0.025, 0.5, 0, 1);
         ESP_LOGI(TAG, "stop 0: %f, %f", _zero.voltage_read, _zero.comand_position);
@@ -51,27 +51,28 @@ namespace hard_stop_damper {
         ESP_LOGI(TAG, "open offset: %f, close offset: %f", local_this->open_offset, local_this->close_offset);
 
         if (abs(local_this->close_offset) > 0.02) {
-            float close_pos = local_this->close_position->value() + local_this->close_offset;
-            ESP_LOGI(TAG, "find close offset, initial: %f, offset: %f, new: %f", local_this->close_position->value(), local_this->close_offset, close_pos);
+            float close_pos = local_this->close_position + local_this->close_offset;
+            ESP_LOGI(TAG, "find close offset, initial: %f, offset: %f, new: %f", local_this->close_position, local_this->close_offset, close_pos);
             local_this->servo_control->write(close_pos);
             delay(2000);
             auto reached = local_this->v_servo_sensor->sample();
-            ESP_LOGI(TAG, "found close offset, old: %f, new: %f", local_this->servo_lower_limit->value(), reached);
-            local_this->close_position->value() = close_pos;
-            local_this->servo_lower_limit->value() = reached;
+            ESP_LOGI(TAG, "found close offset, old: %f, new: %f", local_this->lower_limit, reached);
+            local_this->close_position = close_pos;
+            local_this->lower_limit = reached;
         }
 
         if (abs(local_this->open_offset) > 0.02) {
-            float open_pos = local_this->open_position->value() + local_this->open_offset;
-            ESP_LOGI(TAG, "find open offset, initial: %f, offset: %f, new: %f", local_this->open_position->value(), local_this->open_offset, open_pos);
+            float open_pos = local_this->open_position + local_this->open_offset;
+            ESP_LOGI(TAG, "find open offset, initial: %f, offset: %f, new: %f", local_this->open_position, local_this->open_offset, open_pos);
             local_this->servo_control->write(open_pos);
             delay(2000);
             auto reached = local_this->v_servo_sensor->sample();
-            ESP_LOGI(TAG, "found open offset, old: %f, new: %f", local_this->servo_upper_limit->value(), reached);
-            local_this->open_position->value() = open_pos;
-            local_this->servo_upper_limit->value() = reached;
+            ESP_LOGI(TAG, "found open offset, old: %f, new: %f", local_this->upper_limit, reached);
+            local_this->open_position = open_pos;
+            local_this->upper_limit = reached;
         }
-        local_this->servo_control->write(local_this->open_position->value());
+        local_this->servo_control->write(local_this->open_position);
+        local_this->homed = true;
 
         vTaskDelete(NULL);
     }
@@ -80,28 +81,28 @@ namespace hard_stop_damper {
     {
         if (this->open_at_center) {
             if (this->switch_open_and_close) {
-                this->servo_lower_limit->value() = _one.voltage_read;
-                this->close_position->value() = _one.comand_position;
+                this->lower_limit = _one.voltage_read;
+                this->close_position = _one.comand_position;
             } else {
-                this->servo_lower_limit->value() = _zero.voltage_read;
-                this->close_position->value() = _zero.comand_position;
+                this->lower_limit = _zero.voltage_read;
+                this->close_position = _zero.comand_position;
             }
 
-            this->servo_upper_limit->value() = _zero.voltage_read + ((_one.voltage_read - _zero.voltage_read) / 2.0);
-            this->open_position->value() = _zero.comand_position + ((_one.comand_position - _zero.comand_position) / 2.0);
+            this->upper_limit = _zero.voltage_read + ((_one.voltage_read - _zero.voltage_read) / 2.0);
+            this->open_position = _zero.comand_position + ((_one.comand_position - _zero.comand_position) / 2.0);
 
         } else if (this->switch_open_and_close) {
-            this->servo_lower_limit->value() = _one.voltage_read;
-            this->close_position->value() = _one.comand_position;
+            this->lower_limit = _one.voltage_read;
+            this->close_position = _one.comand_position;
 
-            this->servo_upper_limit->value() = _zero.voltage_read;
-            this->open_position->value() = _zero.comand_position;
+            this->upper_limit = _zero.voltage_read;
+            this->open_position = _zero.comand_position;
         } else {
-            this->servo_lower_limit->value() = _zero.voltage_read;
-            this->close_position->value() = _zero.comand_position;
+            this->lower_limit = _zero.voltage_read;
+            this->close_position = _zero.comand_position;
 
-            this->servo_upper_limit->value() = _one.voltage_read;
-            this->open_position->value() = _one.comand_position;
+            this->upper_limit = _one.voltage_read;
+            this->open_position = _one.comand_position;
         }
     }
 

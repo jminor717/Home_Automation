@@ -11,10 +11,6 @@ CODEOWNERS = ["@jacob"]
 
 MULTI_CONF = True
 
-CONF_UPPER_LIMIT = "upper_limit"
-CONF_LOWER_LIMIT = "lower_limit"
-CONF_OPEN_POSITION = "open_position"
-CONF_CLOSE_POSITION = "close_position"
 CONF_POSITION_SENSOR = "servo_position_sensor"
 CONF_SERVO = "servo"
 CONF_OPEN_AT_CENTER = "open_at_center"
@@ -29,10 +25,6 @@ HardStopDamper = hard_stop_damper_ns.class_("HardStopDamper", cg.Component)
 CONFIG_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): cv.declare_id(HardStopDamper),
-        cv.Required(CONF_UPPER_LIMIT): cv.use_id(cg.global_ns.namespace("float *")),
-        cv.Required(CONF_LOWER_LIMIT): cv.use_id(cg.global_ns.namespace("float *")),
-        cv.Required(CONF_OPEN_POSITION): cv.use_id(cg.global_ns.namespace("float *")),
-        cv.Required(CONF_CLOSE_POSITION): cv.use_id(cg.global_ns.namespace("float *")),
         cv.Required(CONF_POSITION_SENSOR): cv.use_id(voltage_sampler.VoltageSampler),
         cv.Required(CONF_SERVO): cv.use_id(servo.Servo),
         cv.Optional(CONF_OPEN_AT_CENTER, default=False): cv.boolean,
@@ -50,16 +42,6 @@ async def to_code(config):
     cg.add(var.set_switch_open_and_close(config[CONF_FLIP_OPEN]))
     cg.add(var.set_open_offset(config[CONF_OPEN_OFFSET]))
     cg.add(var.set_close_offset(config[CONF_CLOSE_OFFSET]))
-
-    vMax = await cg.get_variable(config[CONF_UPPER_LIMIT])
-    cg.add(var.set_upper_limit(vMax))
-    vMin = await cg.get_variable(config[CONF_LOWER_LIMIT])
-    cg.add(var.set_lower_limit(vMin))
-
-    openPos = await cg.get_variable(config[CONF_OPEN_POSITION])
-    cg.add(var.set_open_position(openPos))
-    closePos = await cg.get_variable(config[CONF_CLOSE_POSITION])
-    cg.add(var.set_close_position(closePos))
 
     sensor = await cg.get_variable(config[CONF_POSITION_SENSOR])
     cg.add(var.set_v_servo_sensor(sensor))
