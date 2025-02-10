@@ -75,38 +75,18 @@ button:
 text_sensor:
   - platform: version
     name: "$device_name Version"
-
-web_server:
-  version: 3
-  sorting_groups:
-    - id: sorting_group_time_settings
-      name: "Time Settings"
-      sorting_weight: 10
-    - id: sorting_group_number_settings
-      name: "Number settings"
-      sorting_weight: 20
-
-datetime:
   - platform: template
-    id: my_datetime_time
-    type: time
-    name: "Pick a Time"
-    optimistic: yes
-    initial_value: "12:34:56"
-    restore_value: false
-    web_server:
-      sorting_group_id: sorting_group_time_settings
-
-number:
-  - platform: template
-    id: my_number
-    name: "vent speed"
-    optimistic: true
-    min_value: 20
-    max_value: 100
-    step: 1
-    web_server:
-      sorting_group_id: sorting_group_number_settings
+    name: ${device_name} Uptime
+    update_interval: 5min
+    icon: mdi:clock-start
+    lambda: |-
+      int seconds = (id(uptime_seconds).state);
+      int days = seconds / (24 * 3600);
+      seconds = seconds % (24 * 3600);
+      int hours = seconds / 3600;
+      seconds = seconds % 3600;
+      int minutes = seconds /  60;
+      return { (String(days) +"d " + String(hours) +"h " + String(minutes) +"m ").c_str() };
 
 hard_stop_damper:
   - id: attic_return_damper
@@ -162,10 +142,17 @@ fan:
 
 sensor:
   - platform: uptime
-    type: seconds
-    name: "$device_name Uptime"
+    id: uptime_seconds
+    name: "$device_name uptime raw"
+    update_interval: 5min
   - { platform: adc, id: attic_return_servo_potentiometer, pin: GPIO4, update_interval: 250ms, attenuation: 12db }
   - { platform: adc, id: attic_supply_servo_potentiometer, pin: GPIO5, update_interval: 250ms, attenuation: 12db }
+  - platform: template
+    name: "Vent Speed Sensor"
+    lambda: |-
+      return id(erv_fan_in).speed;
+    update_interval: 60s
+
 
 servo:
   - { id: attic_return_servo, output: attic_return_servo_output, transition_length: 5s, auto_detach_time: 1000ms, max_level: 60%, min_level: 5%}
@@ -195,23 +182,46 @@ script:
     mode: single 
     then:
       - lambda: |-
-          if((id(bathroom_vent_call).state || id(kitchen_vent_call).state || id(shop_vent_call).state) && !id(erv_hs)){
+          if((id(bathroom_vent_call).state || id(kitchen_vent_call).state || id(shop_vent_call).state || id(attic_vent_call).state)){
+            // one of the vents is calling for increased ventilation
+            if(!id(erv_hs)){
               id(erv_hs) = true;
               id(erv_hs_since) = millis();
-              auto call = id(erv_fan_in).turn_on();
-              call.set_speed(id(erv_hs_speed));
-              call.perform();
+              id(erv_fan_in).turn_on().set_speed(id(erv_hs_speed)).perform();
+            }
+
+            if(id(attic_vent_call).state){ id(attic_return_vent).make_call().set_tilt(1).perform(); }
+            else {                         id(attic_return_vent).make_call().set_tilt(0.3).perform(); }
+          }else{
+            // no vents calling for increased ventilation all should be even 
+            id(erv_fan_in).turn_on().set_speed(id(erv_ls_speed)).perform();
+            id(attic_return_vent).make_call().set_tilt(1).perform();
           }
           if(id(erv_hs)){
             auto now = millis();
             if(now > id(erv_hs_since) + 14'400'000){ // 4 hours
-              auto call = id(erv_fan_in).turn_on();
-              call.set_speed(id(erv_ls_speed));
-              call.perform();
+              id(erv_fan_in).turn_on().set_speed(id(erv_ls_speed)).perform();
             }
           }
 
+switch:
+  - { platform: template, name: bathroom vent call remote, id: bathroom_vent_call, optimistic: true, turn_on_action: { script.execute: eval_erv_state } }
+  - { platform: template, name: kitchen vent call remote, id: kitchen_vent_call, optimistic: true, turn_on_action: { script.execute: eval_erv_state } }
+  - { platform: template, name: shop vent call remote, id: shop_vent_call, optimistic: true, turn_on_action: { script.execute: eval_erv_state } }
+  - { platform: template, name: attic vent call remote, id: attic_vent_call, optimistic: true, turn_on_action: { script.execute: eval_erv_state } }
+    # lambda: return id(attic_vent_call).state;
 
+binary_sensor:
+  - platform: status
+    id: connection_status
+    on_state: 
+      then: 
+        - delay: 3s
+        - script.execute: eval_erv_state
+# binary_sensor:
+#   - platform: template
+#     name: kitchen vent call remote
+#     id: kitchen_vent_call
 
 canbus:
   - platform: esp32_can
@@ -226,14 +236,14 @@ canbus:
               if(x.size() > 0) {
                 switch(x[0]) {
                   case 0b1000'0001:  // bathroom vent request start
-                    id(bathroom_vent_call).publish_state(true); break;
+                    id(bathroom_vent_call).turn_on(); break;
                   case 0b0000'0001:  // bathroom vent request end
-                    id(bathroom_vent_call).publish_state(false); break;
+                    id(bathroom_vent_call).turn_off(); break;
 
-                  case 0b1000'0010:  // kitchen vent request start
-                    id(kitchen_vent_call).turn_on(); break;
-                  case 0b0000'0010:  // kitchen vent request end
-                    id(kitchen_vent_call).turn_off(); break;
+                  // case 0b1000'0010:  // kitchen vent request start
+                  //   id(kitchen_vent_call).publish_state(true); break;
+                  // case 0b0000'0010:  // kitchen vent request end
+                  //   id(kitchen_vent_call).publish_state(false); break;
 
                   case 0b1000'0100:  // shop vent request start
                     id(shop_vent_call).turn_on(); break;
@@ -243,52 +253,7 @@ canbus:
               }
           - script.execute: eval_erv_state
 
-# https://community.home-assistant.io/t/retain-switch-states-on-a-power-failure/181602/11
-# add a toggle helper with the name esphome_${switch_name}
-switch:
-  - platform: template
-    name: kitchen vent call remote
-    id: kitchen_vent_call
-    turn_on_action: 
-      - script.execute: eval_erv_state
-  - platform: template
-    name: shop vent call remote
-    id: shop_vent_call
-    turn_on_action: 
-      - script.execute: eval_erv_state
-  - platform: gpio
-    name: 'test plug'
-    pin: GPIO10
-    id: plg_1
-    on_turn_on:
-     - homeassistant.service:
-        action: input_boolean.turn_on
-        data:
-         entity_id: input_boolean.esphome_${switch_name}
-    on_turn_off:
-     - homeassistant.service:
-        action: input_boolean.turn_off
-        data:
-         entity_id: input_boolean.esphome_${switch_name}
 
 
 
-binary_sensor:
-  - platform: template
-    name: bathroom vent call remote
-    id: bathroom_vent_call
-  - platform: homeassistant
-    entity_id: input_boolean.esphome_${switch_name}
-    id: esphome_${switch_name}
-  - platform: status
-    id: connection_status
-    on_state:
-      then:
-        - delay: 3s
-        - if:
-            condition:
-              - binary_sensor.is_on: esphome_${switch_name}
-            then:
-              - switch.turn_on: plg_1
-            else:
-              - switch.turn_off: plg_1
+
