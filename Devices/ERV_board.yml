@@ -99,8 +99,9 @@ cover:
     device_class: damper
     id: attic_return_vent
     name: attic return vent
+    restore_mode: NO_RESTORE
     open_action: { servo.write: { id: attic_return_servo, level: !lambda "return id(attic_return_damper).open_position;" } }
-    close_action: { servo.write: { id: attic_return_servo, level: !lambda "return  id(attic_return_damper);" } }
+    close_action: { servo.write: { id: attic_return_servo, level: !lambda "return  id(attic_return_damper).close_position;" } }
     tilt_action: { servo.write: { id: attic_return_servo, level: !lambda "return remap(tilt, float(1), float(0), id(attic_return_damper).open_position, id(attic_return_damper).close_position);" }  }
     tilt_lambda: !lambda "return remap(id(attic_return_servo_potentiometer).state, id(attic_return_damper).upper_limit, id(attic_return_damper).lower_limit, float(1), float(0));"
     lambda: "return id(attic_return_servo_potentiometer).state < ( id(attic_return_damper).lower_limit + float(0.1))  ? COVER_CLOSED : COVER_OPEN;"
@@ -108,6 +109,7 @@ cover:
     device_class: damper
     id: attic_supply_vent
     name: attic supply vent
+    restore_mode: NO_RESTORE
     open_action: { servo.write: { id: attic_supply_servo, level: !lambda "return id(attic_supply_damper).open_position;" } }
     close_action: { servo.write: { id: attic_supply_servo, level: !lambda "return  id(attic_supply_damper).close_position;" } }
     tilt_action: { servo.write: { id: attic_supply_servo, level: !lambda "return remap(tilt, float(1), float(0), id(attic_supply_damper).open_position, id(attic_supply_damper).close_position);" }  }
