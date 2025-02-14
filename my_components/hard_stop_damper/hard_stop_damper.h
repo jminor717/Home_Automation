@@ -21,21 +21,20 @@ namespace hard_stop_damper {
 
     class HardStopDamper : public Component {
     public:
-        float get_setup_priority() const override { return setup_priority::DATA; }
+        float get_setup_priority() const override { return setup_priority::LATE; }
         void setup() override;
-        // void loop() override;
         void dump_config() override;
 
 
         // setters for code gen
         void set_v_servo_sensor(adc::ADCSensor* sen) { this->v_servo_sensor = sen; };
         void set_servo(servo::Servo* ser) { this->servo_control = ser; };
-
         void set_open_at_center(bool val) { this->open_at_center = val; };
         void set_switch_open_and_close(bool val) { this->switch_open_and_close = val; };
         void set_open_offset(float val) { this->open_offset = val; };
         void set_close_offset(float val) { this->close_offset = val; };
 
+        // open and close positions found by this component
         float upper_limit;
         float lower_limit;
         float open_position;
