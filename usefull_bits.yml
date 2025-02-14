@@ -9,7 +9,7 @@ external_components:
 esphome:
   name: $device_name
   platformio_options:
-    board_build.2flash_mode: dio
+    board_build.flash_mode: dio
 
 esp32:
   board: esp32-s3-devkitc-1
@@ -56,12 +56,12 @@ text_sensor:
 sensor:
   - platform: uptime
     id: uptime_seconds
-    name: uptime raw
-    update_interval: 5min
+    name: "$device_name uptime raw"
+    update_interval: 1min
 
 text_sensor:
   - platform: template
-    name: ${device_name} - Uptime
+    name: "$device_name - Uptime"
     update_interval: 5min
     icon: mdi:clock-start
     lambda: |-

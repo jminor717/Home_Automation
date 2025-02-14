@@ -2,9 +2,10 @@
 
 #include "esphome.h"
 // #include "esphome/components/button/button.h"
+#include "esphome/components/adc/adc_sensor.h"
 #include "esphome/components/globals/globals_component.h"
 #include "esphome/components/servo/servo.h"
-#include "esphome/components/voltage_sampler/voltage_sampler.h"
+// #include "esphome/components/voltage_sampler/voltage_sampler.h"
 #include "esphome/core/automation.h"
 #include "esphome/core/component.h"
 #include "esphome/core/hal.h"
@@ -27,7 +28,7 @@ namespace hard_stop_damper {
 
 
         // setters for code gen
-        void set_v_servo_sensor(voltage_sampler::VoltageSampler* sen) { this->v_servo_sensor = sen; };
+        void set_v_servo_sensor(adc::ADCSensor* sen) { this->v_servo_sensor = sen; };
         void set_servo(servo::Servo* ser) { this->servo_control = ser; };
 
         void set_open_at_center(bool val) { this->open_at_center = val; };
@@ -39,9 +40,9 @@ namespace hard_stop_damper {
         float lower_limit;
         float open_position;
         float close_position;
-        bool homed;
+        bool homed = false;
     protected:
-        voltage_sampler::VoltageSampler* v_servo_sensor;
+        adc::ADCSensor* v_servo_sensor;
         servo::Servo* servo_control;
         TaskHandle_t task_handle { nullptr };
         bool open_at_center;
@@ -53,6 +54,7 @@ namespace hard_stop_damper {
 
         Position move_to_hard_stop(float increment, float startingPosition, float lowerLimit, float upperLimit);
         void setPositions(Position _zero, Position _one);
+        void setOffsets();
     };
 } // namespace hard_stop_damper
 } // namespace esphome

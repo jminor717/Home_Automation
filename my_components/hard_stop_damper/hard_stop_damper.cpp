@@ -26,7 +26,7 @@ namespace hard_stop_damper {
             this->servo_control->write(commandedPosition);
             delay(500);
             reachedPosition = this->v_servo_sensor->sample();
-            if (abs(reachedPosition - lastReached) < abs(increment * 0.33)) {
+            if (abs(reachedPosition - lastReached) < abs(increment * 0.5)) {
                 break; // when the distance moved gets small
             }
             lastReached = reachedPosition;
@@ -40,6 +40,14 @@ namespace hard_stop_damper {
     void HardStopDamper::find_hard_stops(void* params)
     {
         HardStopDamper* local_this = (HardStopDamper*)params;
+        if (!local_this->homed) {
+            // if this is the first home from setup wait 15 seconds for everything else to be done
+            delay(15'000);
+        }
+        local_this->v_servo_sensor->stop_poller();
+        local_this->v_servo_sensor->set_update_interval(250);
+        local_this->v_servo_sensor->start_poller();
+
         local_this->homed = false;
         delay(2000);
         auto _zero = local_this->move_to_hard_stop(-0.025, 0.5, 0, 1);
@@ -48,33 +56,41 @@ namespace hard_stop_damper {
         ESP_LOGI(TAG, "stop 1: %f, %f", _one.voltage_read, _one.comand_position);
         local_this->setPositions(_zero, _one);
 
-        ESP_LOGI(TAG, "open offset: %f, close offset: %f", local_this->open_offset, local_this->close_offset);
+        local_this->setOffsets();
 
-        if (abs(local_this->close_offset) > 0.02) {
-            float close_pos = local_this->close_position + local_this->close_offset;
-            ESP_LOGI(TAG, "find close offset, initial: %f, offset: %f, new: %f", local_this->close_position, local_this->close_offset, close_pos);
-            local_this->servo_control->write(close_pos);
-            delay(2000);
-            auto reached = local_this->v_servo_sensor->sample();
-            ESP_LOGI(TAG, "found close offset, old: %f, new: %f", local_this->lower_limit, reached);
-            local_this->close_position = close_pos;
-            local_this->lower_limit = reached;
-        }
-
-        if (abs(local_this->open_offset) > 0.02) {
-            float open_pos = local_this->open_position + local_this->open_offset;
-            ESP_LOGI(TAG, "find open offset, initial: %f, offset: %f, new: %f", local_this->open_position, local_this->open_offset, open_pos);
-            local_this->servo_control->write(open_pos);
-            delay(2000);
-            auto reached = local_this->v_servo_sensor->sample();
-            ESP_LOGI(TAG, "found open offset, old: %f, new: %f", local_this->upper_limit, reached);
-            local_this->open_position = open_pos;
-            local_this->upper_limit = reached;
-        }
         local_this->servo_control->write(local_this->open_position);
         local_this->homed = true;
 
+        local_this->v_servo_sensor->stop_poller();
+        local_this->v_servo_sensor->set_update_interval(60'000);
+        local_this->v_servo_sensor->start_poller();
+
         vTaskDelete(NULL);
+    }
+
+
+    void HardStopDamper::setOffsets(){
+        if (abs(this->close_offset) > 0.02) {
+            float close_pos = this->close_position + this->close_offset;
+            ESP_LOGI(TAG, "find close offset, initial: %f, offset: %f, new: %f", this->close_position, this->close_offset, close_pos);
+            this->servo_control->write(close_pos);
+            delay(2000);
+            auto reached = this->v_servo_sensor->sample();
+            ESP_LOGI(TAG, "found close offset, old: %f, new: %f", this->lower_limit, reached);
+            this->close_position = close_pos;
+            this->lower_limit = reached;
+        }
+
+        if (abs(this->open_offset) > 0.02) {
+            float open_pos = this->open_position + this->open_offset;
+            ESP_LOGI(TAG, "find open offset, initial: %f, offset: %f, new: %f", this->open_position, this->open_offset, open_pos);
+            this->servo_control->write(open_pos);
+            delay(2000);
+            auto reached = this->v_servo_sensor->sample();
+            ESP_LOGI(TAG, "found open offset, old: %f, new: %f", this->upper_limit, reached);
+            this->open_position = open_pos;
+            this->upper_limit = reached;
+        }
     }
 
     void HardStopDamper::setPositions(Position _zero, Position _one)

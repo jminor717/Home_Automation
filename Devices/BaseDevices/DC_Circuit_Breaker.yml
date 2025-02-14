@@ -37,8 +37,7 @@ ota:
   password: ""
 
 logger:
-  level: INFO
-
+  level: info
 
 wifi:
   ssid: !secret wifi_ssid
@@ -51,8 +50,9 @@ captive_portal:
 time:
   - platform: homeassistant
 
-
-
+button:
+  - platform: restart
+    name: "$device_name Restart"
 
 text_sensor:
   - platform: version
@@ -68,17 +68,6 @@ text_sensor:
       # we push a new value every 5 seconds
       send_every: 10
 
-
-# i2c:
-#   - id: bus_a
-#     sda: GPIO36
-#     scl: GPIO35
-#     scan: true
-# segmented_epaper:
-#   - id: segmented_e_paper
-#     reset_pin: GPIO21
-#     busy_pin: GPIO20
-#     i2c_id: bus_a
 
 cd74hc4067:
   - id: cd74hc4067_1
@@ -131,6 +120,10 @@ dc_relay:
 
 # name: "garage circuit",
 sensor:
+  - platform: uptime
+    id: uptime_seconds
+    name: "$device_name uptime raw"
+    update_interval: 1min
   - platform: adc
     id: adc_sensor
     pin: GPIO6
