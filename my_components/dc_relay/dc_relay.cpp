@@ -30,9 +30,13 @@ namespace dc_relay {
             circuit->setup();
             circuit->id = i;
             circuit->SC_Test_Chanel = this->SC_Test_Chanel;
+            circuit->Voltage_Divider_Ratio = this->Voltage_Divider_Ratio;
+            circuit->Current_Calibration = this->Current_Calibration;
+            circuit->V_Open_Circuit = this->V_Open_Circuit;
+            circuit->parent = this;
+            circuit->Enable_Circuit_switch->parent = circuit;
             i++;
         }
-
         this->circuit_event_queue = xQueueCreate(BUFFER_COUNT, sizeof(ChangeStateEvent));
         xTaskCreate(Dc_Relay::backgroundCircuitMonitorTask, "circuit_task", 8192 * 2, (void*)this, 0, &this->circuit_task_handle);
     }
@@ -88,6 +92,7 @@ namespace dc_relay {
     void Dc_Relay::stopIfNecessary()
     {
         if (!this->stopped) {
+            ESP_LOGI(TAG, "stopping poling");
             this->stop_poller();
             this->stopped = true;
         }
@@ -96,7 +101,9 @@ namespace dc_relay {
     {
         // if the circuit_event_queue is empty re-start polling
         uint8_t numEventsWaiting = uxQueueMessagesWaiting(this->circuit_event_queue);
+        ESP_LOGI(TAG, "request starting poling events:%d", numEventsWaiting);
         if (this->stopped && numEventsWaiting == 0) {
+            ESP_LOGI(TAG, "starting poling ");
             this->start_poller();
             this->stopped = false;
         }
@@ -105,6 +112,11 @@ namespace dc_relay {
     void Dc_Relay::update()
     {
         float V = this->Vin_Sensor->sample() * this->Voltage_Divider_Ratio;
+
+        // ESP_LOGI(TAG, "read input voltage #%f", V);
+        for (CircuitConfig* circuit : this->circuits) {
+            circuit->read_power();
+        }
         if (this->UVLO > 0) {
             if (V < this->UVLO && !this->inLockOut && !this->inLockOutRecovery) {
                 this->inLockOut = true;
@@ -127,7 +139,7 @@ namespace dc_relay {
 
             // if lock out recovery has completed return to the default state
             if (this->inLockOut && this->inLockOutRecovery && uxQueueMessagesWaiting(this->circuit_event_queue) == 0) {
-                ESP_LOGV(TAG, "recovered from UVLO");
+                ESP_LOGI(TAG, "recovered from UVLO");
                 this->inLockOut = false;
                 this->inLockOutRecovery = false;
             }
@@ -137,16 +149,13 @@ namespace dc_relay {
             }
         }
 
-        ESP_LOGV(TAG, "read input voltage #%f", V);
-        for (CircuitConfig* circuit : this->circuits) {
-            circuit->read_power();
-        }
+ 
     }
 
     float CircuitConfig::read_power()
     {
-        float V = this->V_out_Sensor->sample() * this->parent_->Voltage_Divider_Ratio;
-        float I = this->Current_Sensor->sample() * this->parent_->Current_Calibration;
+        float V = this->V_out_Sensor->sample() * this->Voltage_Divider_Ratio;
+        float I = this->Current_Sensor->sample() * this->Current_Calibration;
         float P = V * I;
 
         if (this->power_sensor) {
@@ -178,25 +187,26 @@ namespace dc_relay {
 
             // increase the duty through the short circuit buck converter while monitoring output current and voltage
             // look at the current and voltage to figure out if there is a short, or a failing component that is causing a breakdown at higher voltage
-            const uint8_t maxDuty = 0.75;
-            float V[maxDuty * 2] = { 0.0 };
-            float I[maxDuty * 2] = { 0.0 };
-            float R[maxDuty * 2] = { 0.0 };
-            float I_Interpolated[maxDuty * 2] = { 0.0 };
+            const uint8_t int_duty = 75;
+            // const float maxDuty = 0.75;
+            float V[int_duty * 2] = { 0.0 };
+            float I[int_duty * 2] = { 0.0 };
+            float R[int_duty * 2] = { 0.0 };
+            float I_Interpolated[int_duty * 2] = { 0.0 };
             float Sum_I_Interpolated = 0;
-            float EMA_I[maxDuty * 2] = { 0.0 };
-            float Delta_I[maxDuty * 2] = { 0.0 };
+            float EMA_I[int_duty * 2] = { 0.0 };
+            float Delta_I[int_duty * 2] = { 0.0 };
             float EMA_alpha = 2.0 / (5.0 + 1.0); // exponential moving average over last ~5 datapoints
             uint8_t i = 0;
-            for (float duty = 0; duty < maxDuty; duty += 0.005) {
+            for (uint8_t duty = 0; duty < int_duty; ++duty) {
                 // TODO: set duty v = ir
-                this->SC_Test_Chanel->write_state(duty);
+                this->SC_Test_Chanel->write_state(float(duty) / 100.0);
                 // wait for the output to settle
                 delay(1);
                 float V_sum = 0, I_sum = 0;
                 for (uint8_t aver = 0; aver < 10; aver++) {
-                    V_sum += this->V_out_Sensor->sample() * this->parent_->Voltage_Divider_Ratio;
-                    I_sum += this->Current_Sensor->sample() * this->parent_->Current_Calibration;
+                    V_sum += this->V_out_Sensor->sample() * this->Voltage_Divider_Ratio;
+                    I_sum += this->Current_Sensor->sample() * this->Current_Calibration;
                 }
 
                 V[i] = V_sum / 10.0;
@@ -204,7 +214,7 @@ namespace dc_relay {
                 R[i] = V[i] / I[i];
 
                 // calculate what the current would be at the open circuit voltage based on the current voltage and current
-                I_Interpolated[i] = this->parent_->V_Open_Circuit / R[i];
+                I_Interpolated[i] = this->V_Open_Circuit / R[i];
                 Sum_I_Interpolated += I_Interpolated[i];
 
                 if (i == 0) {
@@ -261,7 +271,9 @@ namespace dc_relay {
 
     void CircuitConfig::Circuit_State_Changed(bool state)
     {
-        this->Enable_Circuit_switch->publish_state(state);
+        ESP_LOGI(TAG, "AA circuit:%d, changed to: %d", this->id, state);
+
+       // this->Enable_Circuit_switch->publish_state(state);
     }
 
     void CircuitConfig::Circuit_Enable(bool state)
@@ -269,11 +281,18 @@ namespace dc_relay {
         ChangeStateEvent data;
         data.newState = state;
         data.circuit_id = this->id;
-        xQueueSendToBack(this->parent_->circuit_event_queue, &data, portMAX_DELAY);
+        ESP_LOGI(TAG, "circuit:%d, changed to: %d", data.circuit_id, data.newState);
+
+        xQueueSendToBack(this->parent->circuit_event_queue, &data, portMAX_DELAY);
         // xQueueSendToFront()
     }
 
     // CircuitEnable switch, from UI
-    void CircuitEnable::write_state(bool state) { this->parent_->Circuit_Enable(state); }
+    void CircuitEnable::write_state(bool state) { 
+        this->parent->Circuit_Enable(state);
+        this->publish_state(state);
+     }
+    void CircuitEnable::setup() { } //this->state = this->get_initial_state_with_restore_mode().value_or(false); }
+    void CircuitEnable::dump_config() { LOG_SWITCH("", "CircuitEnable Switch", this); }
 } // namespace dc_relay
 } // namespace esphome

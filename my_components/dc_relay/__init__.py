@@ -45,7 +45,7 @@ Dc_Relay = dc_relay_ns.class_("Dc_Relay", cg.Component)
 
 CircuitConfig = dc_relay_ns.class_("CircuitConfig")
 
-EnableCircuitSwitch = dc_relay_ns.class_("CircuitEnable", switch.Switch)
+EnableCircuitSwitch = dc_relay_ns.class_("CircuitEnable", switch.Switch, cg.Component)
 
 # LEDCOutput = dc_relay_ns.class_("customLEDCOutput", output.FloatOutput, cg.Component)
 ledc_ns = cg.esphome_ns.namespace("ledc")
@@ -112,15 +112,27 @@ async def to_code(config):
     chan = await cg.get_variable(config[CONF_SHORT_CIRCUIT_TEST_CHANEL])
     cg.add(var.set_Short_Circuit_Test_Chanel(chan))
 
+    # parent = await cg.get_variable(config[CONF_DFROBOT_SEN0395_ID])
+    # var = await switch.new_switch(config)
+    # await cg.register_component(var, config)
+    # await cg.register_parented(var, parent)
+
+
     circuits = []
     for circuit_config in config[CONF_CIRCUITS]:
         circuit_var = cg.new_Pvariable(circuit_config[CONF_ID], CircuitConfig())
         
-        if enable_config := config.get(CONF_ENABLE_CIRCUIT):
-            b = await switch.new_switch(enable_config)
-            await cg.register_parented(b, config[CONF_ID])
-            cg.add(circuit_var.set_Enable_Circuit_Switch(b))
-        
+        # if enable_config := config.get(CONF_ENABLE_CIRCUIT):
+        #     b = await switch.new_switch(enable_config)
+        #     await cg.register_component(var, enable_config)
+        #     await cg.register_parented(b, var)
+        #     cg.add(circuit_var.set_Enable_Circuit_Switch(b))
+
+        if CONF_ENABLE_CIRCUIT in circuit_config:
+            sw_qen_var = await switch.new_switch(circuit_config[CONF_ENABLE_CIRCUIT])
+            await cg.register_component(sw_qen_var, circuit_config[CONF_ENABLE_CIRCUIT])
+            cg.add(circuit_var.set_Enable_Circuit_Switch(sw_qen_var))
+
         # phase_var = await cg.get_variable(circuit_config[CONF_PHASE_ID])
         v_out_sens = await cg.get_variable(circuit_config[CONF_V_OUT_SENSOR])
         cg.add(circuit_var.set_V_out_sensor(v_out_sens))

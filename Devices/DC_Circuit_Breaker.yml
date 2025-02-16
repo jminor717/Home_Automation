@@ -9,7 +9,7 @@ substitutions:
 external_components:
   - source:
       type: local
-      path: ..\..\my_components # path relative to Devices folder
+      path: ..\my_components # path relative to Devices folder
 
 esphome:
   name: $device_name
@@ -37,7 +37,16 @@ ota:
   password: ""
 
 logger:
-  level: info
+  level: verbose
+  logs:
+    wifi: warn
+    sensor: INFO
+    adc.esp32: INFO
+    adc.common: INFO
+    logger: INFO
+    cd74hc4067: INFO
+    mdns: INFO
+
 
 wifi:
   ssid: !secret wifi_ssid
@@ -53,6 +62,11 @@ time:
 button:
   - platform: restart
     name: "$device_name Restart"
+
+switch:
+  - platform: restart
+    id: needed_for_switch_reference
+
 
 text_sensor:
   - platform: version
@@ -76,17 +90,7 @@ cd74hc4067:
     pin_s2: GPIO7
     pin_s3: GPIO0
 
-switch:
-  - platform: restart
-    name: "$device_name Restart Switch"
-#   - platform: gpio
-#     pin: GPIO11
-#     id: relay_1
-#     name: "relay"
 
-button:
-  - platform: restart
-    name: "$device_name Restart"
 
 output:
   - platform: ledc
@@ -101,17 +105,18 @@ dc_relay:
     voltage_divider_ratio: 18.808
     current_calibration: 2.15
     short_circuit_test_chanel: short_circuit_chanel
+    update_interval: 0.5s
     circuits:
-      - { enable_circuit: { name: "Garage Power Enabled" }, v_out_sensor:  c1_v, current_sensor:  c1_i, enable_pin: GPIO44, short_circuit_test_pin: GPIO43, 
+      - { enable_circuit: { name: "Garage Power Enable" }, v_out_sensor:  c1_v, current_sensor:  c1_i, enable_pin: GPIO44, short_circuit_test_pin: GPIO43, 
               power: { name: "garage power", id:  c1_pow, filters: [ *moving_avg ] } }
-      - { enable_circuit: { name: "Garage Power Enabled" }, v_out_sensor:  c2_v, current_sensor:  c2_i, enable_pin: GPIO11, short_circuit_test_pin: GPIO39, 
-              power: { name: "garage power", id:  c2_pow, filters: [ *moving_avg ] } }
-      - { enable_circuit: { name: "Garage Power Enabled" }, v_out_sensor:  c3_v, current_sensor:  c3_i, enable_pin: GPIO13, short_circuit_test_pin: GPIO12, 
-              power: { name: "garage power", id:  c3_pow, filters: [ *moving_avg ] } }
-      - { enable_circuit: { name: "Garage Power Enabled" }, v_out_sensor:  c4_v, current_sensor:  c4_i, enable_pin: GPIO15, short_circuit_test_pin: GPIO14, 
-              power: { name: "garage power", id:  c4_pow, filters: [ *moving_avg ] } }
-      - { enable_circuit: { name: "Garage Power Enabled" }, v_out_sensor:  c5_v, current_sensor:  c5_i, enable_pin: GPIO40, short_circuit_test_pin: GPIO41, 
-              power: { name: "garage power", id:  c5_pow, filters: [ *moving_avg ] } }
+      - { enable_circuit: { name: "living lights Enable" }, v_out_sensor:  c2_v, current_sensor:  c2_i, enable_pin: GPIO11, short_circuit_test_pin: GPIO39, 
+              power: { name: "living lights power", id:  c2_pow, filters: [ *moving_avg ] } }
+      - { enable_circuit: { name: "utility power Enable" }, v_out_sensor:  c3_v, current_sensor:  c3_i, enable_pin: GPIO13, short_circuit_test_pin: GPIO12, 
+              power: { name: "utility power", id:  c3_pow, filters: [ *moving_avg ] } }
+      - { enable_circuit: { name: "c4 Enable" }, v_out_sensor:  c4_v, current_sensor:  c4_i, enable_pin: GPIO15, short_circuit_test_pin: GPIO14, 
+              power: { name: "c4 power", id:  c4_pow, filters: [ *moving_avg ] } }
+      - { enable_circuit: { name: "c5 Enable" }, v_out_sensor:  c5_v, current_sensor:  c5_i, enable_pin: GPIO40, short_circuit_test_pin: GPIO41, 
+              power: { name: "c5 power", id:  c5_pow, filters: [ *moving_avg ] } }
 
 
 

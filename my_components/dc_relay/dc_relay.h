@@ -77,12 +77,17 @@ namespace dc_relay {
         static void backgroundCircuitMonitorTask(void* params);
     };
 
-    class CircuitEnable : public switch_::Switch, public Parented<CircuitConfig> {
+    class CircuitEnable : public switch_::Switch, public Component  {
+    public:
+        void setup() override;
+        void dump_config() override;
+
+        CircuitConfig* parent;
     protected:
         void write_state(bool state) override;
     };
 
-    class CircuitConfig : public sensor::Sensor, public Parented<Dc_Relay> {
+    class CircuitConfig : public sensor::Sensor {
     public:
         float read_power();
         void Circuit_Enable(bool state);
@@ -99,11 +104,16 @@ namespace dc_relay {
 
         void set_Enable_pin(InternalGPIOPin* pin) { this->Enable_pin_ = pin; };
         void set_Short_Circuit_Test_pin(InternalGPIOPin* pin) { this->Short_Circuit_Test_pin = pin; };
-        void set_Enable_Circuit_Switch(switch_::Switch* _switch_) { this->Enable_Circuit_switch = _switch_; };
+        void set_Enable_Circuit_Switch(CircuitEnable* _switch_) { this->Enable_Circuit_switch = _switch_; };
 
         uint8_t id;
         customLEDCOutput* SC_Test_Chanel;
-
+        float V_Open_Circuit;
+        float Voltage_Divider_Ratio;
+        float Current_Calibration;
+        // QueueHandle_t circuit_event_queue;
+        Dc_Relay* parent;
+        CircuitEnable* Enable_Circuit_switch;
     protected:
         voltage_sampler::VoltageSampler* V_out_Sensor;
         voltage_sampler::VoltageSampler* Current_Sensor;
@@ -111,7 +121,6 @@ namespace dc_relay {
         InternalGPIOPin* Short_Circuit_Test_pin { nullptr };
         sensor::Sensor* power_sensor { nullptr };
         sensor::Sensor* current_sensor { nullptr };
-        switch_::Switch* Enable_Circuit_switch;
         float I_Max = 5.0;
         float I_SC_Test_Max = 1.2;
     };
