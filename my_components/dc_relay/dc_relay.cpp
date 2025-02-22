@@ -148,8 +148,6 @@ namespace dc_relay {
                 return;
             }
         }
-
- 
     }
 
     float CircuitConfig::read_power()
@@ -179,7 +177,6 @@ namespace dc_relay {
             // set pwm to zero before switching the pin
             this->SC_Test_Chanel->write_state(0.0);
 
-
             auto chan = static_cast<ledc_channel_t>(this->SC_Test_Chanel->get_channel());
             auto ledc_mode = get_speed_mode(chan);
             auto pinNum = this->Short_Circuit_Test_pin->get_pin();
@@ -197,8 +194,8 @@ namespace dc_relay {
             float EMA_I[int_duty * 2] = { 0.0 };
             float Delta_I[int_duty * 2] = { 0.0 };
             float EMA_alpha = 2.0 / (5.0 + 1.0); // exponential moving average over last ~5 datapoints
-            uint8_t i = 0;
-            for (uint8_t duty = 0; duty < int_duty; ++duty) {
+            uint16_t loop_index = 0;
+            for (uint16_t duty = 0; duty < int_duty; ++duty) {
                 // TODO: set duty v = ir
                 this->SC_Test_Chanel->write_state(float(duty) / 100.0);
                 // wait for the output to settle
@@ -209,46 +206,49 @@ namespace dc_relay {
                     I_sum += this->Current_Sensor->sample() * this->Current_Calibration;
                 }
 
-                V[i] = V_sum / 10.0;
-                I[i] = I_sum / 10.0;
-                R[i] = V[i] / I[i];
+                V[loop_index] = V_sum / 10.0;
+                I[loop_index] = I_sum / 10.0;
+                R[loop_index] = V[loop_index] / I[loop_index];
 
                 // calculate what the current would be at the open circuit voltage based on the current voltage and current
-                I_Interpolated[i] = this->V_Open_Circuit / R[i];
-                Sum_I_Interpolated += I_Interpolated[i];
+                I_Interpolated[loop_index] = this->V_Open_Circuit / R[loop_index];
+                Sum_I_Interpolated += I_Interpolated[loop_index];
 
-                if (i == 0) {
-                    EMA_I[i] = I[i];
+                if (loop_index == 0) {
+                    EMA_I[loop_index] = I[loop_index];
                 } else {
-                    EMA_I[i] = (EMA_alpha * I[i]) + ((1.0 - EMA_alpha) * EMA_I[i - 1]);
+                    EMA_I[loop_index] = (EMA_alpha * I[loop_index]) + ((1.0 - EMA_alpha) * EMA_I[loop_index - 1]);
                     // EMA = α*current + (1 − α) * EMA yesterday
-                    Delta_I[i] = EMA_I[i] - EMA_I[i - 1];
+                    Delta_I[loop_index] = EMA_I[loop_index] - EMA_I[loop_index - 1];
                 }
 
-                if (I[i] > this->I_SC_Test_Max) {
+                if (I[loop_index] > this->I_SC_Test_Max) {
+                    loop_index++;
                     break;
                 }
-                i++;
+                loop_index++;
             }
 
-            bool shortCircuit = I[i] > this->I_Max;
+            bool shortCircuit = I[loop_index] > this->I_Max;
+            ESP_LOGI(TAG, "circuit:%d, index:%d, final current of: %f, interpolated: %f, sum interpolated %f", this->id, loop_index, I[loop_index], I_Interpolated[loop_index], Sum_I_Interpolated);
+
             // this is the best guess at what the load current would be assuming a resistive load
             // the circuit is considered tripped if this current is greater than 85% of the max current to add safety factor since this is an estimation
-            float Avg_I_Interpolated = Sum_I_Interpolated / (float)i;
+            float Avg_I_Interpolated = Sum_I_Interpolated / (float)loop_index;
             if (Avg_I_Interpolated > this->I_Max * 0.85) {
                 ESP_LOGW(TAG, "short circuit test found extrapolated current of: %f, greater than 85%% of %f", Avg_I_Interpolated, this->I_Max);
                 shortCircuit = true;
             }
 
             float sum_delta_i = 0;
-            for (uint8_t tp = 0; tp < i; tp++) {
+            for (uint8_t tp = 0; tp < loop_index; tp++) {
                 sum_delta_i += Delta_I[tp];
                 float average_delta = sum_delta_i / tp;
                 if (tp > 5 && Delta_I[tp] > average_delta * 1.20 && I_Interpolated[tp] > this->I_Max * 1.20) {
                     // Delta_I can be interprited as resistance assuming delta V is stable
                     // so if Delta_I starts rapidly increasing it could indicate a breakdown at some voltage
                     // a plot of I over V in this scenario will have a 'knee' at some voltage
-                    ESP_LOGW(TAG, "short circuit test found a potential breakdown at %f volts and %f amps; delta_I: %f; max_I: %f; extrapolated current: %f", V[tp], I[tp], Delta_I[tp], I[i], I_Interpolated[tp]);
+                    ESP_LOGW(TAG, "short circuit test found a potential breakdown at %f volts and %f amps; delta_I: %f; max_I: %f; extrapolated current: %f", V[tp], I[tp], Delta_I[tp], I[loop_index], I_Interpolated[tp]);
                     shortCircuit = true;
                     break;
                 }
@@ -273,7 +273,7 @@ namespace dc_relay {
     {
         ESP_LOGI(TAG, "AA circuit:%d, changed to: %d", this->id, state);
 
-       // this->Enable_Circuit_switch->publish_state(state);
+        // this->Enable_Circuit_switch->publish_state(state);
     }
 
     void CircuitConfig::Circuit_Enable(bool state)
@@ -288,11 +288,12 @@ namespace dc_relay {
     }
 
     // CircuitEnable switch, from UI
-    void CircuitEnable::write_state(bool state) { 
+    void CircuitEnable::write_state(bool state)
+    {
         this->parent->Circuit_Enable(state);
         this->publish_state(state);
-     }
-    void CircuitEnable::setup() { } //this->state = this->get_initial_state_with_restore_mode().value_or(false); }
+    }
+    void CircuitEnable::setup() { } // this->state = this->get_initial_state_with_restore_mode().value_or(false); }
     void CircuitEnable::dump_config() { LOG_SWITCH("", "CircuitEnable Switch", this); }
 } // namespace dc_relay
 } // namespace esphome

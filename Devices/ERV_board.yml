@@ -27,6 +27,7 @@ esp32:
     type: esp-idf
     sdkconfig_options:
       CONFIG_ESPTOOLPY_FLASHSIZE_8MB: y
+      # CONFIG_ESP_TIMER_SUPPORTS_ISR_DISPATCH_METHOD: y
 
 preferences:
   # the default of 1min is far too short--flash chip is rated
@@ -107,20 +108,11 @@ cover:
     id: attic_return_vent
     name: attic return vent
     restore_mode: NO_RESTORE
-    open_action: 
-      - servo.write: { id: attic_return_servo, level: !lambda "return id(attic_return_damper).open_position;" } 
-      - delay:  2s
-      - lambda: id(attic_return_servo_potentiometer).update();
-    close_action: 
-      - servo.write: { id: attic_return_servo, level: !lambda "return  id(attic_return_damper).close_position;" }
-      - delay:  2s
-      - lambda: id(attic_return_servo_potentiometer).update();
-    tilt_action: 
-      - servo.write: { id: attic_return_servo, level: !lambda "return remap(tilt, float(1), float(0), id(attic_return_damper).open_position, id(attic_return_damper).close_position);" }
-      - delay:  2s
-      - lambda: !lambda "id(attic_return_servo_potentiometer).update();"
-    tilt_lambda: !lambda "return remap(id(attic_return_servo_potentiometer).state, id(attic_return_damper).upper_limit, id(attic_return_damper).lower_limit, float(1), float(0));"
-    lambda: "return id(attic_return_servo_potentiometer).state < ( id(attic_return_damper).lower_limit + float(0.1))  ? COVER_CLOSED : COVER_OPEN;"
+    open_action: { servo.write: { id: attic_return_servo, level: !lambda "return id(attic_return_damper).open_position;" } }
+    close_action: { servo.write: { id: attic_return_servo, level: !lambda "return  id(attic_return_damper).close_position;" }}
+    tilt_action: { servo.write: { id: attic_return_servo, level: !lambda "return id(attic_return_damper).tilt_to_servo_position(tilt);" }}
+    tilt_lambda: !lambda "return id(attic_return_damper).get_tilt();"
+    lambda: "return id(attic_return_damper).get_cover_state();"
   # - platform: template
   #   device_class: damper
   #   id: attic_supply_vent
@@ -143,16 +135,13 @@ fan:
     restore_mode: ALWAYS_ON 
 
 sensor:
-  - platform: uptime
-    id: uptime_seconds
-    name: "$device_name uptime raw"
-    update_interval: 1min
-  - { platform: adc, id: attic_return_servo_potentiometer, pin: GPIO4, update_interval: 30s, attenuation: 12db, filters: { delta: 10.0 } }
-  - { platform: adc, id: attic_supply_servo_potentiometer, pin: GPIO5, update_interval: 30s, attenuation: 12db, filters: { delta: 10.0 } }
+  - { platform: uptime, id: uptime_seconds, update_interval: 1min }
+  - { platform: template, id: uptime_days, name: "$device_name uptime", update_interval: 1min, entity_category: "diagnostic", lambda: !lambda "return id(uptime_seconds).state / 86'400;"}
+  - { platform: adc, id: attic_return_servo_potentiometer, pin: GPIO4, update_interval: 100ms, attenuation: 12db, filters: { delta: 0.05 } }
+  - { platform: adc, id: attic_supply_servo_potentiometer, pin: GPIO5, update_interval: 100ms, attenuation: 12db, filters: { delta: 0.05 } }
   - platform: template
     name: "Vent Speed Sensor"
-    lambda: |-
-      return id(erv_fan_in).speed;
+    lambda: !lambda "return id(erv_fan_in).speed;"
     update_interval: 60s
 
 

@@ -29,13 +29,13 @@ namespace dc_relay {
         uint8_t get_pinNum() { return this->pin_->get_pin(); }
     };
 
-
     class Dc_Relay : public PollingComponent {
     public:
         float get_setup_priority() const override { return setup_priority::DATA; }
         void setup() override;
         // void loop() override;
         void dump_config() override;
+        void update() override;
 
         // setters for code gen
         void set_Vin_Sensor(voltage_sampler::VoltageSampler* sen) { this->Vin_Sensor = sen; };
@@ -48,11 +48,10 @@ namespace dc_relay {
         void set_Voltage_Divider_Ratio(float val) { this->Voltage_Divider_Ratio = val; };
         void set_Current_Calibration(float val) { this->Current_Calibration = val; };
         void set_circuits(std::vector<CircuitConfig*> _circuits) { this->circuits = std::move(_circuits); }
-        void set_Short_Circuit_Test_Chanel(ledc::LEDCOutput* chan) {
+        void set_Short_Circuit_Test_Chanel(ledc::LEDCOutput* chan)
+        {
             this->SC_Test_Chanel = static_cast<customLEDCOutput*>(chan);
         };
-
-        void update() override;
 
         void stopIfNecessary();
         void startIfAble();
@@ -77,12 +76,13 @@ namespace dc_relay {
         static void backgroundCircuitMonitorTask(void* params);
     };
 
-    class CircuitEnable : public switch_::Switch, public Component  {
+    class CircuitEnable : public switch_::Switch, public Component {
     public:
         void setup() override;
         void dump_config() override;
 
         CircuitConfig* parent;
+
     protected:
         void write_state(bool state) override;
     };
@@ -114,6 +114,7 @@ namespace dc_relay {
         // QueueHandle_t circuit_event_queue;
         Dc_Relay* parent;
         CircuitEnable* Enable_Circuit_switch;
+
     protected:
         voltage_sampler::VoltageSampler* V_out_Sensor;
         voltage_sampler::VoltageSampler* Current_Sensor;

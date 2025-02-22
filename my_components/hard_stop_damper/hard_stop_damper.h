@@ -25,7 +25,6 @@ namespace hard_stop_damper {
         void setup() override;
         void dump_config() override;
 
-
         // setters for code gen
         void set_v_servo_sensor(adc::ADCSensor* sen) { this->v_servo_sensor = sen; };
         void set_servo(servo::Servo* ser) { this->servo_control = ser; };
@@ -34,12 +33,17 @@ namespace hard_stop_damper {
         void set_open_offset(float val) { this->open_offset = val; };
         void set_close_offset(float val) { this->close_offset = val; };
 
+        float tilt_to_servo_position(float tilt);
+        float get_tilt();
+        float get_cover_state();
+
         // open and close positions found by this component
         float upper_limit;
         float lower_limit;
         float open_position;
         float close_position;
         bool homed = false;
+
     protected:
         adc::ADCSensor* v_servo_sensor;
         servo::Servo* servo_control;

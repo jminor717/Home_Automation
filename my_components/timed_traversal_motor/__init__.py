@@ -6,7 +6,7 @@ from esphome.components import voltage_sampler, servo
 
 # from esphome.types import char_ptr
 
-
+AUTO_LOAD = ["output", "hbridge"]
 CODEOWNERS = ["@jacob"]
 
 MULTI_CONF = True

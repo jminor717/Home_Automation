@@ -1,0 +1,62 @@
+substitutions:
+  device_name: central-return-damper
+
+external_components:
+  - source:
+      type: local
+      path: ..\my_components # path relative to Devices folder
+
+esphome:
+  name: $device_name
+  platformio_options:
+    board_build.flash_mode: dio
+
+esp32:
+  board: esp32-s3-devkitc-1
+  variant: esp32s3
+  flash_size: 8MB
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESPTOOLPY_FLASHSIZE_8MB: y
+
+preferences:
+  # the default of 1min is far too short--flash chip is rated
+  # for approx 100k writes.
+  flash_write_interval: "48h"
+
+api:
+  # password: ""
+ota:
+  platform: esphome
+  password: ""
+
+logger:
+  level: info
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "$device_name AP"
+    password: "BiSG9yrKP394"
+captive_portal:
+
+time:
+  - platform: homeassistant
+
+button:
+  - platform: restart
+    name: "$device_name Restart"
+
+text_sensor:
+  - platform: version
+    name: "$device_name Version"
+
+sensor:
+  - { platform: uptime, id: uptime_seconds, update_interval: 1min }
+  - { platform: template, id: uptime_days, name: "$device_name uptime", update_interval: 1min, entity_category: "diagnostic", lambda: !lambda "return id(uptime_seconds).state / 86'400;"}
+
+
+
+timed_traversal_motor:
