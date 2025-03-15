@@ -102,6 +102,7 @@ output:
 dc_relay:
   - id: dc_breaker_a
     v_in_sensor: vin_raw
+    open_circuit_voltage: 48
     uvlo: 42
     voltage_divider_ratio: 18.808
     current_calibration: 2.15
@@ -124,10 +125,12 @@ dc_relay:
 
 
 
-# name: "garage circuit",
+# name: "garage circuit", 
 sensor:
   - { platform: uptime, id: uptime_seconds, update_interval: 1min }
-  - { platform: template, id: uptime_days, name: "$device_name uptime", update_interval: 1min, entity_category: "diagnostic", lambda: !lambda "return id(uptime_seconds).state / 86'400;"}
+  - { platform: template, id: uptime_days, name: "$device_name uptime", update_interval: 1min, 
+      device_class: duration, entity_category: "diagnostic", unit_of_measurement: "d", accuracy_decimals: 2,
+      lambda: !lambda "return id(uptime_seconds).state / 86'400;"}
   - platform: adc
     id: adc_sensor
     pin: GPIO6

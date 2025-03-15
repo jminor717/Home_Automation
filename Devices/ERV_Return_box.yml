@@ -60,9 +60,10 @@ i2c:
     scan: true
 
 sensor:
-  - platform: uptime
-    type: seconds
-    name: "$device_name Uptime"
+  - { platform: uptime, id: uptime_seconds, update_interval: 1min }
+  - { platform: template, id: uptime_days, name: "$device_name uptime", update_interval: 1min, 
+      device_class: duration, entity_category: "diagnostic", unit_of_measurement: "d", accuracy_decimals: 2,
+      lambda: !lambda "return id(uptime_seconds).state / 86'400;"}
   - { platform: adc, id: bathroom_servo_potentiometer, pin: GPIO4, update_interval: 250ms, attenuation: 12db }
   - { platform: adc, id: kitchen_servo_potentiometer, pin: GPIO5, update_interval: 250ms, attenuation: 12db }
   - { platform: adc, id: shop_servo_potentiometer, pin: GPIO6, update_interval: 250ms, attenuation: 12db }

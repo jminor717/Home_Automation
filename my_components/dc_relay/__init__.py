@@ -19,10 +19,9 @@ from esphome.const import (
     UNIT_AMPERE,
     UNIT_WATT,
     UNIT_VOLT,
-    CONF_NAME,
-    DEVICE_CLASS_RESTART,
     ENTITY_CATEGORY_CONFIG,
-    ICON_RESTART_ALERT,
+    ENTITY_CATEGORY_NONE,
+    CONF_MAX_CURRENT
 )
 
 CODEOWNERS = ["@ssieb"]
@@ -32,10 +31,12 @@ CONF_V_OUT_SENSOR = "v_out_sensor"
 CONF_CURRENT_SENSOR = "current_sensor"
 CONF_SHORT_CIRCUIT_TEST_CHANEL = "short_circuit_test_chanel"
 CONF_UVLO = "uvlo"
+CONF_OCV = "open_circuit_voltage"
 CONF_VOLTAGE_RATIO = "voltage_divider_ratio"
 CONF_CURRENT_RATIO = "current_calibration"
 CONF_SHORT_CIRCUIT_TEST_PIN = "short_circuit_test_pin"
 CONF_ENABLE_CIRCUIT = "enable_circuit"
+CONF_TEST_CURRENT = "short_circuit_test_current"
 
 MULTI_CONF = True
 
@@ -55,13 +56,15 @@ SCHEMA_CIRCUIT = {
     cv.GenerateID(): cv.declare_id(CircuitConfig),
     cv.Required(CONF_ENABLE_CIRCUIT): switch.switch_schema(
         EnableCircuitSwitch,
-        entity_category=ENTITY_CATEGORY_CONFIG,
+        entity_category=ENTITY_CATEGORY_NONE,
         default_restore_mode="RESTORE_DEFAULT_OFF",
     ),
     cv.Required(CONF_V_OUT_SENSOR): cv.use_id(voltage_sampler.VoltageSampler),
     cv.Required(CONF_CURRENT_SENSOR): cv.use_id(voltage_sampler.VoltageSampler),
     cv.Required(CONF_ENABLE_PIN): pins.internal_gpio_input_pin_schema,
     cv.Optional(CONF_SHORT_CIRCUIT_TEST_PIN): pins.internal_gpio_input_pin_schema,
+    cv.Optional(CONF_MAX_CURRENT, default=5): cv.positive_float,
+    cv.Optional(CONF_TEST_CURRENT, default=1.2): cv.positive_float,
 
     cv.Optional(CONF_POWER): sensor.sensor_schema(
         unit_of_measurement=UNIT_WATT,
@@ -85,6 +88,7 @@ CONFIG_SCHEMA = cv.All(
             cv.GenerateID(): cv.declare_id(Dc_Relay),
             cv.Required(CONF_V_IN_SENSOR): cv.use_id(voltage_sampler.VoltageSampler),
             cv.Optional(CONF_UVLO, default=0): cv.positive_float,
+            cv.Optional(CONF_OCV, default=12): cv.positive_float,
             cv.Optional(CONF_VOLTAGE_RATIO, default=1): cv.positive_float,
             cv.Optional(CONF_CURRENT_RATIO, default=1): cv.positive_float,
             cv.Required(CONF_CIRCUITS): cv.ensure_list(SCHEMA_CIRCUIT),
@@ -103,6 +107,7 @@ async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
     cg.add(var.set_UVLO(config[CONF_UVLO]))
+    cg.add(var.set_OCV(config[CONF_OCV]))
     cg.add(var.set_Voltage_Divider_Ratio(config[CONF_VOLTAGE_RATIO]))
     cg.add(var.set_Current_Calibration(config[CONF_CURRENT_RATIO]))
 
@@ -132,6 +137,9 @@ async def to_code(config):
             sw_qen_var = await switch.new_switch(circuit_config[CONF_ENABLE_CIRCUIT])
             await cg.register_component(sw_qen_var, circuit_config[CONF_ENABLE_CIRCUIT])
             cg.add(circuit_var.set_Enable_Circuit_Switch(sw_qen_var))
+
+        cg.add(circuit_var.set_Max_Current(circuit_config[CONF_MAX_CURRENT]))
+        cg.add(circuit_var.set_Test_Current(circuit_config[CONF_TEST_CURRENT]))
 
         # phase_var = await cg.get_variable(circuit_config[CONF_PHASE_ID])
         v_out_sens = await cg.get_variable(circuit_config[CONF_V_OUT_SENSOR])

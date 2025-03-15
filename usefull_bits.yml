@@ -55,7 +55,9 @@ text_sensor:
 
 sensor:
   - { platform: uptime, id: uptime_seconds, update_interval: 1min }
-  - { platform: template, id: uptime_days, name: "$device_name uptime", update_interval: 1min, entity_category: "diagnostic", lambda: !lambda "return id(uptime_seconds).state / 86'400;"}
+  - { platform: template, id: uptime_days, name: "$device_name uptime", update_interval: 1min, 
+      device_class: duration, entity_category: "diagnostic", unit_of_measurement: "d", accuracy_decimals: 2,
+      lambda: !lambda "return id(uptime_seconds).state / 86'400;"}
 
 
 text_sensor:

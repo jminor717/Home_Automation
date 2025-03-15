@@ -45,6 +45,8 @@ namespace dc_relay {
             this->UVLO = uvlo;
             this->Hysteresis = uvlo * 0.05;
         };
+        void set_OCV(float vOC) { this->V_Open_Circuit = vOC; };
+
         void set_Voltage_Divider_Ratio(float val) { this->Voltage_Divider_Ratio = val; };
         void set_Current_Calibration(float val) { this->Current_Calibration = val; };
         void set_circuits(std::vector<CircuitConfig*> _circuits) { this->circuits = std::move(_circuits); }
@@ -55,11 +57,12 @@ namespace dc_relay {
 
         void stopIfNecessary();
         void startIfAble();
+        float readInputVoltage();
 
         QueueHandle_t circuit_event_queue;
         float UVLO;
         float Hysteresis;
-        float V_Open_Circuit = 48.0;
+        float V_Open_Circuit;
         float Voltage_Divider_Ratio;
         float Current_Calibration;
 
@@ -106,6 +109,9 @@ namespace dc_relay {
         void set_Short_Circuit_Test_pin(InternalGPIOPin* pin) { this->Short_Circuit_Test_pin = pin; };
         void set_Enable_Circuit_Switch(CircuitEnable* _switch_) { this->Enable_Circuit_switch = _switch_; };
 
+        void set_Max_Current(float max) { this->I_Max = max; };
+        void set_Test_Current(float max) { this->I_SC_Test_Max = max; };
+
         uint8_t id;
         customLEDCOutput* SC_Test_Chanel;
         float V_Open_Circuit;
@@ -122,8 +128,8 @@ namespace dc_relay {
         InternalGPIOPin* Short_Circuit_Test_pin { nullptr };
         sensor::Sensor* power_sensor { nullptr };
         sensor::Sensor* current_sensor { nullptr };
-        float I_Max = 5.0;
-        float I_SC_Test_Max = 1.2;
+        float I_Max;
+        float I_SC_Test_Max;
     };
 } // namespace dc_relay
 } // namespace esphome

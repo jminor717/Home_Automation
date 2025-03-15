@@ -16,7 +16,7 @@ namespace dc_relay {
     inline ledc_mode_t get_speed_mode(uint8_t) { return LEDC_LOW_SPEED_MODE; }
 #endif
 
-    // can have at most 5 circuits on 3sp32-s3 plus plenty of extra room for future expansion
+    // can have at most 5 circuits on 3sp32-s3, plus extra room for circuits cycling on an off faster than the queue can clear them
     static const size_t BUFFER_COUNT = 15;
 
     static const char* const TAG = "Dc_Relay";
@@ -63,8 +63,15 @@ namespace dc_relay {
     void Dc_Relay::backgroundCircuitMonitorTask(void* params)
     {
         Dc_Relay* this_breaker = (Dc_Relay*)params;
-        // delayMicroseconds
-        // delay
+
+
+        // 15 seconds after startup try to enable all the circuits
+        delay(15'000);
+        for (CircuitConfig* circuit : this_breaker->circuits) {
+            circuit->Circuit_Enable(true);
+        }
+
+        // run circuit breaker logic in serpate thread since short circuit testing can take a long time
         while (true) {
             ChangeStateEvent event;
             if (xQueueReceive(this_breaker->circuit_event_queue, &event, 100 / portTICK_PERIOD_MS) == pdTRUE) {
@@ -108,10 +115,13 @@ namespace dc_relay {
             this->stopped = false;
         }
     }
-
+    float Dc_Relay::readInputVoltage()
+    {
+        return this->Vin_Sensor->sample() * this->Voltage_Divider_Ratio;
+    }
     void Dc_Relay::update()
     {
-        float V = this->Vin_Sensor->sample() * this->Voltage_Divider_Ratio;
+        float V = this->readInputVoltage();
 
         // ESP_LOGI(TAG, "read input voltage #%f", V);
         for (CircuitConfig* circuit : this->circuits) {
@@ -174,6 +184,8 @@ namespace dc_relay {
                 this->Short_Circuit_Test_pin->digital_write(0);
             this->Enable_pin_->digital_write(0);
         } else if (this->Short_Circuit_Test_pin) {
+            float V_in = this->parent->readInputVoltage();
+
             // set pwm to zero before switching the pin
             this->SC_Test_Chanel->write_state(0.0);
 
@@ -184,29 +196,33 @@ namespace dc_relay {
 
             // increase the duty through the short circuit buck converter while monitoring output current and voltage
             // look at the current and voltage to figure out if there is a short, or a failing component that is causing a breakdown at higher voltage
-            const uint8_t int_duty = 75;
+            const uint8_t int_duty = 75 * 2;
             // const float maxDuty = 0.75;
-            float V[int_duty * 2] = { 0.0 };
-            float I[int_duty * 2] = { 0.0 };
-            float R[int_duty * 2] = { 0.0 };
-            float I_Interpolated[int_duty * 2] = { 0.0 };
+            float V[int_duty] = { 0.0 };
+            float I[int_duty] = { 0.0 };
+            float R[int_duty] = { 0.0 };
+            float I_Interpolated[int_duty] = { 0.0 };
             float Sum_I_Interpolated = 0;
-            float EMA_I[int_duty * 2] = { 0.0 };
-            float Delta_I[int_duty * 2] = { 0.0 };
+            float EMA_I[int_duty] = { 0.0 };
+            float Delta_I[int_duty] = { 0.0 };
             float EMA_alpha = 2.0 / (5.0 + 1.0); // exponential moving average over last ~5 datapoints
             uint16_t loop_index = 0;
             for (uint16_t duty = 0; duty < int_duty; ++duty) {
-                // TODO: set duty v = ir
-                this->SC_Test_Chanel->write_state(float(duty) / 100.0);
-                // wait for the output to settle
-                delay(1);
+                // step 0.5% each increment up to a max of int_duty/2 (75%)
+                this->SC_Test_Chanel->write_state(float(duty) / 200.0);
+                // wait for the output to settle, 3ms and 150 steps gives a cycle time of ~0.5s
+                delay(3);
                 float V_sum = 0, I_sum = 0;
                 for (uint8_t aver = 0; aver < 10; aver++) {
                     V_sum += this->V_out_Sensor->sample() * this->Voltage_Divider_Ratio;
                     I_sum += this->Current_Sensor->sample() * this->Current_Calibration;
+                    delayMicroseconds(100);
                 }
 
-                V[loop_index] = V_sum / 10.0;
+                // the circuit design used is a negative voltage buck converter to simplify design
+                // so the individual circuits are referenced to Vin instead of ground
+                // todo update when testin real hardware
+                V[loop_index] = (V_sum / 10.0); // V_in - (V_sum / 10.0);
                 I[loop_index] = I_sum / 10.0;
                 R[loop_index] = V[loop_index] / I[loop_index];
 
@@ -221,20 +237,20 @@ namespace dc_relay {
                     // EMA = α*current + (1 − α) * EMA yesterday
                     Delta_I[loop_index] = EMA_I[loop_index] - EMA_I[loop_index - 1];
                 }
-
+                // ESP_LOGV(TAG, "C:%d, index:%d, I:%f, V:%f, R:%f, int:%f, avg:%f", this->id, loop_index, I[loop_index], V[loop_index], R[loop_index], I_Interpolated[loop_index], EMA_I[loop_index]);
                 if (I[loop_index] > this->I_SC_Test_Max) {
                     loop_index++;
                     break;
                 }
                 loop_index++;
             }
-
+            loop_index--;
             bool shortCircuit = I[loop_index] > this->I_Max;
-            ESP_LOGI(TAG, "circuit:%d, index:%d, final current of: %f, interpolated: %f, sum interpolated %f", this->id, loop_index, I[loop_index], I_Interpolated[loop_index], Sum_I_Interpolated);
 
             // this is the best guess at what the load current would be assuming a resistive load
             // the circuit is considered tripped if this current is greater than 85% of the max current to add safety factor since this is an estimation
-            float Avg_I_Interpolated = Sum_I_Interpolated / (float)loop_index;
+            float Avg_I_Interpolated = Sum_I_Interpolated / (float)(loop_index + 1);
+            ESP_LOGI(TAG, "C:%d, index:%d, sc:%d, final current of: %f, interpolated: %f, interpolated %f", this->id, loop_index, shortCircuit, I[loop_index], I_Interpolated[loop_index], Avg_I_Interpolated);
             if (Avg_I_Interpolated > this->I_Max * 0.85) {
                 ESP_LOGW(TAG, "short circuit test found extrapolated current of: %f, greater than 85%% of %f", Avg_I_Interpolated, this->I_Max);
                 shortCircuit = true;
@@ -273,7 +289,7 @@ namespace dc_relay {
     {
         ESP_LOGI(TAG, "AA circuit:%d, changed to: %d", this->id, state);
 
-        // this->Enable_Circuit_switch->publish_state(state);
+        this->Enable_Circuit_switch->publish_state(state);
     }
 
     void CircuitConfig::Circuit_Enable(bool state)
@@ -291,7 +307,7 @@ namespace dc_relay {
     void CircuitEnable::write_state(bool state)
     {
         this->parent->Circuit_Enable(state);
-        this->publish_state(state);
+        // this->publish_state(state);
     }
     void CircuitEnable::setup() { } // this->state = this->get_initial_state_with_restore_mode().value_or(false); }
     void CircuitEnable::dump_config() { LOG_SWITCH("", "CircuitEnable Switch", this); }
