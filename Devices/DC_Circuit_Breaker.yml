@@ -110,15 +110,25 @@ dc_relay:
     update_interval: 0.5s
     circuits:
       - { enable_circuit: { name: "Garage Power Enable" }, v_out_sensor:  c1_v, current_sensor:  c1_i, enable_pin: GPIO44, short_circuit_test_pin: GPIO43, 
-              power: { name: "garage power", id:  c1_pow, filters: [ *moving_avg ] } }
+              power: { name: "garage power", id:  c1_pow, filters: [ *moving_avg ] },
+              current: { name: "garage current", filters: [ *moving_avg ] },
+              voltage: { name: "garage voltage", filters: [ *moving_avg ] } }
       - { enable_circuit: { name: "living lights Enable" }, v_out_sensor:  c2_v, current_sensor:  c2_i, enable_pin: GPIO11, short_circuit_test_pin: GPIO39, 
-              power: { name: "living lights power", id:  c2_pow, filters: [ *moving_avg ] } }
+              power: { name: "living lights power", id:  c2_pow, filters: [ *moving_avg ] },
+              current: { name: "living lights current", filters: [ *moving_avg ] },
+              voltage: { name: "living lights voltage", filters: [ *moving_avg ] } }
       - { enable_circuit: { name: "utility power Enable" }, v_out_sensor:  c3_v, current_sensor:  c3_i, enable_pin: GPIO13, short_circuit_test_pin: GPIO12, 
-              power: { name: "utility power", id:  c3_pow, filters: [ *moving_avg ] } }
+              power: { name: "utility power", id:  c3_pow, filters: [ *moving_avg ] },
+              current: { name: "utility current", filters: [ *moving_avg ] },
+              voltage: { name: "utility voltage", filters: [ *moving_avg ] } }
       - { enable_circuit: { name: "c4 Enable" }, v_out_sensor:  c4_v, current_sensor:  c4_i, enable_pin: GPIO15, short_circuit_test_pin: GPIO14, 
-              power: { name: "c4 power", id:  c4_pow, filters: [ *moving_avg ] } }
+              power: { name: "c4 power", id:  c4_pow, filters: [ *moving_avg ] },
+              current: { name: "c4 current", filters: [ *moving_avg ] },
+              voltage: { name: "c4 voltage", filters: [ *moving_avg ] } }
       - { enable_circuit: { name: "c5 Enable" }, v_out_sensor:  c5_v, current_sensor:  c5_i, enable_pin: GPIO40, short_circuit_test_pin: GPIO41, 
-              power: { name: "c5 power", id:  c5_pow, filters: [ *moving_avg ] } }
+              power: { name: "c5 power", id:  c5_pow, filters: [ *moving_avg ] },
+              current: { name: "c5 current", filters: [ *moving_avg ] },
+              voltage: { name: "c5 voltage", filters: [ *moving_avg ] } }
 
 
 
@@ -133,6 +143,7 @@ sensor:
       lambda: !lambda "return id(uptime_seconds).state / 86'400;"}
   - platform: adc
     id: adc_sensor
+    name: baseSensor
     pin: GPIO6
     attenuation: 12db
     internal: true

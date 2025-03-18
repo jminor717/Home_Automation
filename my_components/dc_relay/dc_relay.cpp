@@ -125,7 +125,7 @@ namespace dc_relay {
 
         // ESP_LOGI(TAG, "read input voltage #%f", V);
         for (CircuitConfig* circuit : this->circuits) {
-            circuit->read_power();
+            circuit->read_power(V);
         }
         if (this->UVLO > 0) {
             if (V < this->UVLO && !this->inLockOut && !this->inLockOutRecovery) {
@@ -160,11 +160,15 @@ namespace dc_relay {
         }
     }
 
-    float CircuitConfig::read_power()
+    float CircuitConfig::read_power(float v_in)
     {
-        float V = this->V_out_Sensor->sample() * this->Voltage_Divider_Ratio;
-        float I = this->Current_Sensor->sample() * this->Current_Calibration;
+        float V = v_in - (this->V_out_Sensor->sample() * this->Voltage_Divider_Ratio);
+        float I = (this->Current_Sensor->sample() - 1.65) * this->Current_Calibration;
         float P = V * I;
+
+        if (this->voltage_sensor) {
+            this->voltage_sensor->publish_state(V);
+        }
 
         if (this->power_sensor) {
             this->power_sensor->publish_state(P);
@@ -208,21 +212,24 @@ namespace dc_relay {
             float EMA_alpha = 2.0 / (5.0 + 1.0); // exponential moving average over last ~5 datapoints
             uint16_t loop_index = 0;
             for (uint16_t duty = 0; duty < int_duty; ++duty) {
+                loop_index = duty;
                 // step 0.5% each increment up to a max of int_duty/2 (75%)
                 this->SC_Test_Chanel->write_state(float(duty) / 200.0);
                 // wait for the output to settle, 3ms and 150 steps gives a cycle time of ~0.5s
                 delay(3);
                 float V_sum = 0, I_sum = 0;
                 for (uint8_t aver = 0; aver < 10; aver++) {
-                    V_sum += this->V_out_Sensor->sample() * this->Voltage_Divider_Ratio;
-                    I_sum += this->Current_Sensor->sample() * this->Current_Calibration;
+                    V_sum += (V_in - (this->V_out_Sensor->sample() * this->Voltage_Divider_Ratio));
+                    I_sum += ((this->Current_Sensor->sample()- 1.65) * this->Current_Calibration);
                     delayMicroseconds(100);
                 }
 
+                // float  V_sum = this->V_out_Sensor->sample() * this->Voltage_Divider_Ratio;
+                // float  I_sum = this->Current_Sensor->sample() * this->Current_Calibration;
+
                 // the circuit design used is a negative voltage buck converter to simplify design
                 // so the individual circuits are referenced to Vin instead of ground
-                // todo update when testin real hardware
-                V[loop_index] = (V_sum / 10.0); // V_in - (V_sum / 10.0);
+                V[loop_index] = (V_sum / 10.0);
                 I[loop_index] = I_sum / 10.0;
                 R[loop_index] = V[loop_index] / I[loop_index];
 
@@ -237,14 +244,11 @@ namespace dc_relay {
                     // EMA = α*current + (1 − α) * EMA yesterday
                     Delta_I[loop_index] = EMA_I[loop_index] - EMA_I[loop_index - 1];
                 }
-                // ESP_LOGV(TAG, "C:%d, index:%d, I:%f, V:%f, R:%f, int:%f, avg:%f", this->id, loop_index, I[loop_index], V[loop_index], R[loop_index], I_Interpolated[loop_index], EMA_I[loop_index]);
+                ESP_LOGV(TAG, "C:%d, index:%d, I:%f, V:%f, R:%f, int:%f, avg:%f", this->id, loop_index, I[loop_index], V[loop_index], R[loop_index], I_Interpolated[loop_index], EMA_I[loop_index]);
                 if (I[loop_index] > this->I_SC_Test_Max) {
-                    loop_index++;
                     break;
                 }
-                loop_index++;
             }
-            loop_index--;
             bool shortCircuit = I[loop_index] > this->I_Max;
 
             // this is the best guess at what the load current would be assuming a resistive load

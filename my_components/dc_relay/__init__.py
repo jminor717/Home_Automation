@@ -11,6 +11,7 @@ from esphome.const import (
     CONF_INPUT,
     CONF_POWER,
     CONF_CURRENT,
+    CONF_VOLTAGE,
     CONF_TRIGGER_ID,
     CONF_VOLTAGE,
     DEVICE_CLASS_POWER,
@@ -74,6 +75,12 @@ SCHEMA_CIRCUIT = {
     ),
     cv.Optional(CONF_CURRENT): sensor.sensor_schema(
         unit_of_measurement=UNIT_AMPERE,
+        device_class=DEVICE_CLASS_CURRENT,
+        state_class=STATE_CLASS_MEASUREMENT,
+        accuracy_decimals=2,
+    ),
+    cv.Optional(CONF_VOLTAGE): sensor.sensor_schema(
+        unit_of_measurement=UNIT_VOLT,
         device_class=DEVICE_CLASS_CURRENT,
         state_class=STATE_CLASS_MEASUREMENT,
         accuracy_decimals=2,
@@ -162,9 +169,10 @@ async def to_code(config):
             current_sensor = await sensor.new_sensor(circuit_config[CONF_CURRENT])
             cg.add(circuit_var.set_current_sensor(current_sensor))
 
-        # if CONF_CURRENT in circuit_config:
-        #     current_sensor = await sensor.new_sensor(circuit_config[CONF_CURRENT])
-        #     cg.add(circuit_var.set_current_sensor(current_sensor))
+
+        if CONF_VOLTAGE in circuit_config:
+            voltage_sensor = await sensor.new_sensor(circuit_config[CONF_VOLTAGE])
+            cg.add(circuit_var.set_voltage_sensor(voltage_sensor))
 
         circuits.append(circuit_var)
     cg.add(var.set_circuits(circuits))

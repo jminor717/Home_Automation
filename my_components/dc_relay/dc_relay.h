@@ -92,7 +92,7 @@ namespace dc_relay {
 
     class CircuitConfig : public sensor::Sensor {
     public:
-        float read_power();
+        float read_power(float v_in);
         void Circuit_Enable(bool state);
         void Circuit_State_Changed(bool state);
         void Do_State_Change(bool state);
@@ -101,6 +101,7 @@ namespace dc_relay {
         // setters for code gen
         void set_power_sensor(sensor::Sensor* _power_sensor) { this->power_sensor = _power_sensor; }
         void set_current_sensor(sensor::Sensor* _current_sensor) { this->current_sensor = _current_sensor; }
+        void set_voltage_sensor(sensor::Sensor* _voltage_sensor) { this->voltage_sensor = _voltage_sensor; }
 
         void set_V_out_sensor(voltage_sampler::VoltageSampler* _V_out_Sensor) { this->V_out_Sensor = _V_out_Sensor; }
         void set_I_out_sensor(voltage_sampler::VoltageSampler* _I_out_Sensor) { this->Current_Sensor = _I_out_Sensor; }
@@ -128,6 +129,7 @@ namespace dc_relay {
         InternalGPIOPin* Short_Circuit_Test_pin { nullptr };
         sensor::Sensor* power_sensor { nullptr };
         sensor::Sensor* current_sensor { nullptr };
+        sensor::Sensor* voltage_sensor { nullptr };
         float I_Max;
         float I_SC_Test_Max;
     };
