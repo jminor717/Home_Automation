@@ -162,7 +162,7 @@ namespace dc_relay {
 
     float CircuitConfig::read_power(float v_in)
     {
-        float V = v_in - (this->V_out_Sensor->sample() * this->Voltage_Divider_Ratio);
+        float V =  (v_in - (this->V_out_Sensor->sample() * this->Voltage_Divider_Ratio));
         float I = (this->Current_Sensor->sample() - 1.65) * this->Current_Calibration;
         float P = V * I;
 
@@ -220,17 +220,17 @@ namespace dc_relay {
                 float V_sum = 0, I_sum = 0;
                 for (uint8_t aver = 0; aver < 10; aver++) {
                     V_sum += (V_in - (this->V_out_Sensor->sample() * this->Voltage_Divider_Ratio));
-                    I_sum += ((this->Current_Sensor->sample()- 1.65) * this->Current_Calibration);
+                    I_sum += ((this->Current_Sensor->sample() - 1.65) * this->Current_Calibration);
                     delayMicroseconds(100);
                 }
 
                 // float  V_sum = this->V_out_Sensor->sample() * this->Voltage_Divider_Ratio;
-                // float  I_sum = this->Current_Sensor->sample() * this->Current_Calibration;
+                // float  I_sum = ((this->Current_Sensor->sample()- 1.65) * this->Current_Calibration);
 
                 // the circuit design used is a negative voltage buck converter to simplify design
                 // so the individual circuits are referenced to Vin instead of ground
-                V[loop_index] = (V_sum / 10.0);
-                I[loop_index] = I_sum / 10.0;
+                V[loop_index] = (V_sum );// / 10.0
+                I[loop_index] = I_sum; // / 10.0
                 R[loop_index] = V[loop_index] / I[loop_index];
 
                 // calculate what the current would be at the open circuit voltage based on the current voltage and current

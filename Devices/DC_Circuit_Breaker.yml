@@ -156,15 +156,18 @@ sensor:
     attenuation: 12db
   # - { name: "V In",        id: vin_raw,  pin: GPIO4, filters: [multiply: 18.808],             platform: adc,      update_interval: 5s, attenuation: 12db, unit_of_measurement: "V" }
   - { name: "$c1 Raw",     id: c1_i, pin: GPIO1,                                            platform: adc,      update_interval: 60s, attenuation: 12db, internal: true }
-  - { name: "$c1 Voltage", id: c1_v, number: 4, sensor: adc_sensor,                  platform: cd74hc4067,      update_interval: 60s,                    internal: true }
+  - { name: "zz 4 Voltage", id: c1_v, number: 4, sensor: adc_sensor,                  platform: cd74hc4067,      update_interval: 5s,                    internal: false }
   - { name: "$c2 Raw",     id: c2_i, pin: GPIO5,                                            platform: adc,      update_interval: 60s, attenuation: 12db, internal: true }
-  - { name: "$c2 Voltage", id: c2_v, number: 1, sensor: adc_sensor,                  platform: cd74hc4067,      update_interval: 60s,                    internal: true }
+  - { name: "zz 1 Voltage", id: c2_v, number: 1, sensor: adc_sensor,                  platform: cd74hc4067,      update_interval: 5s,                    internal: false }
   - { name: "$c3 Raw",     id: c3_i, pin: GPIO4,                                            platform: adc,      update_interval: 60s, attenuation: 12db, internal: true }
-  - { name: "$c3 Voltage", id: c3_v, number: 2, sensor: adc_sensor,                  platform: cd74hc4067,      update_interval: 60s,                    internal: true }
+  - { name: "zz 2 Voltage", id: c3_v, number: 2, sensor: adc_sensor,                  platform: cd74hc4067,      update_interval: 5s,                    internal: false }
   - { name: "$c4 Raw",     id: c4_i, pin: GPIO3,                                            platform: adc,      update_interval: 60s, attenuation: 12db, internal: true }
-  - { name: "$c4 Voltage", id: c4_v, number: 3, sensor: adc_sensor,                  platform: cd74hc4067,      update_interval: 60s,                    internal: true }
+  - { name: "zz 3 Voltage", id: c4_v, number: 3, sensor: adc_sensor,                  platform: cd74hc4067,      update_interval: 5s,                    internal: false }
   - { name: "$c5 Raw",     id: c5_i, pin: GPIO2,                                            platform: adc,      update_interval: 60s, attenuation: 12db, internal: true }
-  - { name: "$c5 Voltage", id: c5_v, number: 0, sensor: adc_sensor,                  platform: cd74hc4067,      update_interval: 60s,                    internal: true }
+  - { name: "zz 0 Voltage", id: c5_v, number: 0, sensor: adc_sensor,                  platform: cd74hc4067,      update_interval: 5s,                    internal: false }
+  - { name: "zz 5 Voltage", id: z5v, number: 5, sensor: adc_sensor,                  platform: cd74hc4067,      update_interval: 5s,                    internal: false }
+  - { name: "zz 6 Voltage", id: z6_v, number: 6, sensor: adc_sensor,                  platform: cd74hc4067,      update_interval: 5s,                    internal: false }
+  - { name: "zz 7 Voltage", id: z7_v, number: 7, sensor: adc_sensor,                  platform: cd74hc4067,      update_interval: 5s,                    internal: false }
 
 
 
