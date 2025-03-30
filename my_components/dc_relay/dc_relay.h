@@ -49,11 +49,9 @@ namespace dc_relay {
 
         void set_Voltage_Divider_Ratio(float val) { this->Voltage_Divider_Ratio = val; };
         void set_Current_Calibration(float val) { this->Current_Calibration = val; };
-        void set_circuits(std::vector<CircuitConfig*> _circuits) { this->circuits = std::move(_circuits); }
-        void set_Short_Circuit_Test_Chanel(ledc::LEDCOutput* chan)
-        {
-            this->SC_Test_Chanel = static_cast<customLEDCOutput*>(chan);
-        };
+        void set_circuits(std::vector<CircuitConfig*> _circuits) { this->circuits = std::move(_circuits); };
+        void set_Short_Circuit_Test_Chanel(ledc::LEDCOutput* chan) { this->SC_Test_Chanel = static_cast<customLEDCOutput*>(chan); };
+        void set_voltage_sensor(sensor::Sensor* _voltage_sensor) { this->vin_display_sensor = _voltage_sensor; }
 
         void stopIfNecessary();
         void startIfAble();
@@ -70,6 +68,7 @@ namespace dc_relay {
         voltage_sampler::VoltageSampler* Vin_Sensor;
         customLEDCOutput* SC_Test_Chanel;
         std::vector<CircuitConfig*> circuits;
+        sensor::Sensor* vin_display_sensor { nullptr };
 
         bool inLockOut;
         bool inLockOutRecovery;

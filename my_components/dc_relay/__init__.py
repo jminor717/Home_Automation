@@ -1,4 +1,4 @@
-from esphome.components import sensor, voltage_sampler, switch, output#, i2c
+from esphome.components import sensor, voltage_sampler, switch, output  #, i2c, LEDCOutput
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome import pins
@@ -15,6 +15,7 @@ from esphome.const import (
     CONF_TRIGGER_ID,
     CONF_VOLTAGE,
     DEVICE_CLASS_POWER,
+    DEVICE_CLASS_VOLTAGE,
     DEVICE_CLASS_CURRENT,
     STATE_CLASS_MEASUREMENT,
     UNIT_AMPERE,
@@ -25,7 +26,11 @@ from esphome.const import (
     CONF_MAX_CURRENT
 )
 
-CODEOWNERS = ["@ssieb"]
+
+CODEOWNERS = ["@jacob"]
+# AUTO_LOAD = ["LEDCOutput"]
+
+
 CONF_CIRCUITS = "circuits"
 CONF_V_IN_SENSOR = "v_in_sensor"
 CONF_V_OUT_SENSOR = "v_out_sensor"
@@ -38,6 +43,7 @@ CONF_CURRENT_RATIO = "current_calibration"
 CONF_SHORT_CIRCUIT_TEST_PIN = "short_circuit_test_pin"
 CONF_ENABLE_CIRCUIT = "enable_circuit"
 CONF_TEST_CURRENT = "short_circuit_test_current"
+CONF_V_IN_DISPLAY = "v_in"
 
 MULTI_CONF = True
 
@@ -81,9 +87,9 @@ SCHEMA_CIRCUIT = {
     ),
     cv.Optional(CONF_VOLTAGE): sensor.sensor_schema(
         unit_of_measurement=UNIT_VOLT,
-        device_class=DEVICE_CLASS_CURRENT,
+        device_class=DEVICE_CLASS_VOLTAGE,
         state_class=STATE_CLASS_MEASUREMENT,
-        accuracy_decimals=2,
+        accuracy_decimals=1,
     ),
 }
 
@@ -101,6 +107,12 @@ CONFIG_SCHEMA = cv.All(
             cv.Required(CONF_CIRCUITS): cv.ensure_list(SCHEMA_CIRCUIT),
             cv.Optional(CONF_SHORT_CIRCUIT_TEST_CHANEL): cv.use_id(LEDCOutput),
             
+            cv.Optional(CONF_V_IN_DISPLAY): sensor.sensor_schema(
+                unit_of_measurement=UNIT_VOLT,
+                device_class=DEVICE_CLASS_VOLTAGE,
+                state_class=STATE_CLASS_MEASUREMENT,
+                accuracy_decimals=1,
+            ),
         }
     )
     .extend(cv.polling_component_schema("500ms")),
@@ -121,8 +133,13 @@ async def to_code(config):
     vin_sens = await cg.get_variable(config[CONF_V_IN_SENSOR])
     cg.add(var.set_Vin_Sensor(vin_sens))
 
-    chan = await cg.get_variable(config[CONF_SHORT_CIRCUIT_TEST_CHANEL])
-    cg.add(var.set_Short_Circuit_Test_Chanel(chan))
+    if CONF_SHORT_CIRCUIT_TEST_CHANEL in config:
+        chan = await cg.get_variable(config[CONF_SHORT_CIRCUIT_TEST_CHANEL])
+        cg.add(var.set_Short_Circuit_Test_Chanel(chan))
+
+    if CONF_V_IN_DISPLAY in config:
+        voltage_sensor = await sensor.new_sensor(config[CONF_V_IN_DISPLAY])
+        cg.add(var.set_voltage_sensor(voltage_sensor))
 
     # parent = await cg.get_variable(config[CONF_DFROBOT_SEN0395_ID])
     # var = await switch.new_switch(config)

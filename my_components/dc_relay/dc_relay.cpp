@@ -122,7 +122,8 @@ namespace dc_relay {
     void Dc_Relay::update()
     {
         float V = this->readInputVoltage();
-
+        this->vin_display_sensor->publish_state(V);
+        
         // ESP_LOGI(TAG, "read input voltage #%f", V);
         for (CircuitConfig* circuit : this->circuits) {
             circuit->read_power(V);
@@ -162,7 +163,7 @@ namespace dc_relay {
 
     float CircuitConfig::read_power(float v_in)
     {
-        float V =  (v_in - (this->V_out_Sensor->sample() * this->Voltage_Divider_Ratio));
+        float V =  2 * (v_in - (this->V_out_Sensor->sample() * this->Voltage_Divider_Ratio));
         float I = (this->Current_Sensor->sample() - 1.65) * this->Current_Calibration;
         float P = V * I;
 
