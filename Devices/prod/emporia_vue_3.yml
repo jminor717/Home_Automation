@@ -44,12 +44,17 @@ i2c:
   sda: 5
   scl: 18
   scan: false
-  frequency: 200kHz  # recommended range is 50-200kHz
+  frequency: 400kHz  # recommended range is 50-200kHz
+  timeout: 2ms
   id: i2c_a
 
 button:
   - platform: restart
     name: Restart  
+
+text_sensor:
+  - platform: version
+    name: "$display_name Version"
 
 time:
   - platform: homeassistant
@@ -82,6 +87,10 @@ time:
     lambda: 'return abs(x);'
 
 sensor:
+  - { platform: uptime, id: uptime_seconds, update_interval: 1min }
+  - { platform: template, id: uptime_days, name: "$display_name uptime", update_interval: 1min, 
+      device_class: duration, entity_category: "diagnostic", unit_of_measurement: "d", accuracy_decimals: 2,
+      lambda: !lambda "return id(uptime_seconds).state / 86'400;"}
   - platform: emporia_vue
     i2c_id: i2c_a
     phases:

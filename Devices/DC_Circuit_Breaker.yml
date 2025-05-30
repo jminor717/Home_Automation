@@ -5,6 +5,20 @@ substitutions:
   c3: chanel_3
   c4: chanel_4
   c5: chanel_5
+  eth_cs: GPIO9
+  eth_clk: GPIO10
+  eth_miso: GPIO11
+  eth_mosi: GPIO12
+  eth_int: GPIO13
+  eth_rst: GPIO14
+
+  ledc_pin: GPIO46
+
+  adc_cs: GPIO15
+  spi_clk: GPIO16
+  spi_miso: GPIO17
+  spi_mosi: GPIO18
+
 
 external_components:
   - source:
@@ -49,13 +63,31 @@ logger:
     ledc.output: INFO
 
 
-wifi:
-  ssid: !secret wifi_ssid
-  password: !secret wifi_password
-  ap:
-    ssid: "$device_name AP"
-    password: "BiSG9yrKP394"
-captive_portal:
+# wifi:
+#   ssid: !secret wifi_ssid
+#   password: !secret wifi_password
+#   ap:
+#     ssid: "$device_name AP"
+#     password: "BiSG9yrKP394"
+# captive_portal:
+
+ethernet:
+  type: W5500
+  clk_pin: $eth_clk
+  mosi_pin: $eth_mosi
+  miso_pin: $eth_miso
+  cs_pin: $eth_cs
+  interrupt_pin: $eth_int
+  reset_pin: $eth_rst
+
+
+# ethernet:
+#   type: W5500
+#   clk_pin: GPIO10
+#   mosi_pin: GPIO12
+#   miso_pin: GPIO11
+#   cs_pin: GPIO9
+#   interrupt_pin: GPIO13
 
 time:
   - platform: homeassistant
@@ -84,46 +116,55 @@ text_sensor:
       send_every: 10
 
 
-cd74hc4067:
-  - id: cd74hc4067_1
-    pin_s0: GPIO9
-    pin_s1: GPIO8
-    pin_s2: GPIO7
-    pin_s3: GPIO0
+# cd74hc4067:
+#   - id: cd74hc4067_1
+#     pin_s0: GPIO6
+#     pin_s1: GPIO8
+#     pin_s2: GPIO7
+#     pin_s3: GPIO0
 
+spi:
+  clk_pin: $spi_clk
+  mosi_pin: $spi_miso
+  miso_pin: $spi_mosi
+  interface: spi3
 
+mcp3204:
+  cs_pin: $adc_cs
+  reference_voltage: 3.3V
+  data_rate: 75kHz
 
 output:
   - platform: ledc
-    pin: GPIO46
+    pin: $ledc_pin
     id: short_circuit_chanel
     frequency: 19531Hz
 
-dc_relay:
-  - id: dc_breaker_a
-    v_in_sensor: vin_raw
-    open_circuit_voltage: 48
-    uvlo: 42
-    voltage_divider_ratio: 18.808
-    current_calibration: 2.15
-    # short_circuit_test_chanel: short_circuit_chanel
-    update_interval: 0.5s
-    v_in: { name: "V In Meas", filters: [ *moving_avg ] }
-    circuits:
-      - { enable_circuit: { name: "c5 Enable" }, v_out_sensor:  c1_v, current_sensor:  c1_i, enable_pin: GPIO44, #short_circuit_test_pin: GPIO43, 
-              power: { name: "c5 power", id:  c1_pow, filters: [ *moving_avg ] },
-              current: { name: "c5 current", filters: [ *moving_avg ] }, #
-              voltage: { name: "c5 voltage", filters: [ *moving_avg ] } }
-      - { enable_circuit: { name: "c2 Enable" }, v_out_sensor:  c2_v, current_sensor:  c2_i, enable_pin: GPIO11, #short_circuit_test_pin: GPIO39, 
-              power: { name: "c2 power", id:  c2_pow, filters: [ *moving_avg ] },
-              current: { name: "c2 current", filters: [ *moving_avg ] }, #
-              voltage: { name: "c2 voltage", filters: [ *moving_avg ] } }
-      - { enable_circuit: { name: "c3 Enable" }, v_out_sensor:  c3_v, current_sensor:  c3_i, enable_pin: GPIO13 }
-      - { enable_circuit: { name: "c4 Enable" }, v_out_sensor:  c4_v, current_sensor:  c4_i, enable_pin: GPIO15}
-      - { enable_circuit: { name: "c1 Enable" }, v_out_sensor:  c5_v, current_sensor:  c5_i, enable_pin: GPIO40, #short_circuit_test_pin: GPIO41, 
-              power: { name: "c1 power", id:  c5_pow, filters: [ *moving_avg ] },
-              current: { name: "c1 current", filters: [ *moving_avg ] }, #
-              voltage: { name: "c1 voltage", filters: [ *moving_avg ] } }
+# dc_relay:
+#   - id: dc_breaker_a
+#     v_in_sensor: vin_raw
+#     open_circuit_voltage: 48
+#     uvlo: 42
+#     voltage_divider_ratio: 18.808
+#     current_calibration: 2.15
+#     # short_circuit_test_chanel: short_circuit_chanel
+#     update_interval: 0.5s
+#     v_in: { name: "V In Meas", filters: [ *moving_avg ] }
+#     circuits:
+#       - { enable_circuit: { name: "c5 Enable" }, v_out_sensor:  c1_v, current_sensor:  c1_i, enable_pin: GPIO44, #short_circuit_test_pin: GPIO43, 
+#               power: { name: "c5 power", id:  c1_pow, filters: [ *moving_avg ] },
+#               current: { name: "c5 current", filters: [ *moving_avg ] }, #
+#               voltage: { name: "c5 voltage", filters: [ *moving_avg ] } }
+#       - { enable_circuit: { name: "c2 Enable" }, v_out_sensor:  c2_v, current_sensor:  c2_i, enable_pin: GPIO11, #short_circuit_test_pin: GPIO39, 
+#               power: { name: "c2 power", id:  c2_pow, filters: [ *moving_avg ] },
+#               current: { name: "c2 current", filters: [ *moving_avg ] }, #
+#               voltage: { name: "c2 voltage", filters: [ *moving_avg ] } }
+      # - { enable_circuit: { name: "c3 Enable" }, v_out_sensor:  c3_v, current_sensor:  c3_i, enable_pin: GPIO13 }
+#       - { enable_circuit: { name: "c4 Enable" }, v_out_sensor:  c4_v, current_sensor:  c4_i, enable_pin: GPIO15}
+#       - { enable_circuit: { name: "c1 Enable" }, v_out_sensor:  c5_v, current_sensor:  c5_i, enable_pin: GPIO40, #short_circuit_test_pin: GPIO41, 
+#               power: { name: "c1 power", id:  c5_pow, filters: [ *moving_avg ] },
+#               current: { name: "c1 current", filters: [ *moving_avg ] }, #
+#               voltage: { name: "c1 voltage", filters: [ *moving_avg ] } }
 
 
 
@@ -136,30 +177,38 @@ sensor:
   - { platform: template, id: uptime_days, name: "$device_name uptime", update_interval: 1min, 
       device_class: duration, entity_category: "diagnostic", unit_of_measurement: "d", accuracy_decimals: 2,
       lambda: !lambda "return id(uptime_seconds).state / 86'400;"}
-  - platform: adc
-    id: adc_sensor
-    name: baseSensor
-    pin: GPIO6
-    attenuation: 12db
-    internal: true
+  # - platform: adc
+  #   id: adc_sensor
+  #   name: baseSensor
+  #   pin: GPIO5
+  #   attenuation: 12db
+  #   # internal: true
+  - {platform: mcp3204, id: v0, name: voltage 0, update_interval: 3s, number: 0, unit_of_measurement: "V"}
+  - {platform: mcp3204, id: v1, name: voltage 1, update_interval: 3s, number: 1, unit_of_measurement: "V"}
+  - {platform: mcp3204, id: v2, name: voltage 2, update_interval: 3s, number: 2, unit_of_measurement: "V"}
+  - {platform: mcp3204, id: v3, name: voltage 3, update_interval: 3s, number: 3, unit_of_measurement: "V"}
+  - {platform: mcp3204, id: v4, name: voltage 4, update_interval: 3s, number: 4, unit_of_measurement: "V"}
+  - {platform: mcp3204, id: v5, name: voltage 5, update_interval: 3s, number: 5, unit_of_measurement: "V"}
+  - {platform: mcp3204, id: v6, name: voltage 6, update_interval: 3s, number: 6, unit_of_measurement: "V"}
+  - {platform: mcp3204, id: v7, name: voltage 7, update_interval: 3s, number: 7, unit_of_measurement: "V"}
 # 18.808  on_value_range 
-  - platform: adc
-    name: "V In"
-    id: vin_raw
-    pin: GPIO10
-    update_interval: 60s
-    attenuation: 12db
-  # - { name: "V In",        id: vin_raw,  pin: GPIO4, filters: [multiply: 18.808],             platform: adc,      update_interval: 5s, attenuation: 12db, unit_of_measurement: "V" }
-  - { name: "$c1 Raw",     id: c1_i, pin: GPIO1,                                            platform: adc,      update_interval: 60s, attenuation: 12db, internal: true }
-  - { name: "zz 5_1 Voltage", id: c1_v, number: 4, sensor: adc_sensor,                  platform: cd74hc4067,      update_interval: 5s,                    internal: false }
-  - { name: "$c2 Raw",     id: c2_i, pin: GPIO5,                                            platform: adc,      update_interval: 60s, attenuation: 12db, internal: true }
-  - { name: "zz 2_2 Voltage", id: c2_v, number: 1, sensor: adc_sensor,                  platform: cd74hc4067,      update_interval: 5s,                    internal: false }
-  - { name: "$c3 Raw",     id: c3_i, pin: GPIO4,                                            platform: adc,      update_interval: 60s, attenuation: 12db, internal: true }
-  - { name: "zz 3_3 Voltage", id: c3_v, number: 2, sensor: adc_sensor,                  platform: cd74hc4067,      update_interval: 5s,                    internal: true }
-  - { name: "$c4 Raw",     id: c4_i, pin: GPIO3,                                            platform: adc,      update_interval: 60s, attenuation: 12db, internal: true }
-  - { name: "zz 4_4 Voltage", id: c4_v, number: 3, sensor: adc_sensor,                  platform: cd74hc4067,      update_interval: 5s,                    internal: true }
-  - { name: "$c5 Raw",     id: c5_i, pin: GPIO2,                                            platform: adc,      update_interval: 60s, attenuation: 12db, internal: true }
-  - { name: "zz 1_5 Voltage", id: c5_v, number: 0, sensor: adc_sensor,                  platform: cd74hc4067,      update_interval: 5s,                    internal: false }
+  # - platform: adc
+  #   name: "V In"
+  #   id: vin_raw
+  #   pin: GPIO10
+  #   update_interval: 60s
+  #   attenuation: 12db
+  # # - { name: "V In",        id: vin_raw,  pin: GPIO4, filters: [multiply: 18.808],             platform: adc,      update_interval: 5s, attenuation: 12db, unit_of_measurement: "V" }
+  # - { name: "$c1 Raw",     id: c1_i, pin: GPIO1,                                            platform: adc,      update_interval: 60s, attenuation: 12db, internal: true }
+  # - { name: "zz 5_1 Voltage", id: c1_v, number: 4, sensor: adc_sensor,                  platform: cd74hc4067,      update_interval: 5s,                    internal: false }
+  # - { name: "$c2 Raw",     id: c2_i, pin: GPIO5,                                            platform: adc,      update_interval: 60s, attenuation: 12db, internal: true }
+  # - { name: "zz 2_2 Voltage", id: c2_v, number: 1, sensor: adc_sensor,                  platform: cd74hc4067,      update_interval: 5s,                    internal: false }
+  # - { name: "$c3 Raw",     id: c3_i, pin: GPIO4,                                            platform: adc,      update_interval: 60s, attenuation: 12db, internal: true }
+  # - { name: "c3 Voltage", id: c3_v, number: 2, sensor: adc_sensor,                  platform: cd74hc4067,      update_interval: 5s,                    internal: true }
+  # - { name: "$c4 Raw",     id: c4_i, pin: GPIO3,                                            platform: adc,      update_interval: 60s, attenuation: 12db, internal: true }
+  # - { name: "zz 4_4 Voltage", id: c4_v, number: 3, sensor: adc_sensor,                  platform: cd74hc4067,      update_interval: 5s,                    internal: true }
+  # - { name: "$c5 Raw",     id: c5_i, pin: GPIO2,                                            platform: adc,      update_interval: 60s, attenuation: 12db, internal: true }
+  # - { name: "zz 1_5 Voltage", id: c5_v, number: 0, sensor: adc_sensor,                  platform: cd74hc4067,      update_interval: 5s,                    internal: false }
   # - { name: "zz 5 Voltage", id: z5v, number: 5, sensor: adc_sensor,                  platform: cd74hc4067,      update_interval: 5s,                    internal: false }
   # - { name: "zz 6 Voltage", id: z6_v, number: 6, sensor: adc_sensor,                  platform: cd74hc4067,      update_interval: 5s,                    internal: false }
   # - { name: "zz 7 Voltage", id: z7_v, number: 7, sensor: adc_sensor,                  platform: cd74hc4067,      update_interval: 5s,                    internal: false }
