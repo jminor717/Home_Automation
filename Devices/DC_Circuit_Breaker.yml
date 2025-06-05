@@ -14,6 +14,7 @@ substitutions:
 
   ledc_pin: GPIO46
 
+  gpio_cs: GPIO7
   adc_cs: GPIO15
   spi_clk: GPIO16
   spi_miso: GPIO17
@@ -80,15 +81,6 @@ ethernet:
   interrupt_pin: $eth_int
   reset_pin: $eth_rst
 
-
-# ethernet:
-#   type: W5500
-#   clk_pin: GPIO10
-#   mosi_pin: GPIO12
-#   miso_pin: GPIO11
-#   cs_pin: GPIO9
-#   interrupt_pin: GPIO13
-
 time:
   - platform: homeassistant
 
@@ -99,7 +91,92 @@ button:
 switch:
   - platform: restart
     id: needed_for_switch_reference
+  - platform: gpio
+    name: "MCP23S17 Pin #0"
+    pin: { mcp23xxx: mcp_gpio, number: 0, mode: { output: true }, inverted: false }
+  # - platform: gpio
+  #   name: "MCP23S17 Pin #1"
+  #   pin: { mcp23xxx: mcp_gpio, number: 1, mode: { output: true }, inverted: false }
+  - platform: gpio
+    name: "MCP23S17 Pin #2"
+    pin: { mcp23xxx: mcp_gpio, number: 2, mode: { output: true }, inverted: false }
+  - platform: gpio
+    name: "MCP23S17 Pin #9"
+    pin: { mcp23xxx: mcp_gpio, number: 9, mode: { output: true }, inverted: false }
+  - platform: gpio
+    name: "MCP23S17 Pin #10"
+    pin: { mcp23xxx: mcp_gpio, number: 10, mode: { output: true }, inverted: false }
+  - platform: gpio
+    name: "MCP23S17 Pin #8"
+    pin: { mcp23xxx: mcp_gpio, number: 8, mode: { output: true }, inverted: false }
 
+binary_sensor:
+  - platform: gpio
+    name: "MCP23S17 Pin #1"
+    pin: { mcp23xxx: mcp_gpio, number: 1, mode: {input: true, pullup: true}, inverted: false  }
+    filters:
+      - delayed_on_off: 500ms
+#   - platform: gpio
+#     name: "MCP23S17 Pin #2"
+#     pin: { mcp23xxx: mcp_gpio, number: 2, mode: {input: true, pullup: true}, inverted: false  }
+#     filters:
+#       - delayed_on_off: 500ms
+#   - platform: gpio
+#     name: "MCP23S17 Pin #3"
+#     pin: { mcp23xxx: mcp_gpio, number: 3, mode: {input: true, pullup: true}, inverted: false  }
+#     filters:
+#       - delayed_on_off: 500ms
+#   - platform: gpio
+#     name: "MCP23S17 Pin #4"
+#     pin: { mcp23xxx: mcp_gpio, number: 4, mode: {input: true, pullup: true}, inverted: false  }
+#     filters:
+#       - delayed_on_off: 500ms
+#   - platform: gpio
+#     name: "MCP23S17 Pin #5"
+#     pin: { mcp23xxx: mcp_gpio, number: 5, mode: {input: true, pullup: true}, inverted: false  }
+#     filters:
+#       - delayed_on_off: 500ms
+#   - platform: gpio
+#     name: "MCP23S17 Pin #6"
+#     pin: { mcp23xxx: mcp_gpio, number: 6, mode: {input: true, pullup: true}, inverted: false  }
+#     filters:
+#       - delayed_on_off: 500ms
+#   - platform: gpio
+#     name: "MCP23S17 Pin #9"
+#     pin: { mcp23xxx: mcp_gpio, number: 9, mode: {input: true, pullup: true}, inverted: false  }
+#     filters:
+#       - delayed_on_off: 500ms
+#   - platform: gpio
+#     name: "MCP23S17 Pin #10"
+#     pin: { mcp23xxx: mcp_gpio, number: 10, mode: {input: true, pullup: true}, inverted: false  }
+#     filters:
+#       - delayed_on_off: 500ms
+#   - platform: gpio
+#     name: "MCP23S17 Pin #11"
+#     pin: { mcp23xxx: mcp_gpio, number: 11, mode: {input: true, pullup: true}, inverted: false  }
+#     filters:
+#       - delayed_on_off: 500ms
+#   - platform: gpio
+#     name: "MCP23S17 Pin #12"
+#     pin: { mcp23xxx: mcp_gpio, number: 12, mode: {input: true, pullup: true}, inverted: false  }
+#     filters:
+#       - delayed_on_off: 500ms
+#   - platform: gpio
+#     name: "MCP23S17 Pin #13"
+#     pin: { mcp23xxx: mcp_gpio, number: 13, mode: {input: true, pullup: true}, inverted: false  }
+#     filters:
+#       - delayed_on_off: 500ms
+#   - platform: gpio
+#     name: "MCP23S17 Pin #14"
+#     pin: { mcp23xxx: mcp_gpio, number: 14, mode: {input: true, pullup: true}, inverted: false  }
+#     filters:
+#       - delayed_on_off: 500ms
+#   - platform: gpio
+#     name: "MCP23S17 Pin #15"
+#     pin: { mcp23xxx: mcp_gpio, number: 15, mode: {input: true, pullup: true}, inverted: false  }
+#     filters:
+#       - delayed_on_off: 500ms
+      # One of INPUT or INPUT_PULLUP
 
 text_sensor:
   - platform: version
@@ -125,14 +202,22 @@ text_sensor:
 
 spi:
   clk_pin: $spi_clk
-  mosi_pin: $spi_miso
-  miso_pin: $spi_mosi
+  mosi_pin: $spi_mosi
+  miso_pin: $spi_miso
   interface: spi3
 
-mcp3204:
+mcp3008:
   cs_pin: $adc_cs
-  reference_voltage: 3.3V
-  data_rate: 75kHz
+  # data_rate: 75kHz
+  data_rate: 1MHz
+  id: mcp_adc
+
+mcp23s17:
+  - id: mcp_gpio
+    cs_pin: $gpio_cs
+    data_rate: 1MHz
+    deviceaddress: 0
+
 
 output:
   - platform: ledc
@@ -183,14 +268,14 @@ sensor:
   #   pin: GPIO5
   #   attenuation: 12db
   #   # internal: true
-  - {platform: mcp3204, id: v0, name: voltage 0, update_interval: 3s, number: 0, unit_of_measurement: "V"}
-  - {platform: mcp3204, id: v1, name: voltage 1, update_interval: 3s, number: 1, unit_of_measurement: "V"}
-  - {platform: mcp3204, id: v2, name: voltage 2, update_interval: 3s, number: 2, unit_of_measurement: "V"}
-  - {platform: mcp3204, id: v3, name: voltage 3, update_interval: 3s, number: 3, unit_of_measurement: "V"}
-  - {platform: mcp3204, id: v4, name: voltage 4, update_interval: 3s, number: 4, unit_of_measurement: "V"}
-  - {platform: mcp3204, id: v5, name: voltage 5, update_interval: 3s, number: 5, unit_of_measurement: "V"}
-  - {platform: mcp3204, id: v6, name: voltage 6, update_interval: 3s, number: 6, unit_of_measurement: "V"}
-  - {platform: mcp3204, id: v7, name: voltage 7, update_interval: 3s, number: 7, unit_of_measurement: "V"}
+  - {platform: mcp3008, id: v0, name: voltage 0, update_interval: 5s, number: 0, accuracy_decimals: 2, mcp3008_id: mcp_adc, reference_voltage: 3.3, unit_of_measurement: "V"}
+  - {platform: mcp3008, id: v1, name: voltage 1, update_interval: 5s, number: 1, accuracy_decimals: 2, mcp3008_id: mcp_adc, reference_voltage: 3.3, unit_of_measurement: "V"}
+  - {platform: mcp3008, id: v2, name: voltage 2, update_interval: 5s, number: 2, accuracy_decimals: 2, mcp3008_id: mcp_adc, reference_voltage: 3.3, unit_of_measurement: "V"}
+  - {platform: mcp3008, id: v3, name: voltage 3, update_interval: 5s, number: 3, accuracy_decimals: 2, mcp3008_id: mcp_adc, reference_voltage: 3.3, unit_of_measurement: "V"}
+  - {platform: mcp3008, id: v4, name: voltage 4, update_interval: 5s, number: 4, accuracy_decimals: 2, mcp3008_id: mcp_adc, reference_voltage: 3.3, unit_of_measurement: "V"}
+  - {platform: mcp3008, id: v5, name: voltage 5, update_interval: 5s, number: 5, accuracy_decimals: 2, mcp3008_id: mcp_adc, reference_voltage: 3.3, unit_of_measurement: "V"}
+  - {platform: mcp3008, id: v6, name: voltage 6, update_interval: 5s, number: 6, accuracy_decimals: 2, mcp3008_id: mcp_adc, reference_voltage: 3.3, unit_of_measurement: "V"}
+  - {platform: mcp3008, id: v7, name: voltage 7, update_interval: 5s, number: 7, accuracy_decimals: 2, mcp3008_id: mcp_adc, reference_voltage: 3.3, unit_of_measurement: "V"}
 # 18.808  on_value_range 
   # - platform: adc
   #   name: "V In"
