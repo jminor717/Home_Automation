@@ -1,5 +1,5 @@
 substitutions:
-  device_name: dc-circuit-breaker
+  device_name: garage-temp-sensor
   eth_cs: GPIO9
   eth_clk: GPIO10
   eth_miso: GPIO11
@@ -7,14 +7,22 @@ substitutions:
   eth_int: GPIO13
   eth_rst: GPIO14
 
-  scl: GPIO15
-  sda: GPIO16
-  sda2: GPIO17
-  scl2: GPIO18
-  one_wire: GPIO19
+  scl: GPIO4
+  sda: GPIO5
+  sda2: GPIO7
+  scl2: GPIO6
+  one_wire: GPIO15
   DS18B20_06: "0xa13c01d607cdea28"
 
-
+.defaultfilters:
+  - &moving_avg
+    # we capture a new sample every 5 seconds, so the time can
+    # be calculated from the number of samples as n * 0.5.
+    sliding_window_moving_average:
+      # we average over the past 120 seconds
+      window_size: 24
+      # we push a new value every 60 seconds
+      send_every: 12
 
 external_components:
   - source:
@@ -49,7 +57,7 @@ logger:
   level: verbose
   logs:
     wifi: warn
-    sensor: INFO
+    sensor: debug
     adc.esp32: INFO
     adc.common: INFO
     logger: INFO
@@ -93,7 +101,12 @@ one_wire:
     id: one_wire_bus_a
 
 
+
 sensor:
+  - { platform: uptime, id: uptime_seconds, update_interval: 1min }
+  - { platform: template, id: uptime_days, name: "$device_name uptime", update_interval: 1min, 
+      device_class: duration, entity_category: "diagnostic", unit_of_measurement: "d", accuracy_decimals: 2,
+      lambda: !lambda "return id(uptime_seconds).state / 86'400;"}
   - platform: sht4x
     update_interval: 30s
     i2c_id: bus_a
@@ -114,10 +127,11 @@ sensor:
     humidity:
       name: "Garage Attic Humidity"
       id: garage_attic_humid
-  - platform: dallas_temp
-    address: $DS18B20_06
-    id: "rt_ds18_6"
-    name: "Roof Temp"
-    resolution: 10
-    one_wire_id: one_wire_bus_a
-    update_interval: 30s
+  # - platform: dallas_temp
+  #   address: $DS18B20_06
+  #   id: "rt_ds18_6"
+  #   name: "Roof Temp"
+  #   resolution: 10
+  #   one_wire_id: one_wire_bus_a
+  #   update_interval: 1s
+  #   filters: [ *moving_avg ]
