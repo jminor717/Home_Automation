@@ -9,8 +9,8 @@ substitutions:
 
   scl: GPIO4
   sda: GPIO5
-  sda2: GPIO7
-  scl2: GPIO6
+  sda2: GPIO6
+  scl2: GPIO7
   one_wire: GPIO15
   DS18B20_06: "0xa13c01d607cdea28"
 
