@@ -20,6 +20,8 @@ substitutions:
   spi_miso: GPIO17
   spi_mosi: GPIO18
 
+  scl_pin: GPIO20
+  sda_pin: GPIO19
 
 external_components:
   - source:
@@ -62,6 +64,7 @@ logger:
     cd74hc4067: INFO
     mdns: INFO
     ledc.output: INFO
+    sdp3x.sensor: INFO
 
 ethernet:
   type: W5500
@@ -210,6 +213,12 @@ spi:
   miso_pin: $spi_miso
   interface: spi3
 
+i2c:
+  - id: bus_a
+    sda: $sda_pin
+    scl: $scl_pin
+    scan: true
+
 # output:
 #   - platform: ledc
 #     pin: $ledc_pin
@@ -249,6 +258,21 @@ spi:
 
 # name: "garage circuit", 
 sensor:
+  - platform: sdp3x
+    update_interval: 100ms
+    name: "Indoor Pressure"
+    id: house_pressure
+    i2c_id: bus_a
+    address: 0x25
+    unit_of_measurement: "Pa"
+    filters:
+      # we capture a new sample every 1 seconds, so the time can
+      # be calculated from the number of samples as n * 1.
+      sliding_window_moving_average:
+        # we average over the past 2 seconds
+        window_size: 20
+        # we push a new value every 1 seconds
+        send_every: 10
   - { platform: uptime, id: uptime_seconds, update_interval: 1min }
   - { platform: template, id: uptime_days, name: "$device_name uptime", update_interval: 1min, 
       device_class: duration, entity_category: "diagnostic", unit_of_measurement: "d", accuracy_decimals: 2,

@@ -86,26 +86,17 @@ sensor:
             - output.turn_on: bathroom_vent_call
 
 globals:
-  - { id: bathroom_upper, type: float, initial_value: "2.5"}
-  - { id: bathroom_lower, type: float, initial_value: "0"}
-  - { id: bathroom_opened, type: float, initial_value: "1"}
-  - { id: bathroom_closed, type: float, initial_value: "0"}
-  - { id: kitchen_upper, type: float, initial_value: "2.5"}
-  - { id: kitchen_lower, type: float, initial_value: "0"}
-  - { id: kitchen_opened, type: float, initial_value: "1"}
-  - { id: kitchen_closed, type: float, initial_value: "0"}
-  - { id: shop_upper, type: float, initial_value: "2.5"}
-  - { id: shop_lower, type: float, initial_value: "0"}
-  - { id: shop_opened, type: float, initial_value: "1"}
-  - { id: shop_closed, type: float, initial_value: "0"}
+  - { id: open_vent_bits, type: int, initial_value: "0b0000'0000"}
+  - { id: close_vent_bits, type: int, initial_value: "0b0000'0001"}
+
 
 hard_stop_damper:
-  - {id: bathroom_damper, upper_limit: bathroom_upper, lower_limit: bathroom_lower, open_position: bathroom_opened, close_position: bathroom_closed,
-    servo_position_sensor: bathroom_servo_potentiometer, servo: bathroom_servo, open_at_center: true, switch_open_and_close: false, open_offset: -0.075 }
-  - {id: kitchen_damper, upper_limit: kitchen_upper, lower_limit: kitchen_lower, open_position: kitchen_opened, close_position: kitchen_closed,
-    servo_position_sensor: kitchen_servo_potentiometer, servo: kitchen_servo, open_at_center: true, switch_open_and_close: false, open_offset: 0 }
-  - {id: shop_damper, upper_limit: shop_upper, lower_limit: shop_lower, open_position: shop_opened, close_position: shop_closed,
-    servo_position_sensor: shop_servo_potentiometer, servo: shop_servo, open_at_center: true, switch_open_and_close: false, open_offset: 0 }
+  - {id: bathroom_damper, servo_position_sensor: bathroom_servo_potentiometer, servo: bathroom_servo, 
+    open_at_center: true, switch_open_and_close: false, open_offset: -0.075 }
+  - {id: kitchen_damper, servo_position_sensor: kitchen_servo_potentiometer, servo: kitchen_servo, 
+    open_at_center: true, switch_open_and_close: false, open_offset: 0 }
+  - {id: shop_damper, servo_position_sensor: shop_servo_potentiometer, servo: shop_servo, 
+    open_at_center: true, switch_open_and_close: false, open_offset: 0 }
 
 
 cover:
@@ -113,29 +104,32 @@ cover:
     device_class: damper
     id: bathroom_vent
     name: bathroom vent
-    open_action: { servo.write: { id: bathroom_servo, level: !lambda "return id(bathroom_opened);" } }
-    close_action: { servo.write: { id: bathroom_servo, level: !lambda "return  id(bathroom_closed);" } }
-    tilt_action: { servo.write: { id: bathroom_servo, level: !lambda "return remap(tilt, float(1), float(0), id(bathroom_opened), id(bathroom_closed));" }  }
-    tilt_lambda: !lambda "return remap(id(bathroom_servo_potentiometer).state, id(bathroom_upper), id(bathroom_lower), float(1), float(0));"
-    lambda: "return id(bathroom_servo_potentiometer).state < ( id(bathroom_lower) + float(0.1))  ? COVER_CLOSED : COVER_OPEN;"
+    restore_mode: NO_RESTORE
+    open_action: { servo.write: { id: bathroom_servo, level: !lambda "return id(bathroom_damper).open_position;" } }
+    close_action: { servo.write: { id: bathroom_servo, level: !lambda "return  id(bathroom_damper).close_position;" }}
+    tilt_action: { servo.write: { id: bathroom_servo, level: !lambda "return id(bathroom_damper).tilt_to_servo_position(tilt);" }}
+    tilt_lambda: !lambda "return id(bathroom_damper).get_tilt();"
+    lambda: "return id(bathroom_damper).get_cover_state();"
   - platform: template
     device_class: damper
     id: kitchen_vent
     name: kitchen vent
-    open_action: { servo.write: { id: kitchen_servo, level: !lambda "return id(kitchen_opened);" } }
-    close_action: { servo.write: { id: kitchen_servo, level: !lambda "return  id(kitchen_closed);" } }
-    tilt_action: { servo.write: { id: kitchen_servo, level: !lambda "return remap(tilt, float(1), float(0), id(kitchen_opened), id(kitchen_closed));" }  }
-    tilt_lambda: !lambda "return remap(id(kitchen_servo_potentiometer).state, id(kitchen_upper), id(kitchen_lower), float(1), float(0));"
-    lambda: "return id(kitchen_servo_potentiometer).state < ( id(kitchen_lower) + float(0.1))  ? COVER_CLOSED : COVER_OPEN;"
+    restore_mode: NO_RESTORE
+    open_action: { servo.write: { id: bathroom_servo, level: !lambda "return id(kitchen_damper).open_position;" } }
+    close_action: { servo.write: { id: bathroom_servo, level: !lambda "return  id(kitchen_damper).close_position;" }}
+    tilt_action: { servo.write: { id: bathroom_servo, level: !lambda "return id(kitchen_damper).tilt_to_servo_position(tilt);" }}
+    tilt_lambda: !lambda "return id(kitchen_damper).get_tilt();"
+    lambda: "return id(kitchen_damper).get_cover_state();"
   - platform: template
     device_class: damper
     id: shop_vent
     name: shop vent
-    open_action: { servo.write: { id: shop_servo, level: !lambda "return id(shop_opened);" } }
-    close_action: { servo.write: { id: shop_servo, level: !lambda "return  id(shop_closed);" } }
-    tilt_action: { servo.write: { id: shop_servo, level: !lambda "return remap(tilt, float(1), float(0), id(shop_opened), id(shop_closed));" }  }
-    tilt_lambda: !lambda "return remap(id(shop_servo_potentiometer).state, id(shop_upper), id(shop_lower), float(1), float(0));"
-    lambda: "return id(shop_servo_potentiometer).state < ( id(shop_lower) + float(0.1))  ? COVER_CLOSED : COVER_OPEN;"
+    restore_mode: NO_RESTORE
+    open_action: { servo.write: { id: bathroom_servo, level: !lambda "return id(shop_damper).open_position;" } }
+    close_action: { servo.write: { id: bathroom_servo, level: !lambda "return  id(shop_damper).close_position;" }}
+    tilt_action: { servo.write: { id: bathroom_servo, level: !lambda "return id(shop_damper).tilt_to_servo_position(tilt);" }}
+    tilt_lambda: !lambda "return id(shop_damper).get_tilt();"
+    lambda: "return id(shop_damper).get_cover_state();"
 
 
 
@@ -157,7 +151,9 @@ output:
       - if:
           condition:
             lambda: return state;
-          then: { canbus.send: { data: [0b1000_0001] } }
+          # then: { canbus.send: { data: [0b1000_0001] } }
+          then: 
+            canbus.send: !lambda return {id(open_vent_bits), 0x20, 0x42}; 
           else: { canbus.send: { data: [0b0000_0001] } }
   - platform: template
     id: kitchen_vent_call
