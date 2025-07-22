@@ -1,0 +1,135 @@
+substitutions:
+  device_name: erv-ctrl
+  eth_cs: GPIO9
+  eth_clk: GPIO10
+  eth_miso: GPIO11
+  eth_mosi: GPIO12
+  eth_int: GPIO13
+  eth_rst: GPIO14
+
+  scl_pin: GPIO20
+  sda_pin: GPIO19
+
+  erv_in_l_pin: GPIO21
+  erv_out_l_pin: GPIO38
+
+
+external_components:
+  - source:
+      type: local
+      path: ..\my_components # path relative to Devices folder
+
+esphome:
+  name: $device_name
+  platformio_options:
+    board_build.flash_mode: dio
+
+esp32:
+  board: esp32-s3-devkitc-1
+  variant: esp32s3
+  flash_size: 8MB
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESPTOOLPY_FLASHSIZE_8MB: y
+
+preferences:
+  # the default of 1min is far too short--flash chip is rated
+  # for approx 100k writes.
+  flash_write_interval: "48h"
+
+api:
+  # password: ""
+ota:
+  platform: esphome
+  password: ""
+
+logger:
+  level: verbose
+  logs:
+    wifi: warn
+    sensor: INFO
+    adc.esp32: INFO
+    adc.common: INFO
+    logger: INFO
+    cd74hc4067: INFO
+    mdns: INFO
+    ledc.output: INFO
+    sdp3x.sensor: INFO
+
+ethernet:
+  type: W5500
+  clk_pin: $eth_clk
+  mosi_pin: $eth_mosi
+  miso_pin: $eth_miso
+  cs_pin: $eth_cs
+  interrupt_pin: $eth_int
+  reset_pin: $eth_rst
+
+time:
+  - platform: homeassistant
+
+button:
+  - platform: restart
+    name: "$device_name Restart"
+
+text_sensor:
+  - platform: version
+    name: "$device_name Version"
+
+
+i2c:
+  - id: bus_a
+    sda: $sda_pin
+    scl: $scl_pin
+    scan: true
+
+
+sensor:
+  - { platform: uptime, id: uptime_seconds, update_interval: 1min }
+  - { platform: template, id: uptime_days, name: "$device_name uptime", update_interval: 1min, 
+      device_class: duration, entity_category: "diagnostic", unit_of_measurement: "d", accuracy_decimals: 2,
+      lambda: !lambda "return id(uptime_seconds).state / 86'400;"}
+  - platform: sdp3x
+    update_interval: 10ms
+    name: "Pressure Delta"
+    id: pressure_dif
+    i2c_id: bus_a
+    address: 0x25
+    # unit_of_measurement: "Pa"
+    filters:
+      # - quantile: # covers up high frequency high amplitude signals eg door opening
+      #     window_size: 10
+      #     send_every: 10
+      #     quantile: .9
+      # - delta: 0.000145
+      - sliding_window_moving_average:
+          window_size: 25
+          send_every: 25
+      - or:
+        - sliding_window_moving_average:
+            window_size: 8  # we average over the past 2 seconds
+            send_every: 4  # we push a new value every 1 seconds
+        - delta: 0.01 # or if the value changes rapidly
+      - delta: 0.0006
+      # - or:
+      #   - throttle: 5min
+      #   - delta: 0.0004
+
+fan:
+  - platform: speed
+    output: erv_in_l
+    name: "ERV input low"
+  - platform: speed
+    output: erv_out_l
+    name: "ERV output low"
+
+output:
+  - platform: ledc
+    pin: $erv_in_l_pin
+    id: erv_in_l
+    frequency: 19531Hz
+  - platform: ledc
+    pin: $erv_out_l_pin
+    id: erv_out_l
+    frequency: 19531Hz
