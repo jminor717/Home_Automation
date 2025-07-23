@@ -17,7 +17,7 @@ substitutions:
 external_components:
   - source:
       type: local
-      path: ..\my_components # path relative to Devices folder
+      path: ..\..\my_components # path relative to Devices folder
 
 esphome:
   name: $device_name
@@ -45,17 +45,7 @@ ota:
   password: ""
 
 logger:
-  level: verbose
-  logs:
-    wifi: warn
-    sensor: INFO
-    adc.esp32: INFO
-    adc.common: INFO
-    logger: INFO
-    cd74hc4067: INFO
-    mdns: INFO
-    ledc.output: INFO
-    sdp3x.sensor: INFO
+  level: INFO
 
 ethernet:
   type: W5500
@@ -84,7 +74,36 @@ i2c:
     scl: $scl_pin
     scan: true
 
+globals:
+  - id: filter_queue
+    type: std::deque<float>
+    restore_value: no
+  - id: filter_queue_depth
+    type: int
+    restore_value: no
+    initial_value: '120'
+  - id: send_every
+    type: int
+    restore_value: no
+    initial_value: '120'
+  - id: last_sent
+    type: int
+    restore_value: no
+    initial_value: '60'
+  - id: outlier_threshold
+    type: float
+    restore_value: no
+    initial_value: '0.03'
+  - id: amount_to_send_after_outlier
+    type: int
+    restore_value: no
+    initial_value: '20' # after an outlier is detected, we send the next 5 seconds of data
+  - id: needs_sent_after_outlier
+    type: int
+    restore_value: no
+    initial_value: '0'
 
+# 0.005715
 sensor:
   - { platform: uptime, id: uptime_seconds, update_interval: 1min }
   - { platform: template, id: uptime_days, name: "$device_name uptime", update_interval: 1min, 
@@ -98,23 +117,60 @@ sensor:
     address: 0x25
     # unit_of_measurement: "Pa"
     filters:
-      # - quantile: # covers up high frequency high amplitude signals eg door opening
-      #     window_size: 10
-      #     send_every: 10
-      #     quantile: .9
-      # - delta: 0.000145
       - sliding_window_moving_average:
-          window_size: 25
+          window_size: 50
           send_every: 25
-      - or:
-        - sliding_window_moving_average:
-            window_size: 8  # we average over the past 2 seconds
-            send_every: 4  # we push a new value every 1 seconds
-        - delta: 0.01 # or if the value changes rapidly
-      - delta: 0.0006
-      # - or:
-      #   - throttle: 5min
-      #   - delta: 0.0004
+      # send to lambda filter 4 times per second lambda sends once every 30 seconds
+      # lambda will average over the last 30 seconds
+      # if the value is an outlier to the running average, it will send the next 20 values in order to capture transient events
+      - lambda: |-
+          float sum = 0;
+          size_t valid_count = 0;
+          // find running average to check for outliers
+          for (auto v : id(filter_queue)) {
+            if (!std::isnan(v)) {
+              sum += v;
+              valid_count++;
+            }
+          }
+          float average = NAN;
+          if (valid_count) {
+            average = sum / valid_count;
+          } else {
+            // if no values in queue, just return the current value and add to queue
+            id(filter_queue).push_back(x);
+            return x;
+          }
+
+          id(filter_queue).push_back(x);
+          // if the current value is an outlier, we will send the next 20 values
+          if (std::abs(x - average) > id(outlier_threshold)) {
+            ESP_LOGVV("filt", "outL: %f", x);
+            id(needs_sent_after_outlier) = id(amount_to_send_after_outlier);
+            id(last_sent) = 0;
+            return x;
+          }
+
+          if (id(needs_sent_after_outlier) > 0) {
+            id(needs_sent_after_outlier)--;
+            ESP_LOGVV("filt", "outL sent: %f", x);
+            return x;
+          }
+
+          // if we have enough values in the queue, pop the oldest one
+          if (id(filter_queue).size() >= id(filter_queue_depth)) {
+            id(filter_queue).pop_front();
+          }
+          // send the average every 30 seconds, this average doesn't include the current X but this should be good enough
+          if (id(last_sent) >= id(send_every)) {
+            id(last_sent) = 0;
+            ESP_LOGVV("filt", "AVEe: %f", average);
+            return average;
+          } else {
+            id(last_sent)++;
+          }
+          return {};
+
 
 fan:
   - platform: speed

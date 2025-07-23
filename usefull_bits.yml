@@ -10,6 +10,13 @@ esphome:
   name: $device_name
   platformio_options:
     board_build.flash_mode: dio
+  includes:
+    - GeoGab.h
+
+
+lambda: |-
+  esp_logi("GeoGab", "Timeout: %d", geogab.settings.timeout);
+
 
 esp32:
   board: esp32-s3-devkitc-1
