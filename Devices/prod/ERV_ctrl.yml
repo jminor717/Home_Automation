@@ -23,6 +23,8 @@ esphome:
   name: $device_name
   platformio_options:
     board_build.flash_mode: dio
+  includes:
+    - pressurePeakFilter.h
 
 esp32:
   board: esp32-s3-devkitc-1
@@ -74,34 +76,6 @@ i2c:
     scl: $scl_pin
     scan: true
 
-globals:
-  - id: filter_queue
-    type: std::deque<float>
-    restore_value: no
-  - id: filter_queue_depth
-    type: int
-    restore_value: no
-    initial_value: '120'
-  - id: send_every
-    type: int
-    restore_value: no
-    initial_value: '120'
-  - id: last_sent
-    type: int
-    restore_value: no
-    initial_value: '60'
-  - id: outlier_threshold
-    type: float
-    restore_value: no
-    initial_value: '0.03'
-  - id: amount_to_send_after_outlier
-    type: int
-    restore_value: no
-    initial_value: '20' # after an outlier is detected, we send the next 5 seconds of data
-  - id: needs_sent_after_outlier
-    type: int
-    restore_value: no
-    initial_value: '0'
 
 # 0.005715
 sensor:
@@ -118,58 +92,15 @@ sensor:
     # unit_of_measurement: "Pa"
     filters:
       - sliding_window_moving_average:
-          window_size: 50
-          send_every: 25
+          window_size: 48
+          send_every: 12
       # send to lambda filter 4 times per second lambda sends once every 30 seconds
       # lambda will average over the last 30 seconds
       # if the value is an outlier to the running average, it will send the next 20 values in order to capture transient events
+
       - lambda: |-
-          float sum = 0;
-          size_t valid_count = 0;
-          // find running average to check for outliers
-          for (auto v : id(filter_queue)) {
-            if (!std::isnan(v)) {
-              sum += v;
-              valid_count++;
-            }
-          }
-          float average = NAN;
-          if (valid_count) {
-            average = sum / valid_count;
-          } else {
-            // if no values in queue, just return the current value and add to queue
-            id(filter_queue).push_back(x);
-            return x;
-          }
-
-          id(filter_queue).push_back(x);
-          // if the current value is an outlier, we will send the next 20 values
-          if (std::abs(x - average) > id(outlier_threshold)) {
-            ESP_LOGVV("filt", "outL: %f", x);
-            id(needs_sent_after_outlier) = id(amount_to_send_after_outlier);
-            id(last_sent) = 0;
-            return x;
-          }
-
-          if (id(needs_sent_after_outlier) > 0) {
-            id(needs_sent_after_outlier)--;
-            ESP_LOGVV("filt", "outL sent: %f", x);
-            return x;
-          }
-
-          // if we have enough values in the queue, pop the oldest one
-          if (id(filter_queue).size() >= id(filter_queue_depth)) {
-            id(filter_queue).pop_front();
-          }
-          // send the average every 30 seconds, this average doesn't include the current X but this should be good enough
-          if (id(last_sent) >= id(send_every)) {
-            id(last_sent) = 0;
-            ESP_LOGVV("filt", "AVEe: %f", average);
-            return average;
-          } else {
-            id(last_sent)++;
-          }
-          return {};
+            return peakFilter.apply_filter(x);
+      - delta: 0.0005
 
 
 fan:
