@@ -97,7 +97,6 @@ sensor:
       # send to lambda filter 4 times per second lambda sends once every 30 seconds
       # lambda will average over the last 30 seconds
       # if the value is an outlier to the running average, it will send the next 20 values in order to capture transient events
-
       - lambda: |-
             return peakFilter.apply_filter(x);
       - delta: 0.0005

@@ -31,15 +31,6 @@ ota:
 logger:
   level: info
 
-.defaultfilters:
-  - &moving_avg
-    # we capture a new sample every 1 seconds
-    sliding_window_moving_average:
-      # we average over the past 120 seconds
-      window_size: 120
-      # we push a new value every 60 seconds
-      send_every: 60
-
 
 wifi:
   ssid: !secret wifi_ssid
@@ -75,18 +66,26 @@ sensor:
     address: $DS18B20_07
     id: "hvac_sup_ds18_7"
     name: "HV-AC Supply Air Temp"
-    resolution: 10
+    # resolution: 12
     one_wire_id: one_wire_bus_a
-    update_interval: 5s
-    filters: [ *moving_avg ]
+    update_interval: 1s
+    filters:
+      - sliding_window_moving_average:
+          window_size: 60
+          send_every: 30
+      - delta: 0.1
   - platform: dallas_temp
     address: $DS18B20_08
     name: "HV-AC Return Air Temp"
     id: "hvac_ret_ds18_8"
-    resolution: 10
+    # resolution: 12
     one_wire_id: one_wire_bus_a
-    update_interval: 5s
-    filters: [ *moving_avg ]
+    update_interval: 1s
+    filters:
+      - sliding_window_moving_average:
+          window_size: 60
+          send_every: 30
+      - delta: 0.1
 
 
 
