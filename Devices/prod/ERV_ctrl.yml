@@ -94,11 +94,27 @@ sensor:
       - sliding_window_moving_average:
           window_size: 48
           send_every: 12
+      - lambda: |-
+          id(pressure_dif_avg).publish_state(x);
+          return x;
       # send to lambda filter 4 times per second lambda sends once every 30 seconds
       # lambda will average over the last 30 seconds
       # if the value is an outlier to the running average, it will send the next 20 values in order to capture transient events
       - lambda: |-
             return peakFilter.apply_filter(x);
+      - delta: 0.0005
+  - platform: template
+    # name: "Pressure Delta Average"
+    internal: true
+    id: pressure_dif_avg
+    unit_of_measurement: "hPa"
+    device_class: "pressure"
+    state_class: "measurement"
+    accuracy_decimals: 3
+    filters:
+      - sliding_window_moving_average:
+          window_size: 240
+          send_every: 240
       - delta: 0.0005
 
 
