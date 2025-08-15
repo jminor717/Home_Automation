@@ -24,7 +24,17 @@ esphome:
   platformio_options:
     board_build.flash_mode: dio
   includes:
-    - pressurePeakFilter.h
+    - src\erv_ctrl\pressurePeakFilter.h
+    - src\erv_ctrl\PID.h
+    - src\erv_ctrl\PressurePID.h
+  on_boot:
+    - priority: 600
+      then:
+        - lambda: |-
+            init_pressure_pid_();
+
+
+
 
 esp32:
   board: esp32-s3-devkitc-1
@@ -113,18 +123,64 @@ sensor:
     accuracy_decimals: 3
     filters:
       - sliding_window_moving_average:
-          window_size: 240
-          send_every: 240
-      - delta: 0.0005
+          window_size: 480
+          send_every: 83
+      # - delta: 0.0005
+    on_value:
+      then: 
+        - delay: 100ms
+        - script.execute: eval_erv_state
+
+# globals:
+#   - { id: erv_pid, type: "struct tm" }
+#   - id: my_global_struct_instance
+#     type: MyCustomStruct
+#     restore_value: no # or yes, depending on your needs
+#     initial_value: '{.value1 = 10, .value2 = 3.14, .name = "My Initial Name"}' # Initialize members
+# , initial_value: ""
+
+script:
+  - id: eval_erv_state
+    mode: single
+    then:
+      - lambda: |-
+          // id(erv_pid).tm_sec = 0;
+          float current_pressure = id(pressure_dif_avg).state * 100.0; // convert hPa to Pa
+
+          auto call = id(erv_out).turn_on();
+          call.set_speed(20);
+          call.perform();
+          
+          float Fan_l = update_pressure_pid_(current_pressure);
+
+          if(Fan_l != NAN) {
+            auto call = id(erv_in).turn_on();
+            call.set_speed(Fan_l);
+            call.perform();
+            ESP_LOGI("erv_eval", "SP:  %.6f  pressure: %.6f   %.2f  %.2f  %.2f  %.2f", Fan_l, current_pressure, id(pressure_target).state, id(max_vent_speed).state, id(min_vent_speed).state, id(vent_speed_sp).state);
+          }
+
+
+  - id: erv_pid_change
+    mode: queued
+    then:
+      - lambda: |-
+          pid_limits(pressure_pid, id(min_vent_speed).state, id(max_vent_speed).state);
+          pressure_setpoint = id(pressure_target).state;
+
+
+
 
 
 fan:
   - platform: speed
     output: erv_in_l
-    name: "ERV input low"
+    name: "ERV input"
+    id: erv_in
   - platform: speed
     output: erv_out_l
-    name: "ERV output low"
+    name: "ERV output"
+    id: erv_out
 
 output:
   - platform: ledc
@@ -135,3 +191,29 @@ output:
     pin: $erv_out_l_pin
     id: erv_out_l
     frequency: 19531Hz
+
+
+number:
+  - { platform: homeassistant, id: pressure_target, name: "Pressure Target", entity_id: input_number.home_pressure_target,
+      on_value: { then: [ delay: 100ms, script.execute: erv_pid_change]} }
+  - { platform: homeassistant, id: max_vent_speed, name: "Max Vent Speed", entity_id: input_number.max_vent_speed,
+      on_value: { then: [ delay: 100ms, script.execute: erv_pid_change]} }
+  - { platform: homeassistant, id: min_vent_speed, name: "Min Vent Speed", entity_id: input_number.min_vent_speed,
+      on_value: { then: [ delay: 100ms, script.execute: erv_pid_change]} }
+  - { platform: homeassistant, id: vent_speed_sp, name: "Vent Speed Target", entity_id: input_number.vent_speed_target,
+      on_value: { then: [ delay: 100ms, script.execute: erv_pid_change]}  }
+  # - platform: template
+  #   id: max_vent_speed
+  #   name: "Max Vent Speed"
+  #   optimistic: true
+  #   min_value: 10
+  #   max_value: 100
+  #   step: 1
+  # - platform: template
+  #   id: min_vent_speed
+  #   name: "Min Vent Speed"
+  #   optimistic: true
+  #   min_value: 10
+  #   max_value: 100
+  #   step: 1
+
