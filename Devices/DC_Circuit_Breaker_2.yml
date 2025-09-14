@@ -1,0 +1,120 @@
+substitutions:
+  device_name: dc-circuit-breaker
+  eth_cs: GPIO9
+  eth_clk: GPIO10
+  eth_miso: GPIO11
+  eth_mosi: GPIO12
+  eth_int: GPIO13
+  eth_rst: GPIO14
+
+  adc_cs: GPIO4
+  spi_clk: GPIO5
+  spi_miso: GPIO6
+  spi_mosi: GPIO7
+
+# 15, 16, 17, 18, 8, 19, 20, 3, 
+# 0, 1, 2, 41, 40, 39, 38, 21, 45
+
+external_components:
+  - source:
+      type: local
+      path: ..\my_components # path relative to Devices folder
+
+esphome:
+  name: $device_name
+  platformio_options:
+    board_build.flash_mode: dio
+
+esp32:
+  board: esp32-s3-devkitc-1
+  variant: esp32s3
+  flash_size: 8MB
+  framework:
+    # type: arduino
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESPTOOLPY_FLASHSIZE_8MB: y
+
+preferences:
+  # the default of 1min is far too short--flash chip is rated
+  # for approx 100k writes.
+  flash_write_interval: "48h"
+
+api:
+  # password: ""
+ota:
+  platform: esphome
+  password: ""
+
+logger:
+  level: verbose
+  logs:
+    wifi: warn
+    sensor: INFO
+    adc.esp32: INFO
+    adc.common: INFO
+    logger: INFO
+    cd74hc4067: INFO
+    mdns: INFO
+    ledc.output: INFO
+    sdp3x.sensor: INFO
+
+ethernet:
+  type: W5500
+  clk_pin: $eth_clk
+  mosi_pin: $eth_mosi
+  miso_pin: $eth_miso
+  cs_pin: $eth_cs
+  interrupt_pin: $eth_int
+  reset_pin: $eth_rst
+
+time:
+  - platform: homeassistant
+
+button:
+  - platform: restart
+    name: "$device_name Restart"
+
+
+text_sensor:
+  - platform: version
+    name: "$device_name Version"
+
+
+spi:
+  clk_pin: $spi_clk
+  mosi_pin: $spi_mosi
+  miso_pin: $spi_miso
+  interface: spi3
+
+mcp3008:
+  cs_pin: $adc_cs
+  # data_rate: 75kHz
+  data_rate: 1MHz
+  id: mcp_adc
+
+
+
+
+
+
+
+# name: "garage circuit", 
+sensor:
+  - { platform: uptime, id: uptime_seconds, update_interval: 1min }
+  - { platform: template, id: uptime_days, name: "$device_name uptime", update_interval: 1min, 
+      device_class: duration, entity_category: "diagnostic", unit_of_measurement: "d", accuracy_decimals: 2,
+      lambda: !lambda "return id(uptime_seconds).state / 86'400;"}
+  # - {platform: mcp3008, id: v0, name: voltage 0, update_interval: 5s, number: 0, accuracy_decimals: 2, mcp3008_id: mcp_adc, reference_voltage: 3.3, unit_of_measurement: "V"}
+  # - {platform: mcp3008, id: v1, name: voltage 1, update_interval: 5s, number: 1, accuracy_decimals: 2, mcp3008_id: mcp_adc, reference_voltage: 3.3, unit_of_measurement: "V"}
+  # - {platform: mcp3008, id: v2, name: voltage 2, update_interval: 5s, number: 2, accuracy_decimals: 2, mcp3008_id: mcp_adc, reference_voltage: 3.3, unit_of_measurement: "V"}
+  # - {platform: mcp3008, id: v3, name: voltage 3, update_interval: 5s, number: 3, accuracy_decimals: 2, mcp3008_id: mcp_adc, reference_voltage: 3.3, unit_of_measurement: "V"}
+  # - {platform: mcp3008, id: v4, name: voltage 4, update_interval: 5s, number: 4, accuracy_decimals: 2, mcp3008_id: mcp_adc, reference_voltage: 3.3, unit_of_measurement: "V"}
+  # - {platform: mcp3008, id: v5, name: voltage 5, update_interval: 5s, number: 5, accuracy_decimals: 2, mcp3008_id: mcp_adc, reference_voltage: 3.3, unit_of_measurement: "V"}
+  # - {platform: mcp3008, id: v6, name: voltage 6, update_interval: 5s, number: 6, accuracy_decimals: 2, mcp3008_id: mcp_adc, reference_voltage: 3.3, unit_of_measurement: "V"}
+  # - {platform: mcp3008, id: v7, name: voltage 7, update_interval: 5s, number: 7, accuracy_decimals: 2, mcp3008_id: mcp_adc, reference_voltage: 3.3, unit_of_measurement: "V"}
+# 18.808  on_value_range 
+
+
+
+
