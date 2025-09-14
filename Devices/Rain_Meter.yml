@@ -1,0 +1,141 @@
+substitutions:
+  device_name: dc-circuit-breaker
+  eth_cs: GPIO9
+  eth_clk: GPIO10
+  eth_miso: GPIO11
+  eth_mosi: GPIO12
+  eth_int: GPIO13
+  eth_rst: GPIO14
+
+  scl_pin: GPIO5
+  sda_pin: GPIO4
+
+external_components:
+  - source:
+      type: local
+      path: ..\my_components # path relative to Devices folder
+
+esphome:
+  name: $device_name
+  platformio_options:
+    board_build.flash_mode: dio
+
+esp32:
+  board: esp32-s3-devkitc-1
+  variant: esp32s3
+  flash_size: 8MB
+  framework:
+    # type: arduino
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESPTOOLPY_FLASHSIZE_8MB: y
+
+preferences:
+  # the default of 1min is far too short--flash chip is rated
+  # for approx 100k writes.
+  flash_write_interval: "48h"
+
+api:
+  # password: ""
+ota:
+  platform: esphome
+  password: ""
+
+logger:
+  level: verbose
+  logs:
+    wifi: warn
+    sensor: INFO
+    adc.esp32: INFO
+    adc.common: INFO
+    logger: INFO
+    mdns: INFO
+    veml7700: INFO
+    ltr390: INFO
+
+
+
+ethernet:
+  type: W5500
+  clk_pin: $eth_clk
+  mosi_pin: $eth_mosi
+  miso_pin: $eth_miso
+  cs_pin: $eth_cs
+  interrupt_pin: $eth_int
+  reset_pin: $eth_rst
+
+time:
+  - platform: homeassistant
+
+button:
+  - platform: restart
+    name: "$device_name Restart"
+
+i2c:
+  - id: bus_a
+    sda: $sda_pin
+    scl: $scl_pin
+    scan: true
+
+.defaultfilters:
+  - &moving_avg_three
+    sliding_window_moving_average:
+      window_size: 4
+      send_every: 2
+  - &moving_avg_2_min
+    sliding_window_moving_average:
+      window_size: 120
+      send_every: 120
+  - &moving_avg_thirty
+    sliding_window_moving_average:
+      window_size: 30
+      send_every: 30
+
+
+sensor:
+  - platform: veml7700
+    address: 0x10
+    update_interval: 5s
+    ambient_light: 
+      name: "Ambient light"
+      filters: [ *moving_avg_three ]
+    infrared: 
+      name: "near infrared light"
+      filters: [ *moving_avg_three ]
+    # full_spectrum: "Full spectrum light"
+    actual_gain:
+      name: "X_Actual gain"
+      filters:
+        - throttle: 60s
+    actual_integration_time:
+      name: "X_Actual integration time"
+      filters:
+        - throttle: 60s
+  - platform: ltr390
+    update_interval: 1s
+    uv_index:
+      name: "UV Index"
+      filters: [ *moving_avg_2_min ]
+    light:
+      name: "Light"
+      filters: [ *moving_avg_thirty ]
+    # uv:
+    #   name: "X_UV Sensor Counts"
+    # ambient_light:
+    #   name: "X_Light Sensor Counts"
+
+
+
+i2c_device:
+  id: fdc1004
+  address: 0b1010000
+
+#  on...:
+#  then:
+#    - lambda: !lambda |-
+#        id(i2cdev).write_byte(0x00, 0x12);
+#        if (auto b = id(i2cdev).read_byte(0x01)) {
+#          // TODO
+#        }
+
+

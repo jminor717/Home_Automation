@@ -14,6 +14,12 @@ substitutions:
 
   ledc_pin: GPIO46
 
+  motor_1: GPIO4
+  motor_dir_A: GPIO5
+  motor_dir_B: GPIO6
+  stop_1: GPIO19
+  stop_2: GPIO20
+
   gpio_cs: GPIO7
   adc_cs: GPIO15
   spi_clk: GPIO16
@@ -38,6 +44,7 @@ esp32:
   variant: esp32s3
   flash_size: 8MB
   framework:
+    # type: arduino
     type: esp-idf
     sdkconfig_options:
       CONFIG_ESPTOOLPY_FLASHSIZE_8MB: y
@@ -93,96 +100,157 @@ mcp23s17:
     cs_pin: $gpio_cs
     data_rate: 1MHz
     deviceaddress: 0
-    open_drain_interrupt: true
+    open_drain_interrupt: false
+
+# Example configuration entry
+# fan:
+#   - platform: hbridge
+#     id: my_fan
+#     name: "Living Room Fan"
+#     pin_a: my_output_id
+#     pin_b: my_output_id_2
+#     enable_pin: my_output_id_3
+#     decay_mode: slow
+
+output:
+  - platform: gpio
+    pin: $motor_1
+    id: motor_speed
+  - platform: ledc
+    pin: $motor_dir_A
+    id: motor_dir_1
+  - platform: ledc
+    pin: $motor_dir_B
+    id: motor_dir_2
+  # - platform: ledc
+  #   pin: $motor_2
+  #   id: my_output_id_2
+  # - platform: ledc
+  #   pin: $motor_en
+  #   id: my_output_id_3
+
+# timed_traversal_motor:
+
+cover:
+  - platform: endstop
+    name: "Endstop Cover"
+
+    open_action:
+      - output.turn_off: motor_dir_1
+      - output.set_level:
+              id: motor_dir_2
+              level: 25%
+    open_duration: 30sec
+    open_endstop: open_endstop_binary_sensor
+
+    close_action:
+      - output.turn_off: motor_dir_2
+      - output.set_level:
+              id: motor_dir_1
+              level: 25%
+    close_duration: 30sec
+    close_endstop: close_endstop_binary_sensor
+
+    stop_action:
+      - output.turn_off: motor_dir_1
+      - output.turn_off: motor_dir_2
+
 
 switch:
   # - platform: restart
   #   id: needed_for_switch_reference
   - platform: gpio
-    name: "MCP23S17 Pin #0"
-    pin: { mcp23xxx: mcp_gpio, number: 0, mode: { output: true }, inverted: false }
-  # - platform: gpio
-  #   name: "MCP23S17 Pin #1"
-  #   pin: { mcp23xxx: mcp_gpio, number: 1, mode: { output: true }, inverted: false }
+    name: "MCP23S17 Pin #1"
+    pin: { mcp23xxx: mcp_gpio, number: 1, mode: { output: true }, inverted: false }
   - platform: gpio
     name: "MCP23S17 Pin #2"
     pin: { mcp23xxx: mcp_gpio, number: 2, mode: { output: true }, inverted: false }
   - platform: gpio
-    name: "MCP23S17 Pin #9"
-    pin: { mcp23xxx: mcp_gpio, number: 9, mode: { output: true }, inverted: false }
+    name: "MCP23S17 Pin #3"
+    pin: { mcp23xxx: mcp_gpio, number: 3, mode: { output: true }, inverted: false }
   - platform: gpio
-    name: "MCP23S17 Pin #10"
-    pin: { mcp23xxx: mcp_gpio, number: 10, mode: { output: true }, inverted: false }
+    name: "MCP23S17 Pin #4"
+    pin: { mcp23xxx: mcp_gpio, number: 4, mode: { output: true }, inverted: false }
   - platform: gpio
-    name: "MCP23S17 Pin #8"
-    pin: { mcp23xxx: mcp_gpio, number: 8, mode: { output: true }, inverted: false }
+    name: "MCP23S17 Pin #5"
+    pin: { mcp23xxx: mcp_gpio, number: 5, mode: { output: true }, inverted: false }
+  - platform: gpio
+    name: "MCP23S17 Pin #6"
+    pin: { mcp23xxx: mcp_gpio, number: 6, mode: { output: true }, inverted: false }
 
 binary_sensor:
   - platform: gpio
-    name: "MCP23S17 Pin #1"
-    pin: { mcp23xxx: mcp_gpio, number: 1, mode: {input: true }, inverted: false, interrupt: CHANGE  }
-    filters:
-      - delayed_on_off: 500ms
-#   - platform: gpio
-#     name: "MCP23S17 Pin #2"
-#     pin: { mcp23xxx: mcp_gpio, number: 2, mode: {input: true, pullup: true}, inverted: false  }
-#     filters:
-#       - delayed_on_off: 500ms
+    id: open_endstop_binary_sensor
+    pin: $stop_1
   - platform: gpio
-    name: "MCP23S17 Pin #3"
-    pin: { mcp23xxx: mcp_gpio, number: 3, mode: {input: true, pullup: true}, inverted: false  }
+    id: close_endstop_binary_sensor
+    pin: $stop_2
+
+  # - platform: gpio
+  #   name: "MCP23S17 Pin #1"
+  #   pin: { mcp23xxx: mcp_gpio, number: 1, mode: {input: true, pullup: false }, inverted: false, interrupt: CHANGE  }
+  #   filters:
+  #     - delayed_on_off: 500ms
+  # - platform: gpio
+  #   name: "MCP23S17 Pin #2"
+  #   pin: { mcp23xxx: mcp_gpio, number: 2, mode: {input: true, pullup: false}, inverted: false  }
+  #   filters:
+  #     - delayed_on_off: 500ms
+  # - platform: gpio
+  #   name: "MCP23S17 Pin #3"
+  #   pin: { mcp23xxx: mcp_gpio, number: 3, mode: {input: true, pullup: false}, inverted: false  }
+  #   filters:
+  #     - delayed_on_off: 500ms
+  # - platform: gpio
+  #   name: "MCP23S17 Pin #4"
+  #   pin: { mcp23xxx: mcp_gpio, number: 4, mode: {input: true, pullup: false}, inverted: false  }
+  #   filters:
+  #     - delayed_on_off: 500ms
+  # - platform: gpio
+  #   name: "MCP23S17 Pin #5"
+  #   pin: { mcp23xxx: mcp_gpio, number: 5, mode: {input: true, pullup: false}, inverted: false  }
+  #   filters:
+  #     - delayed_on_off: 500ms
+  # - platform: gpio
+  #   name: "MCP23S17 Pin #6"
+  #   pin: { mcp23xxx: mcp_gpio, number: 6, mode: {input: true, pullup: false}, inverted: false  }
+  #   filters:
+  #     - delayed_on_off: 500ms
+  - platform: gpio
+    name: "MCP23S17 Pin #9"
+    pin: { mcp23xxx: mcp_gpio, number: 9, mode: {input: true, pullup: false}, inverted: false  }
     filters:
       - delayed_on_off: 500ms
   - platform: gpio
-    name: "MCP23S17 Pin #4"
-    pin: { mcp23xxx: mcp_gpio, number: 4, mode: {input: true, pullup: true}, inverted: false  }
+    name: "MCP23S17 Pin #10"
+    pin: { mcp23xxx: mcp_gpio, number: 10, mode: {input: true, pullup: false}, inverted: false  }
     filters:
       - delayed_on_off: 500ms
   - platform: gpio
-    name: "MCP23S17 Pin #5"
-    pin: { mcp23xxx: mcp_gpio, number: 5, mode: {input: true, pullup: true}, inverted: false  }
+    name: "MCP23S17 Pin #11"
+    pin: { mcp23xxx: mcp_gpio, number: 11, mode: {input: true, pullup: false}, inverted: false  }
     filters:
       - delayed_on_off: 500ms
   - platform: gpio
-    name: "MCP23S17 Pin #6"
-    pin: { mcp23xxx: mcp_gpio, number: 6, mode: {input: true, pullup: true}, inverted: false  }
+    name: "MCP23S17 Pin #12"
+    pin: { mcp23xxx: mcp_gpio, number: 12, mode: {input: true, pullup: false}, inverted: false  }
     filters:
       - delayed_on_off: 500ms
-#   - platform: gpio
-#     name: "MCP23S17 Pin #9"
-#     pin: { mcp23xxx: mcp_gpio, number: 9, mode: {input: true, pullup: true}, inverted: false  }
-#     filters:
-#       - delayed_on_off: 500ms
-#   - platform: gpio
-#     name: "MCP23S17 Pin #10"
-#     pin: { mcp23xxx: mcp_gpio, number: 10, mode: {input: true, pullup: true}, inverted: false  }
-#     filters:
-#       - delayed_on_off: 500ms
-#   - platform: gpio
-#     name: "MCP23S17 Pin #11"
-#     pin: { mcp23xxx: mcp_gpio, number: 11, mode: {input: true, pullup: true}, inverted: false  }
-#     filters:
-#       - delayed_on_off: 500ms
-#   - platform: gpio
-#     name: "MCP23S17 Pin #12"
-#     pin: { mcp23xxx: mcp_gpio, number: 12, mode: {input: true, pullup: true}, inverted: false  }
-#     filters:
-#       - delayed_on_off: 500ms
-#   - platform: gpio
-#     name: "MCP23S17 Pin #13"
-#     pin: { mcp23xxx: mcp_gpio, number: 13, mode: {input: true, pullup: true}, inverted: false  }
-#     filters:
-#       - delayed_on_off: 500ms
-#   - platform: gpio
-#     name: "MCP23S17 Pin #14"
-#     pin: { mcp23xxx: mcp_gpio, number: 14, mode: {input: true, pullup: true}, inverted: false  }
-#     filters:
-#       - delayed_on_off: 500ms
-#   - platform: gpio
-#     name: "MCP23S17 Pin #15"
-#     pin: { mcp23xxx: mcp_gpio, number: 15, mode: {input: true, pullup: true}, inverted: false  }
-#     filters:
-#       - delayed_on_off: 500ms
+  - platform: gpio
+    name: "MCP23S17 Pin #13"
+    pin: { mcp23xxx: mcp_gpio, number: 13, mode: {input: true, pullup: false}, inverted: false  }
+    filters:
+      - delayed_on_off: 500ms
+  - platform: gpio
+    name: "MCP23S17 Pin #14"
+    pin: { mcp23xxx: mcp_gpio, number: 14, mode: {input: true, pullup: false}, inverted: false  }
+    filters:
+      - delayed_on_off: 500ms
+  - platform: gpio
+    name: "MCP23S17 Pin #15"
+    pin: { mcp23xxx: mcp_gpio, number: 15, mode: {input: true, pullup: false}, inverted: false  }
+    filters:
+      - delayed_on_off: 500ms
       # One of INPUT or INPUT_PULLUP
 
 text_sensor:
@@ -213,11 +281,11 @@ spi:
   miso_pin: $spi_miso
   interface: spi3
 
-i2c:
-  - id: bus_a
-    sda: $sda_pin
-    scl: $scl_pin
-    scan: true
+# i2c:
+#   - id: bus_a
+#     sda: $sda_pin
+#     scl: $scl_pin
+#     scan: true
 
 # output:
 #   - platform: ledc
@@ -258,21 +326,6 @@ i2c:
 
 # name: "garage circuit", 
 sensor:
-  - platform: sdp3x
-    update_interval: 100ms
-    name: "Indoor Pressure"
-    id: house_pressure
-    i2c_id: bus_a
-    address: 0x25
-    unit_of_measurement: "Pa"
-    filters:
-      # we capture a new sample every 1 seconds, so the time can
-      # be calculated from the number of samples as n * 1.
-      sliding_window_moving_average:
-        # we average over the past 2 seconds
-        window_size: 20
-        # we push a new value every 1 seconds
-        send_every: 10
   - { platform: uptime, id: uptime_seconds, update_interval: 1min }
   - { platform: template, id: uptime_days, name: "$device_name uptime", update_interval: 1min, 
       device_class: duration, entity_category: "diagnostic", unit_of_measurement: "d", accuracy_decimals: 2,

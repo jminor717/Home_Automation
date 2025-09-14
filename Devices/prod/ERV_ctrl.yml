@@ -146,11 +146,6 @@ script:
       - lambda: |-
           // id(erv_pid).tm_sec = 0;
           float current_pressure = id(pressure_dif_avg).state * 100.0; // convert hPa to Pa
-
-          auto call = id(erv_out).turn_on();
-          call.set_speed(20);
-          call.perform();
-          
           float Fan_l = update_pressure_pid_(current_pressure);
 
           if(Fan_l != NAN) {
@@ -159,6 +154,11 @@ script:
             call.perform();
             ESP_LOGI("erv_eval", "SP:  %.6f  pressure: %.6f   %.2f  %.2f  %.2f  %.2f", Fan_l, current_pressure, id(pressure_target).state, id(max_vent_speed).state, id(min_vent_speed).state, id(vent_speed_sp).state);
           }
+
+          auto outputSpeed = id(vent_speed_sp).state;
+          auto call = id(erv_out).turn_on();
+          call.set_speed(outputSpeed);
+          call.perform();
 
 
   - id: erv_pid_change

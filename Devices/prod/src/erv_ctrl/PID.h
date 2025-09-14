@@ -23,9 +23,11 @@
 /*		Includes and dependencies			*/
 /*-------------------------------------------------------------*/
 #include "esp_timer.h"
+#include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
+
 /*-------------------------------------------------------------*/
 /*		Macros and definitions				*/
 /*-------------------------------------------------------------*/
@@ -161,8 +163,9 @@ bool pid_compute(pid_controller* pid)
         return false;
 
     float in = *(pid->input);
+    float sp = *(pid->setpoint);
     // Compute error
-    float error = (*(pid->setpoint)) - in;
+    float error = sp - in;
     // Compute integral
     pid->iterm += (pid->Ki * error);
     if (pid->iterm > pid->omax)
@@ -183,9 +186,17 @@ bool pid_compute(pid_controller* pid)
     // Keep track of some variables for next execution
     pid->lastin = in;
     pid->lasttime = esp_timer_get_time();
-    if (abs(error) < pid->smallValue) {
-        // If error is small, reset the integral term to avoid windup
-        pid->iterm = 0;
+    if ((error < 0 && pid->iterm > 0) || (error > 0 && pid->iterm < 0)) {
+        // error > 0 = input < setpoint
+        // error < 0 = input > setpoint
+        // error < 0 && pid->iterm > 0 = overshoot
+        // error > 0 && pid->iterm < 0 = undershoot
+
+        // error < pid->smallValue
+        // If error is small, reduce the integral term to avoid windup
+        // when we over/undershoot scale the integral term down proportional to the derivitive(slope)
+        // helps to reduce oscillation and overshoot caused by integral windup
+        pid->iterm = pid->iterm * (1 - (abs(dinput) * 0.1));
     }
     return true;
 }

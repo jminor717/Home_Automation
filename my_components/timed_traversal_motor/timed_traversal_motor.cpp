@@ -1,4 +1,5 @@
 #include "timed_traversal_motor.h"
+#include "esphome/components/fan/fan.h"
 #include "esphome/core/helpers.h"
 #include "esphome/core/log.h"
 
@@ -6,14 +7,13 @@ namespace esphome {
 namespace timed_traversal_motor {
     static const char* const TAG = "Timed_Traversal_Motor";
 
+
+
     void TimedTraversalMotor::setup()
     {
         // this->motor_comand_thread();
         this->stop_0_pin->attach_interrupt(TimedTraversalMotor::gpio_intr, &this->store_, gpio::INTERRUPT_ANY_EDGE);
         this->stop_1_pin->attach_interrupt(TimedTraversalMotor::gpio_intr, &this->store_, gpio::INTERRUPT_ANY_EDGE);
-        this->store_.limit_switch_triggered = xQueueCreate(1, sizeof(uint32_t));
-        this->store_.timer_expired = xQueueCreate(1, sizeof(uint32_t));
-        this->state_changed = xQueueCreate(1, sizeof(uint32_t));
 
         // create task with a high priority (19) to ensure minimal delay between the gpio limit switch event and the action to stop the motor
         // xTaskCreatePinnedToCore(TimedTraversalMotor::motor_comand_thread, "hard_stop_task", 8192 * 2, (void*)this, 19, &this->task_handle, 1);
@@ -46,14 +46,14 @@ namespace timed_traversal_motor {
     {
         float dist = state - this->current_position;
         this->target_position = state;
-        FanDirection fan_dir;
+        esphome::fan::FanDirection _dir;
         if (dist > 0) {
             this->is_moving = MovementDirection::POS;
-            fan_dir = FanDirection::FORWARD;
+            _dir = esphome::fan::FanDirection::FORWARD;
         }
         if (dist < 0) {
             this->is_moving = MovementDirection::NEG;
-            fan_dir = FanDirection::REVERSE;
+            _dir = esphome::fan::FanDirection::REVERSE;
         } else {
             this->is_moving = MovementDirection::STILL;
             return;
@@ -63,7 +63,7 @@ namespace timed_traversal_motor {
         this->expected_travel_time = this->total_travel_time * dist;
 
         // todo: start moving motor
-        this->drive_motor.turn_on().set_direction(fan_dir).set_speed(100).perform();
+        this->drive_motor->turn_on().set_direction(_dir).set_speed(100).perform();
 
         xQueueReset(this->store_.timer_expired);
         esp_timer_start_once(this->timer_handle, this->expected_travel_time);
@@ -71,7 +71,7 @@ namespace timed_traversal_motor {
 
         uint32_t ulValReceived;
         xQueueReceive(this->store_.timer_expired, &ulValReceived, pdMS_TO_TICKS((this->expected_travel_time + 100'000) / 1000)); // wait for a maximum of the expected travel time plus 100 miliseconds
-        this->drive_motor.turn_off().perform();
+        this->drive_motor->turn_off().perform();
     }
 
     void
@@ -113,7 +113,7 @@ namespace timed_traversal_motor {
 
         // move in other direction to second hard stop tracking elapsed time
         // if high and low speeds are desired move back to first hardstop ad a different speed to get a linear approximation for commanded speed vs actual speed
-        uint32_t travel_time = local_this->move_to_hardstop(-1);
+        uint32_t travel_time = this->move_to_hardstop(-1);
         this->current_position = 0;
         this->total_travel_time = travel_time;
         this->homed = true;
@@ -128,16 +128,40 @@ namespace timed_traversal_motor {
         if (stop_0 && stop_1) {
             return 0;
         }
+
+        esphome::fan::FanDirection _dir;
+        esphome::fan::FanDirection _reverse_dir;
+        if (speed > 0) {
+            this->is_moving = MovementDirection::POS;
+            _dir = esphome::fan::FanDirection::FORWARD;
+            _reverse_dir = esphome::fan::FanDirection::REVERSE;
+        }
+        if (speed < 0) {
+            this->is_moving = MovementDirection::NEG;
+            _dir = esphome::fan::FanDirection::REVERSE;
+            _reverse_dir = esphome::fan::FanDirection::FORWARD;
+        } else {
+            this->is_moving = MovementDirection::STILL;
+            return 0;
+        }
+
         xQueueReset(this->store_.limit_switch_triggered);
 
         // TODO start moving motor
-        this->drive_motor.turn_on().set_direction(fan_dir).set_speed(abs(speed) * 100).perform();
+        this->drive_motor->turn_on().set_direction(_dir).set_speed(abs(speed) * 100).perform();
         uint32_t start = micros();
 
         uint32_t ulValReceived;
         xQueueReceive(this->store_.limit_switch_triggered, &ulValReceived, pdMS_TO_TICKS(60'000)); // give the motor up to a minute to move to the limit switch
         uint32_t end = this->store_.event_micros;
-        this->drive_motor.turn_off().perform();
+        this->drive_motor->turn_off().perform();
+
+        // slowly back off the limit switch so it is not triggered when we start moving in the other direction
+        xQueueReset(this->store_.limit_switch_triggered);
+        this->drive_motor->turn_on().set_direction(_reverse_dir).set_speed(10).perform();
+        xQueueReceive(this->store_.limit_switch_triggered, &ulValReceived, pdMS_TO_TICKS(60'000)); // give the motor up to a minute to move to the limit switch
+        this->drive_motor->turn_off().perform();
+
 
         uint32_t dif = end - start;
         return dif;
@@ -148,7 +172,7 @@ namespace timed_traversal_motor {
         uint32_t ulVarToSend = 2;
         // #ifdef CONFIG_ESP_TIMER_SUPPORTS_ISR_DISPATCH_METHOD
         // xQueueOverwriteFromISR(arg->timer_expired, &ulVarToSend, &xHigherPriorityTaskWoken);
-        xQueueOverwrite(arg->timer_expired, &ulVarToSend, &xHigherPriorityTaskWoken);
+        xQueueOverwriteFromISR(arg->timer_expired, &ulVarToSend, &xHigherPriorityTaskWoken);
         if (xHigherPriorityTaskWoken == pdTRUE) {
             vPortYield();
         }
@@ -177,7 +201,7 @@ namespace timed_traversal_motor {
 
         BaseType_t xHigherPriorityTaskWoken = pdFALSE;
         uint32_t ulVarToSend = 1;
-        xQueueOverwrite(this->state_changed, &ulVarToSend, &xHigherPriorityTaskWoken);
+        xQueueOverwrite(this->state_changed, &ulVarToSend);
     }
     void TimedTraversalMotor::request_home()
     {
@@ -185,7 +209,7 @@ namespace timed_traversal_motor {
 
         BaseType_t xHigherPriorityTaskWoken = pdFALSE;
         uint32_t ulVarToSend = 1;
-        xQueueOverwrite(this->state_changed, &ulVarToSend, &xHigherPriorityTaskWoken);
+        xQueueOverwrite(this->state_changed, &ulVarToSend);
     }
     void TimedTraversalMotor::dump_config()
     {

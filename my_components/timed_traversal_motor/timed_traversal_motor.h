@@ -36,6 +36,13 @@ namespace timed_traversal_motor {
 
     class TimedTraversalMotor : public output::FloatOutput, public PollingComponent {
     public:
+        TimedTraversalMotor()
+        {
+            this->store_.limit_switch_triggered = xQueueCreate(1, sizeof(uint32_t));
+            this->store_.timer_expired = xQueueCreate(1, sizeof(uint32_t));
+            this->state_changed = xQueueCreate(1, sizeof(uint32_t));
+        }
+
         float get_setup_priority() const override { return setup_priority::DATA; }
         void setup() override;
         void dump_config() override;
@@ -47,7 +54,7 @@ namespace timed_traversal_motor {
         static void timer_intr(TimedTraversalMotorStore* arg);
 
     protected:
-        hbridge::HBridgeFan drive_motor;
+        hbridge::HBridgeFan* drive_motor;
 
         TaskHandle_t task_handle { nullptr };
         TimedTraversalMotorStore store_ {};
@@ -61,7 +68,7 @@ namespace timed_traversal_motor {
         bool homed = false;
 
         MovementDirection is_moving = MovementDirection::STILL;
-        uint32_t movement_start_time;
+        uint32_t movement_start_time = 0;
 
         QueueHandle_t state_changed;
         bool home_requested = false;
