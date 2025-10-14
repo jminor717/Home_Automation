@@ -1,0 +1,153 @@
+substitutions:
+  device_name: garage-door
+  eth_cs: GPIO9
+  eth_clk: GPIO10
+  eth_miso: GPIO11
+  eth_mosi: GPIO12
+  eth_int: GPIO13
+  eth_rst: GPIO14
+
+  motor_speed_pin: GPIO4
+  motor_dir_A: GPIO5
+  motor_dir_B: GPIO6
+
+  lock_r_lock: GPIO7
+  lock_r_unlock: GPIO15
+
+external_components:
+  - source:
+      type: local
+      path: ..\my_components # path relative to Devices folder
+
+esphome:
+  name: $device_name
+  platformio_options:
+    board_build.flash_mode: dio
+
+esp32:
+  board: esp32-s3-devkitc-1
+  variant: esp32s3
+  flash_size: 8MB
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESPTOOLPY_FLASHSIZE_8MB: y
+      # CONFIG_ESP_TIMER_SUPPORTS_ISR_DISPATCH_METHOD: y
+
+preferences:
+  # the default of 1min is far too short--flash chip is rated for approx 100k writes.
+  flash_write_interval: "48h"
+
+api:
+  # password: ""
+ota:
+  platform: esphome
+  password: ""
+
+logger:
+  level: debug
+  logs:
+    wifi: INFO
+    sensor: INFO
+    binary_sensor: INFO
+
+ethernet:
+  type: W5500
+  clk_pin: $eth_clk
+  mosi_pin: $eth_mosi
+  miso_pin: $eth_miso
+  cs_pin: $eth_cs
+  interrupt_pin: $eth_int
+  reset_pin: $eth_rst
+
+time:
+  - platform: homeassistant
+
+button:
+  - platform: restart
+    name: "$device_name Restart"
+
+text_sensor:
+  - platform: version
+    name: "$device_name Version"
+
+sensor:
+  - { platform: uptime, id: uptime_seconds, update_interval: 1min }
+  - { platform: template, id: uptime_days, name: "$device_name uptime", update_interval: 1min, device_class: duration, entity_category: "diagnostic", unit_of_measurement: "d",
+      accuracy_decimals: 2, lambda: !lambda "return id(uptime_seconds).state / 86'400;", }
+
+output:
+  - platform: ledc
+    pin: $motor_speed_pin
+    id: motor_speed
+    frequency: 19531Hz
+    # 39063Hz
+  - platform: gpio
+    pin: $motor_dir_A
+    id: motor_dir_1
+  - platform: gpio
+    pin: $motor_dir_B
+    id: motor_dir_2
+
+globals:
+  - { id: lock_r_moving, type: bool, initial_value: "false" }
+
+
+lock:
+  - platform: template
+    id: door_r_lock
+    name: "Template Lock"
+    lock_action:
+      - globals.set: { id: lock_r_moving, value: "true"}
+      - output.turn_off: motor_dir_1
+      - output.turn_on: motor_dir_2
+      - output.set_level: { id: motor_speed, level: 50% }
+    unlock_action:
+      - globals.set: { id: lock_r_moving, value: "true"}
+      - output.turn_on: motor_dir_1
+      - output.turn_off: motor_dir_2
+      - output.set_level: { id: motor_speed, level: 50% }
+    open_action:
+      - globals.set: { id: lock_r_moving, value: "true"}
+      - output.turn_on: motor_dir_1
+      - output.turn_off: motor_dir_2
+      - output.set_level: { id: motor_speed, level: 50% }
+      # - lock.template.publish: { id: door_r_lock, state: UNLOCKING }
+
+#   valid options are 'LOCKED', 'UNLOCKED', 'JAMMED', 'LOCKING', 'UNLOCKING'
+
+binary_sensor:
+  - platform: gpio
+    id: r_lock_sensor
+    pin: $lock_r_lock
+    filters: [ delayed_on_off: 100ms]
+    on_press: 
+      then:
+        - lock.template.publish: { id: door_r_lock, state: LOCKED }
+        - output.turn_off: motor_speed
+        - globals.set: { id: lock_r_moving, value: "false"}
+    on_release:
+      if:
+        condition:
+          lambda: 'return id(lock_r_moving);'
+        then: { lock.template.publish: { id: door_r_lock, state: UNLOCKING } }
+        else: { lock.template.publish: { id: door_r_lock, state: JAMMED } }
+  - platform: gpio
+    id: r_unlock_sensor
+    pin: $lock_r_unlock
+    filters: [ delayed_on_off: 100ms]
+    on_press: 
+      then:
+        - lock.template.publish: { id: door_r_lock, state: UNLOCKED }
+        - output.turn_off: motor_speed
+        - globals.set: { id: lock_r_moving, value: "false"}
+    on_release:
+      if:
+        condition:
+          lambda: 'return id(lock_r_moving);'
+        then: { lock.template.publish: { id: door_r_lock, state: LOCKING } }
+        else: { lock.template.publish: { id: door_r_lock, state: JAMMED } }
+
+
+
+

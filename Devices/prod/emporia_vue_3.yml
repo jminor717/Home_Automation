@@ -17,8 +17,7 @@ esp32:
     version: recommended
 
 preferences:
-  # the default of 1min is far too short--flash chip is rated
-  # for approx 100k writes.
+  # the default of 1min is far too short--flash chip is rated for approx 100k writes.
   flash_write_interval: "96h"
 
 api:

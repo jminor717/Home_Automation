@@ -1,5 +1,25 @@
 substitutions:
-  device_name: central-return-damper
+  # device_name: central-return-damper
+  device_name: dc-circuit-breaker
+  eth_cs: GPIO9
+  eth_clk: GPIO10
+  eth_miso: GPIO11
+  eth_mosi: GPIO12
+  eth_int: GPIO13
+  eth_rst: GPIO14
+
+  motor_speed_pin: GPIO17
+  motor_dir_A: GPIO6
+  motor_dir_B: GPIO7
+  stop_1: GPIO15
+  stop_2: GPIO16
+
+  one_wire_a: GPIO18
+  one_wire_b: GPIO8
+
+  DS18B20_07: "0xa20119280563f828"
+
+
 
 external_components:
   - source:
@@ -21,9 +41,8 @@ esp32:
       CONFIG_ESPTOOLPY_FLASHSIZE_8MB: y
 
 preferences:
-  # the default of 1min is far too short--flash chip is rated
-  # for approx 100k writes.
-  flash_write_interval: "48h"
+  # the default of 1min is far too short--flash chip is rated for approx 100k writes.
+  flash_write_interval: "168h"
 
 api:
   # password: ""
@@ -34,13 +53,14 @@ ota:
 logger:
   level: info
 
-wifi:
-  ssid: !secret wifi_ssid
-  password: !secret wifi_password
-  ap:
-    ssid: "$device_name AP"
-    password: "BiSG9yrKP394"
-captive_portal:
+ethernet:
+  type: W5500
+  clk_pin: $eth_clk
+  mosi_pin: $eth_mosi
+  miso_pin: $eth_miso
+  cs_pin: $eth_cs
+  interrupt_pin: $eth_int
+  reset_pin: $eth_rst
 
 time:
   - platform: homeassistant
@@ -53,10 +73,72 @@ text_sensor:
   - platform: version
     name: "$device_name Version"
 
+output:
+  - platform: gpio # ledc
+    pin: $motor_speed_pin
+    id: motor_speed
+    # frequency: 60Hz
+  - platform: gpio
+    pin: $motor_dir_A
+    id: motor_dir_1
+  - platform: gpio
+    pin: $motor_dir_B
+    id: motor_dir_2
+
+binary_sensor:
+  - platform: gpio
+    id: open_endstop_binary_sensor
+    pin: $stop_1
+  - platform: gpio
+    id: close_endstop_binary_sensor
+    pin: $stop_2
+
+cover:
+  - platform: endstop
+    name: "Endstop Cover"
+    open_action:
+      - output.turn_off: motor_dir_1
+      - output.turn_on: motor_dir_2
+      - output.turn_on: motor_speed
+    open_duration: 30sec
+    open_endstop: open_endstop_binary_sensor
+    close_action:
+      - output.turn_off: motor_dir_2
+      - output.turn_on: motor_dir_1
+      - output.turn_on: motor_speed
+    close_duration: 30sec
+    close_endstop: close_endstop_binary_sensor
+    stop_action:
+      - output.turn_off: motor_speed
+      - output.turn_off: motor_dir_2
+      - output.turn_off: motor_dir_1
+
+.defaultfilters:
+  - &moving_avg
+    sliding_window_moving_average:
+      window_size: 60
+      send_every: 30
+
+one_wire:
+  - platform: gpio
+    pin: $one_wire_a
+    id: one_wire_bus_a
+  - platform: gpio
+    pin: $one_wire_b
+    id: one_wire_bus_b
+
 sensor:
   - { platform: uptime, id: uptime_seconds, update_interval: 1min }
-  - { platform: template, id: uptime_days, name: "$device_name uptime", update_interval: 1min, entity_category: "diagnostic", lambda: !lambda "return id(uptime_seconds).state / 86'400;"}
+  - { platform: template, id: uptime_days, name: "$device_name uptime", update_interval: 1min, 
+      device_class: duration, entity_category: "diagnostic", unit_of_measurement: "d", accuracy_decimals: 2,
+      lambda: !lambda "return id(uptime_seconds).state / 86'400;"}
+  - { platform: dallas_temp, address: $DS18B20_07, name: "Slab Edge Temp", id: "slab_one",  one_wire_id: one_wire_bus_b, update_interval: 1s, filters: [ *moving_avg, delta: 0.1 ]}
+  - { platform: dallas_temp, address: $DS18B20_07, name: "Slab Center Temp", id: "slab_two",  one_wire_id: one_wire_bus_a, update_interval: 1s, filters: [ *moving_avg, delta: 0.1 ]}
+  - { platform: dallas_temp, address: $DS18B20_07, name: "Ground Edge Temp", id: "ground_one",  one_wire_id: one_wire_bus_b, update_interval: 1s, filters: [ *moving_avg, delta: 0.1 ]}
+  - { platform: dallas_temp, address: $DS18B20_07, name: "Ground Center Temp", id: "ground_two",  one_wire_id: one_wire_bus_a, update_interval: 1s, filters: [ *moving_avg, delta: 0.1 ]}
+    # resolution: 12
+    
+    
+    
 
 
-
-timed_traversal_motor:

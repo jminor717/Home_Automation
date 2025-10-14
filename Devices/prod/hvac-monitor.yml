@@ -18,8 +18,7 @@ esp32:
       CONFIG_ESPTOOLPY_FLASHSIZE_8MB: y
 
 preferences:
-  # the default of 1min is far too short--flash chip is rated
-  # for approx 100k writes.
+  # the default of 1min is far too short--flash chip is rated for approx 100k writes.
   flash_write_interval: "120h"
 
 api:
@@ -57,6 +56,12 @@ one_wire:
     pin: GPIO11
     id: one_wire_bus_a
 
+.defaultfilters:
+  - &moving_avg
+    sliding_window_moving_average:
+      window_size: 60
+      send_every: 30
+
 sensor:
   - { platform: uptime, id: uptime_seconds, update_interval: 1min }
   - { platform: template, id: uptime_days, name: "$device_name uptime", update_interval: 1min, 
@@ -69,11 +74,7 @@ sensor:
     # resolution: 12
     one_wire_id: one_wire_bus_a
     update_interval: 1s
-    filters:
-      - sliding_window_moving_average:
-          window_size: 60
-          send_every: 30
-      - delta: 0.1
+    filters: [ *moving_avg, delta: 0.1 ]
   - platform: dallas_temp
     address: $DS18B20_08
     name: "HV-AC Return Air Temp"
@@ -81,11 +82,7 @@ sensor:
     # resolution: 12
     one_wire_id: one_wire_bus_a
     update_interval: 1s
-    filters:
-      - sliding_window_moving_average:
-          window_size: 60
-          send_every: 30
-      - delta: 0.1
+    filters: [ *moving_avg, delta: 0.1 ]
 
 
 

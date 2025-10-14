@@ -36,8 +36,7 @@ esp32:
       CONFIG_ESPTOOLPY_FLASHSIZE_8MB: y
 
 preferences:
-  # the default of 1min is far too short--flash chip is rated
-  # for approx 100k writes.
+  # the default of 1min is far too short--flash chip is rated for approx 100k writes.
   flash_write_interval: "48h"
 
 api:

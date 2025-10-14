@@ -50,8 +50,7 @@ esp32:
       # CONFIG_ESP_TIMER_SUPPORTS_ISR_DISPATCH_METHOD: y
 
 preferences:
-  # the default of 1min is far too short--flash chip is rated
-  # for approx 100k writes.
+  # the default of 1min is far too short--flash chip is rated for approx 100k writes.
   flash_write_interval: "48h"
 
 api:
@@ -110,19 +109,6 @@ button:
 text_sensor:
   - platform: version
     name: "$device_name Version"
-  # - platform: template
-  #   name: "$device_name Uptime"
-  #   update_interval: 5min
-  #   icon: mdi:clock-start
-  #   entity_category: "diagnostic"
-  #   lambda: |-
-  #     int seconds = (id(uptime_seconds).state);
-  #     int days = seconds / (24 * 3600);
-  #     seconds = seconds % (24 * 3600);
-  #     int hours = seconds / 3600;
-  #     seconds = seconds % 3600;
-  #     int minutes = seconds /  60;
-  #     return  std::to_string(days) +"d " + std::to_string(hours) +"h " + std::to_string(minutes) +"m";
 
 hard_stop_damper:
   - id: attic_return_damper
