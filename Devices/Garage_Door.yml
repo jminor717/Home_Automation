@@ -7,12 +7,12 @@ substitutions:
   eth_int: GPIO13
   eth_rst: GPIO14
 
-  motor_speed_pin: GPIO4
-  motor_dir_A: GPIO5
-  motor_dir_B: GPIO6
+  motor_speed_pin: GPIO6
+  motor_dir_A: GPIO7
+  motor_dir_B: GPIO15
 
-  lock_r_lock: GPIO7
-  lock_r_unlock: GPIO15
+  lock_r_lock: GPIO16
+  lock_r_unlock: GPIO17
 
 external_components:
   - source:
@@ -92,34 +92,68 @@ output:
 globals:
   - { id: lock_r_moving, type: bool, initial_value: "false" }
 
+script:
+  - id: check_lock_jammed
+    mode: restart
+    then:
+      - delay: 5s
+      - if:
+          condition:
+            and:
+              - binary_sensor.is_off: r_lock_sensor
+              - binary_sensor.is_off: r_unlock_sensor
+          then:
+            - lock.template.publish: { id: door_r_lock, state: JAMMED }
+            - output.turn_off: motor_speed
+            - globals.set: { id: lock_r_moving, value: "false"}
 
 lock:
   - platform: template
     id: door_r_lock
-    name: "Template Lock"
+    name: "Right Garage Door Lock"
     lock_action:
       - globals.set: { id: lock_r_moving, value: "true"}
       - output.turn_off: motor_dir_1
       - output.turn_on: motor_dir_2
-      - output.set_level: { id: motor_speed, level: 50% }
+      - output.set_level: { id: motor_speed, level: 80% }
+      - script.execute: check_lock_jammed
     unlock_action:
       - globals.set: { id: lock_r_moving, value: "true"}
       - output.turn_on: motor_dir_1
       - output.turn_off: motor_dir_2
-      - output.set_level: { id: motor_speed, level: 50% }
+      - output.set_level: { id: motor_speed, level: 80% }
+      - script.execute: check_lock_jammed
     open_action:
       - globals.set: { id: lock_r_moving, value: "true"}
       - output.turn_on: motor_dir_1
       - output.turn_off: motor_dir_2
-      - output.set_level: { id: motor_speed, level: 50% }
+      - output.set_level: { id: motor_speed, level: 80% }
+      - script.execute: check_lock_jammed
       # - lock.template.publish: { id: door_r_lock, state: UNLOCKING }
 
 #   valid options are 'LOCKED', 'UNLOCKED', 'JAMMED', 'LOCKING', 'UNLOCKING'
 
 binary_sensor:
+  - platform: status
+    id: connection_status
+    on_state:
+      then:
+        - delay: 3s
+        - if:
+            condition: { binary_sensor.is_on: r_lock_sensor }
+            then:
+              - lock.template.publish: { id: door_r_lock, state: LOCKED }
+              - globals.set: { id: lock_r_moving, value: "false"}
+            else:
+              - if:
+                  condition: { binary_sensor.is_on: r_unlock_sensor }
+                  then:
+                    - lock.template.publish: { id: door_r_lock, state: UNLOCKED }
+                    - globals.set: { id: lock_r_moving, value: "false"}
+                  else: { lock.lock: door_r_lock }
   - platform: gpio
     id: r_lock_sensor
-    pin: $lock_r_lock
+    pin: { number: $lock_r_lock, mode: { input: true, pulldown : true } }
     filters: [ delayed_on_off: 100ms]
     on_press: 
       then:
@@ -134,7 +168,7 @@ binary_sensor:
         else: { lock.template.publish: { id: door_r_lock, state: JAMMED } }
   - platform: gpio
     id: r_unlock_sensor
-    pin: $lock_r_unlock
+    pin: { number: $lock_r_unlock, mode: { input: true, pulldown : true } }
     filters: [ delayed_on_off: 100ms]
     on_press: 
       then:
@@ -147,7 +181,4 @@ binary_sensor:
           lambda: 'return id(lock_r_moving);'
         then: { lock.template.publish: { id: door_r_lock, state: LOCKING } }
         else: { lock.template.publish: { id: door_r_lock, state: JAMMED } }
-
-
-
 

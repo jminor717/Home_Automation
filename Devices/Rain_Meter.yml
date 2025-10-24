@@ -10,17 +10,6 @@ substitutions:
   scl_pin: GPIO5
   sda_pin: GPIO4
 
-  motor_speed_pin: GPIO17
-  motor_dir_A: GPIO6
-  motor_dir_B: GPIO7
-  stop_1: GPIO15
-  stop_2: GPIO16
-
-  gpio_cs: GPIO0
-  spi_clk: GPIO1
-  spi_mosi: GPIO2
-  spi_miso: GPIO41
-
 external_components:
   - source:
       type: local
@@ -63,8 +52,6 @@ logger:
     veml7700: INFO
     ltr390: INFO
 
-
-
 ethernet:
   type: W5500
   clk_pin: $eth_clk
@@ -87,12 +74,6 @@ i2c:
     scl: $scl_pin
     scan: true
 
-spi:
-  clk_pin: $spi_clk
-  mosi_pin: $spi_mosi
-  miso_pin: $spi_miso
-  interface: spi3
-
 .defaultfilters:
   - &moving_avg_three
     sliding_window_moving_average:
@@ -107,84 +88,6 @@ spi:
       window_size: 30
       send_every: 30
 
-
-output:
-  - platform: ledc
-    pin: $motor_speed_pin
-    id: motor_speed
-    frequency: 19531Hz
-    # 39063Hz
-  - platform: gpio
-    pin: $motor_dir_A
-    id: motor_dir_1
-  - platform: gpio
-    pin: $motor_dir_B
-    id: motor_dir_2
-  - platform: slow_pwm
-    pin: { mcp23xxx: mcp_gpio, number: 3, mode: { output: true }, inverted: false }
-    id: mcp_gpio_3
-    period: 100ms
-  - platform: gpio
-    pin: { mcp23xxx: mcp_gpio, number: 4, mode: { output: true }, inverted: false }
-    id: mcp_gpio_4
-  - platform: gpio
-    pin: { mcp23xxx: mcp_gpio, number: 5, mode: { output: true }, inverted: false }
-    id: mcp_gpio_5
-
-# binary_sensor:
-#   - platform: gpio
-#     id: open_endstop_binary_sensor
-#     pin: $stop_1
-#   - platform: gpio
-#     id: close_endstop_binary_sensor
-#     pin: $stop_2
-
-cover:
-  # - platform: endstop
-  #   name: "Endstop Cover"
-  #   # restore_mode: NO_RESTORE
-  #   open_action:
-  #     - output.turn_off: motor_dir_1
-  #     - output.set_level:
-  #             id: motor_dir_2
-  #             level: 50%
-  #   open_duration: 30sec
-  #   open_endstop: open_endstop_binary_sensor
-  #   close_action:
-  #     - output.turn_off: motor_dir_2
-  #     - output.set_level:
-  #             id: motor_dir_1
-  #             level: 50%
-  #   close_duration: 30sec
-  #   close_endstop: close_endstop_binary_sensor
-  #   stop_action:
-  #     - output.turn_off: motor_dir_1
-  #     - output.turn_off: motor_dir_2
-  - platform: endstop
-    name: "Endstop Cover"
-    # restore_mode: NO_RESTORE
-    open_action:
-      - output.turn_off: motor_dir_1
-      - output.turn_on: motor_dir_2
-      # - output.turn_on: motor_speed
-      - output.set_level:
-              id: motor_speed
-              level: 10%
-    open_duration: 30sec
-    open_endstop: open_endstop_binary_sensor
-    close_action:
-      - output.turn_off: motor_dir_2
-      - output.turn_on: motor_dir_1
-      # - output.turn_on: motor_speed
-      - output.set_level:
-              id: motor_speed
-              level: 10%
-    close_duration: 30sec
-    close_endstop: close_endstop_binary_sensor
-    stop_action:
-      - output.turn_off: motor_speed
-      - output.turn_off: motor_dir_2
-      - output.turn_off: motor_dir_1
 
 sensor:
   - platform: veml7700
@@ -224,111 +127,8 @@ i2c_device:
   id: fdc1004
   address: 0b1010000
 
-#  on...:
-#  then:
-#    - lambda: !lambda |-
-#        id(i2cdev).write_byte(0x00, 0x12);
-#        if (auto b = id(i2cdev).read_byte(0x01)) {
-#          // TODO
-#        }
-
-mcp23s17:
-  - id: mcp_gpio
-    cs_pin: $gpio_cs
-    data_rate: 1MHz
-    deviceaddress: 0
-    open_drain_interrupt: false
 
 # interval:
 #   - interval: 100ms
 #     then:
 #       - output.toggle: mcp_gpio_3
-
-switch:
-  - platform: template
-    name: "gpio 4"
-    optimistic: true
-    turn_on_action:
-      - output.turn_on: mcp_gpio_4
-    turn_off_action:
-      - output.turn_off: mcp_gpio_4
-  - platform: template
-    name: "gpio 5"
-    optimistic: true
-    turn_on_action:
-      - output.turn_on: mcp_gpio_5
-    turn_off_action:
-      - output.turn_off: mcp_gpio_5
-  # - platform: gpio
-  #   name: "MCP23S17 Pin #0"
-  #   pin: { mcp23xxx: mcp_gpio, number: 0, mode: { output: true }, inverted: false }
-  # - platform: gpio
-  #   name: "MCP23S17 Pin #1"
-  #   pin: { mcp23xxx: mcp_gpio, number: 1, mode: { output: true }, inverted: false }
-  # - platform: gpio
-  #   name: "MCP23S17 Pin #2"
-  #   pin: { mcp23xxx: mcp_gpio, number: 2, mode: { output: true }, inverted: false }
-  # - platform: gpio
-  #   name: "MCP23S17 Pin #3"
-  #   pin: { mcp23xxx: mcp_gpio, number: 3, mode: { output: true }, inverted: false }
-  # - platform: gpio
-  #   name: "MCP23S17 Pin #4"
-  #   pin: { mcp23xxx: mcp_gpio, number: 4, mode: { output: true }, inverted: false }
-  # - platform: gpio
-  #   name: "MCP23S17 Pin #5"
-  #   pin: { mcp23xxx: mcp_gpio, number: 5, mode: { output: true }, inverted: false }
-  - platform: gpio
-    name: "MCP23S17 Pin #6"
-    pin: { mcp23xxx: mcp_gpio, number: 6, mode: { output: true }, inverted: false }
-  - platform: gpio
-    id: mcp_gpio_7
-    name: "MCP23S17 Pin #7"
-    pin: { mcp23xxx: mcp_gpio, number: 7, mode: { output: true }, inverted: false }
-
-binary_sensor:
-  - platform: gpio
-    id: open_endstop_binary_sensor
-    pin: $stop_1
-  - platform: gpio
-    id: close_endstop_binary_sensor
-    pin: $stop_2
-  # - platform: gpio
-  #   name: "MCP23S17 in #0"
-  #   pin: { mcp23xxx: mcp_gpio, number: 8, mode: {input: true, pullup: false}, inverted: false  }
-  #   filters:
-  #     - delayed_on_off: 50ms
-  # - platform: gpio
-  #   name: "MCP23S17 in #1"
-  #   pin: { mcp23xxx: mcp_gpio, number: 9, mode: {input: true, pullup: true}, inverted: false  }
-  #   filters:
-  #     - delayed_on_off: 50ms
-  # - platform: gpio
-  #   name: "MCP23S17 in #2"
-  #   pin: { mcp23xxx: mcp_gpio, number: 10, mode: {input: true, pullup: true}, inverted: false  }
-  #   filters:
-  #     - delayed_on_off: 50ms
-  # - platform: gpio
-  #   name: "MCP23S17 in #3"
-  #   pin: { mcp23xxx: mcp_gpio, number: 11, mode: {input: true, pullup: true}, inverted: false  }
-  #   filters:
-  #     - delayed_on_off: 50ms
-  # - platform: gpio
-  #   name: "MCP23S17 Pin #4"
-  #   pin: { mcp23xxx: mcp_gpio, number: 12, mode: {input: true, pullup: true}, inverted: false  }
-  #   filters:
-  #     - delayed_on_off: 50ms
-  # - platform: gpio
-  #   name: "MCP23S17 in #5"
-  #   pin: { mcp23xxx: mcp_gpio, number: 13, mode: {input: true, pullup: true}, inverted: false  }
-  #   filters:
-  #     - delayed_on_off: 50ms
-  # - platform: gpio
-  #   name: "MCP23S17 in #6"
-  #   pin: { mcp23xxx: mcp_gpio, number: 14, mode: {input: true, pullup: true}, inverted: false  }
-  #   filters:
-  #     - delayed_on_off: 50ms
-  # - platform: gpio
-  #   name: "MCP23S17 in #7"
-  #   pin: { mcp23xxx: mcp_gpio, number: 15, mode: {input: true, pullup: true}, inverted: false  }
-  #   filters:
-  #     - delayed_on_off: 50ms
