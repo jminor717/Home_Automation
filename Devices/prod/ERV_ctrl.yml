@@ -27,6 +27,7 @@ esphome:
     - src\erv_ctrl\pressurePeakFilter.h
     - src\erv_ctrl\PID.h
     - src\erv_ctrl\PressurePID.h
+    # - ..\..\GeoGab.h
   on_boot:
     - priority: 600
       then:
@@ -96,46 +97,82 @@ sensor:
     update_interval: 10ms
     name: "Pressure Delta"
     id: pressure_dif
+    device_class: "pressure"
+    state_class: "measurement"
+    unit_of_measurement: "Pa"
+    accuracy_decimals: 5
     i2c_id: bus_a
     address: 0x25
-    # unit_of_measurement: "Pa"
     filters:
       - sliding_window_moving_average:
           window_size: 48
           send_every: 12
       - lambda: |-
           id(pressure_dif_avg).publish_state(x);
-          return x;
+          id(pressure_dif_ema).publish_state(x);
+          // id(pressure_dif_internal).publish_state(x);
+          return peakFilter.apply_filter(x);;
       # send to lambda filter 4 times per second lambda sends once every 30 seconds
       # lambda will average over the last 30 seconds
       # if the value is an outlier to the running average, it will send the next 20 values in order to capture transient events
-      - lambda: |-
-            return peakFilter.apply_filter(x);
       - delta: 0.0005
+      - multiply: 100.0
+      # - multiply: 6894.7572931783
   - platform: template
-    # name: "Pressure Delta Average"
-    internal: true
+    name: "Pressure Delta Average"
     id: pressure_dif_avg
-    unit_of_measurement: "hPa"
     device_class: "pressure"
     state_class: "measurement"
-    accuracy_decimals: 3
+    unit_of_measurement: "Pa"
+    accuracy_decimals: 5
     filters:
+      # - quantile:
+      #     window_size: 960
+      #     send_every: 120
+      #     send_first_at: 120
+      #     quantile: .9
       - sliding_window_moving_average:
-          window_size: 480
-          send_every: 83
-      # - delta: 0.0005
-    on_value:
-      then: 
-        - delay: 100ms
-        - script.execute: eval_erv_state
+          window_size: 960
+          send_every: 120
+      - delta: 0.0005
+      - multiply: 100.0
+  - platform: template
+    name: "Pressure Delta ema"
+    id: pressure_dif_ema
+    device_class: "pressure"
+    state_class: "measurement"
+    unit_of_measurement: "Pa"
+    accuracy_decimals: 5
+    filters:
+      - exponential_moving_average:
+          alpha: 0.000208    # = 2 / (960 + 1)
+          send_every: 120
+      - delta: 0.0005
+      - multiply: 100.0
+
+  # - platform: template
+  #   internal: true
+  #   id: pressure_dif_internal
+  #   filters:
+  #     - sliding_window_moving_average:
+  #         # window_size: 480
+  #         # send_every: 83
+  #         window_size: 480
+  #         send_every: 120
+  #     # - delta: 0.0005
+  #   on_value:
+  #     then: 
+  #       - delay: 100ms
+  #       - script.execute: eval_erv_state
 
 # globals:
-#   - { id: erv_pid, type: "struct tm" }
 #   - id: my_global_struct_instance
 #     type: MyCustomStruct
 #     restore_value: no # or yes, depending on your needs
 #     initial_value: '{.value1 = 10, .value2 = 3.14, .name = "My Initial Name"}' # Initialize members
+  
+  
+  # - { id: erv_pid, type: "struct tm" }
 # , initial_value: ""
 
 script:
@@ -144,7 +181,7 @@ script:
     then:
       - lambda: |-
           // id(erv_pid).tm_sec = 0;
-          float current_pressure = id(pressure_dif_avg).state * 100.0; // convert hPa to Pa
+          float current_pressure = id(pressure_dif_avg).state ;// convert hPa to Pa* 100.0
           float Fan_l = update_pressure_pid_(current_pressure);
 
           if(Fan_l != NAN) {

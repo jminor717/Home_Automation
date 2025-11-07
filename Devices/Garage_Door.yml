@@ -1,5 +1,6 @@
 substitutions:
-  device_name: garage-door
+  # device_name: garage-door
+  device_name: dc-circuit-breaker
   eth_cs: GPIO9
   eth_clk: GPIO10
   eth_miso: GPIO11
@@ -91,6 +92,7 @@ output:
 
 globals:
   - { id: lock_r_moving, type: bool, initial_value: "false" }
+  - { id: lock_r_target, type: LockState, initial_value: "LOCK_STATE_NONE" }
 
 script:
   - id: check_lock_jammed
@@ -99,37 +101,41 @@ script:
       - delay: 5s
       - if:
           condition:
-            and:
-              - binary_sensor.is_off: r_lock_sensor
-              - binary_sensor.is_off: r_unlock_sensor
+            or: # if the target is still LOCKING/UNLOCKING then it wasn't able to move off of the sensor
+              - lambda: 'return id(lock_r_target) == LOCK_STATE_LOCKING || id(lock_r_target) == LOCK_STATE_UNLOCKING;'
+              - and: [ binary_sensor.is_off: r_lock_sensor, binary_sensor.is_off: r_unlock_sensor]
           then:
             - lock.template.publish: { id: door_r_lock, state: JAMMED }
             - output.turn_off: motor_speed
             - globals.set: { id: lock_r_moving, value: "false"}
 
+# track when the lock was commanded to move vs when it was move externally through lock_r_moving
+# track the target state to determine if it reached the target or is jammed
 lock:
   - platform: template
     id: door_r_lock
     name: "Right Garage Door Lock"
     lock_action:
       - globals.set: { id: lock_r_moving, value: "true"}
+      - globals.set: { id: lock_r_target, value: "LOCK_STATE_LOCKING"}
       - output.turn_off: motor_dir_1
       - output.turn_on: motor_dir_2
       - output.set_level: { id: motor_speed, level: 80% }
       - script.execute: check_lock_jammed
     unlock_action:
       - globals.set: { id: lock_r_moving, value: "true"}
+      - globals.set: { id: lock_r_target, value: "LOCK_STATE_UNLOCKING"}
       - output.turn_on: motor_dir_1
       - output.turn_off: motor_dir_2
       - output.set_level: { id: motor_speed, level: 80% }
       - script.execute: check_lock_jammed
     open_action:
       - globals.set: { id: lock_r_moving, value: "true"}
+      - globals.set: { id: lock_r_target, value: "LOCK_STATE_UNLOCKING"}
       - output.turn_on: motor_dir_1
       - output.turn_off: motor_dir_2
       - output.set_level: { id: motor_speed, level: 80% }
       - script.execute: check_lock_jammed
-      # - lock.template.publish: { id: door_r_lock, state: UNLOCKING }
 
 #   valid options are 'LOCKED', 'UNLOCKED', 'JAMMED', 'LOCKING', 'UNLOCKING'
 
@@ -164,7 +170,7 @@ binary_sensor:
       if:
         condition:
           lambda: 'return id(lock_r_moving);'
-        then: { lock.template.publish: { id: door_r_lock, state: UNLOCKING } }
+        then: [ lock.template.publish: { id: door_r_lock, state: UNLOCKING }, globals.set: { id: lock_r_target, value: "LOCK_STATE_LOCKED"} ]
         else: { lock.template.publish: { id: door_r_lock, state: JAMMED } }
   - platform: gpio
     id: r_unlock_sensor
@@ -179,6 +185,6 @@ binary_sensor:
       if:
         condition:
           lambda: 'return id(lock_r_moving);'
-        then: { lock.template.publish: { id: door_r_lock, state: LOCKING } }
+        then: [ lock.template.publish: { id: door_r_lock, state: LOCKING }, globals.set: { id: lock_r_target, value: "LOCK_STATE_UNLOCKED"} ]
         else: { lock.template.publish: { id: door_r_lock, state: JAMMED } }
 

@@ -6,7 +6,7 @@ public:
     struct settings_t {
         int filter_queue_depth = 240;
         int send_every = 240;
-        float outlier_threshold = 0.03;
+        float outlier_threshold = 0.06;
         int amount_to_send_after_outlier = 20;
     } settings;
 
