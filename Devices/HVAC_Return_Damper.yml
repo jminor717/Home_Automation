@@ -8,14 +8,16 @@ substitutions:
   eth_int: GPIO13
   eth_rst: GPIO14
 
-  motor_speed_pin: GPIO17
-  motor_dir_A: GPIO6
-  motor_dir_B: GPIO7
-  stop_1: GPIO15
-  stop_2: GPIO16
+  motor_speed_pin: GPIO15
+  motor_dir_A: GPIO16
+  motor_dir_B: GPIO17
+  stop_1: GPIO18
+  stop_2: GPIO8
 
-  one_wire_a: GPIO18
-  one_wire_b: GPIO8
+  one_wire_a: GPIO4
+  one_wire_b: GPIO5
+  one_wire_c: GPIO6
+  one_wire_d: GPIO7
 
   DS18B20_07: "0xa20119280563f828"
 
@@ -126,16 +128,22 @@ one_wire:
   - platform: gpio
     pin: $one_wire_b
     id: one_wire_bus_b
+  - platform: gpio
+    pin: $one_wire_c
+    id: one_wire_bus_c
+  - platform: gpio
+    pin: $one_wire_d
+    id: one_wire_bus_d
 
 sensor:
   - { platform: uptime, id: uptime_seconds, update_interval: 1min }
   - { platform: template, id: uptime_days, name: "$device_name uptime", update_interval: 1min, 
       device_class: duration, entity_category: "diagnostic", unit_of_measurement: "d", accuracy_decimals: 2,
       lambda: !lambda "return id(uptime_seconds).state / 86'400;"}
-  - { platform: dallas_temp, address: $DS18B20_07, name: "Slab Edge Temp", id: "slab_one",  one_wire_id: one_wire_bus_b, update_interval: 1s, filters: [ *moving_avg, delta: 0.1 ]}
-  - { platform: dallas_temp, address: $DS18B20_07, name: "Slab Center Temp", id: "slab_two",  one_wire_id: one_wire_bus_a, update_interval: 1s, filters: [ *moving_avg, delta: 0.1 ]}
-  - { platform: dallas_temp, address: $DS18B20_07, name: "Ground Edge Temp", id: "ground_one",  one_wire_id: one_wire_bus_b, update_interval: 1s, filters: [ *moving_avg, delta: 0.1 ]}
-  - { platform: dallas_temp, address: $DS18B20_07, name: "Ground Center Temp", id: "ground_two",  one_wire_id: one_wire_bus_a, update_interval: 1s, filters: [ *moving_avg, delta: 0.1 ]}
+  - { platform: dallas_temp, address: $DS18B20_07, name: "Slab Edge Temp", id: "slab_one",  one_wire_id: one_wire_bus_a, update_interval: 1s, filters: [ *moving_avg, delta: 0.1 ]}
+  - { platform: dallas_temp, address: $DS18B20_07, name: "Slab Center Temp", id: "slab_two",  one_wire_id: one_wire_bus_b, update_interval: 1s, filters: [ *moving_avg, delta: 0.1 ]}
+  - { platform: dallas_temp, address: $DS18B20_07, name: "Ground Edge Temp", id: "ground_one",  one_wire_id: one_wire_bus_c, update_interval: 1s, filters: [ *moving_avg, delta: 0.1 ]}
+  - { platform: dallas_temp, address: $DS18B20_07, name: "Ground Center Temp", id: "ground_two",  one_wire_id: one_wire_bus_d, update_interval: 1s, filters: [ *moving_avg, delta: 0.1 ]}
     # resolution: 12
     
     
