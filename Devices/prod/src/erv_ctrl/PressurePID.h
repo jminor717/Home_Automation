@@ -3,6 +3,8 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include "PID.h"
+
 
 extern "C" {
 

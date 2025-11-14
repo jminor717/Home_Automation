@@ -24,10 +24,11 @@ esphome:
   platformio_options:
     board_build.flash_mode: dio
   includes:
-    - src\erv_ctrl\pressurePeakFilter.h
-    - src\erv_ctrl\PID.h
-    - src\erv_ctrl\PressurePID.h
-    # - ..\..\GeoGab.h
+    - src\erv_ctrl
+    - <erv_ctrl\pressurePeakFilter.h>
+    - <erv_ctrl\PID.h>
+    - <erv_ctrl\PressurePID.h>
+    - <erv_ctrl\my_custom_struct.h>
   on_boot:
     - priority: 600
       then:
@@ -111,7 +112,7 @@ sensor:
           id(pressure_dif_avg).publish_state(x);
           id(pressure_dif_ema).publish_state(x);
           // id(pressure_dif_internal).publish_state(x);
-          return peakFilter.apply_filter(x);;
+          return id(peak_filter)->apply_filter(x);;
       # send to lambda filter 4 times per second lambda sends once every 30 seconds
       # lambda will average over the last 30 seconds
       # if the value is an outlier to the running average, it will send the next 20 values in order to capture transient events
@@ -165,12 +166,18 @@ sensor:
   #       - delay: 100ms
   #       - script.execute: eval_erv_state
 
-# globals:
-#   - id: my_global_struct_instance
-#     type: MyCustomStruct
-#     restore_value: no # or yes, depending on your needs
-#     initial_value: '{.value1 = 10, .value2 = 3.14, .name = "My Initial Name"}' # Initialize members
-  
+
+globals:
+  - id: my_global_struct_instance
+    type: MyCustomStruct*
+    restore_value: no
+    initial_value: 'new MyCustomStruct(1, 2, 3)'
+
+  - id: peak_filter
+    type: PressurePeakFilter*
+    restore_value: no
+    initial_value: 'new PressurePeakFilter(240, 240, 0.06, 20)'
+
   
   # - { id: erv_pid, type: "struct tm" }
 # , initial_value: ""
@@ -192,9 +199,9 @@ script:
           }
 
           auto outputSpeed = id(vent_speed_sp).state;
-          auto call = id(erv_out).turn_on();
-          call.set_speed(outputSpeed);
-          call.perform();
+          auto call2 = id(erv_out).turn_on();
+          call2.set_speed(outputSpeed);
+          call2.perform();
 
 
   - id: erv_pid_change

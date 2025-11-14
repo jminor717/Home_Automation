@@ -12,6 +12,9 @@ substitutions:
   spi_miso: GPIO6
   spi_mosi: GPIO7
 
+  bat_raw_voltage_pin: GPIO15
+  bat_raw_current_pin: GPIO16
+  bat_charge_en_pin: GPIO17
 # 15, 16, 17, 18, 8, 19, 20, 3, 
 # 0, 1, 2, 41, 40, 39, 38, 21, 45
 
@@ -93,17 +96,52 @@ mcp3008:
   id: mcp_adc
 
 
+switch:
+  - platform: gpio
+    pin: $bat_charge_en_pin
+    # name: "ERV High Speed"
+    id: bat_charge_en
 
 
 
-
-
+# multiply the voltage and current(x) to get power
 # name: "garage circuit", 
 sensor:
   - { platform: uptime, id: uptime_seconds, update_interval: 1min }
   - { platform: template, id: uptime_days, name: "$device_name uptime", update_interval: 1min, 
       device_class: duration, entity_category: "diagnostic", unit_of_measurement: "d", accuracy_decimals: 2,
-      lambda: !lambda "return id(uptime_seconds).state / 86'400;"}
+      lambda: !lambda "return id(uptime_seconds).state / 86'400;"
+    }
+  - { platform: template, name: "Network Battery Power", id: bat_power, unit_of_measurement: "W", accuracy_decimals: 2, 
+      filters: { lambda: !lambda "return x * id(bat_raw_voltage).state;" } 
+    }
+  - { platform: adc, id: bat_raw_current, name: "Network Battery Current", pin: $bat_raw_current_pin, unit_of_measurement: "A",
+      update_interval: 100ms, attenuation: 0db, 
+      filters: [ sliding_window_moving_average: { window_size: 60, send_every: 30 }, multiply: 1 ],
+      on_value: { lambda: !lambda "id(bat_power).publish_state(x);" }
+    }
+  - platform: adc
+    id: bat_raw_voltage
+    name: "Network Battery Voltage"
+    pin: $bat_raw_voltage_pin
+    update_interval: 100ms
+    attenuation: 12db
+    filters: [ 
+      sliding_window_moving_average: { window_size: 60, send_every: 30 }, # average last 6 seconds send every 3 seconds
+      multiply: 4.84 # to scale to actual battery voltage from ADC voltage
+    ]
+    on_value:
+        - lambda: |-
+            if(x > 13.3) {
+              id(bat_charge_en).turn_off(); // Turn off charging
+            } else if(x < 13.0) {
+              id(bat_charge_en).turn_on(); // Turn on charging
+            }
+      # on_value_range: [ 
+      #   { below: 13.0, then: [ switch.turn_on: bat_charge_en ] },
+      #   { above: 13.3, then: [ switch.turn_off: bat_charge_en ] },
+      # ]
+
   # - {platform: mcp3008, id: v0, name: voltage 0, update_interval: 5s, number: 0, accuracy_decimals: 2, mcp3008_id: mcp_adc, reference_voltage: 3.3, unit_of_measurement: "V"}
   # - {platform: mcp3008, id: v1, name: voltage 1, update_interval: 5s, number: 1, accuracy_decimals: 2, mcp3008_id: mcp_adc, reference_voltage: 3.3, unit_of_measurement: "V"}
   # - {platform: mcp3008, id: v2, name: voltage 2, update_interval: 5s, number: 2, accuracy_decimals: 2, mcp3008_id: mcp_adc, reference_voltage: 3.3, unit_of_measurement: "V"}

@@ -1,3 +1,6 @@
+#ifndef pressure_peak_filter_h
+#define pressure_peak_filter_h
+
 #include "esphome.h"
 using namespace esphome;
 
@@ -15,6 +18,14 @@ public:
         int last_sent = 60;
         int needs_sent_after_outlier = 0;
     } data;
+
+    PressurePeakFilter(int depth, int send_every, float outlier_threshold, int amount_to_send_after_outlier)
+    {
+        settings.filter_queue_depth = depth;
+        settings.send_every = send_every;
+        settings.outlier_threshold = outlier_threshold;
+        settings.amount_to_send_after_outlier = amount_to_send_after_outlier;
+    }
 
     optional<float> apply_filter(float x)
     {
@@ -65,5 +76,7 @@ public:
         }
         return {};
     }
+};
 
-} peakFilter;
+#endif
+// End of Header file
