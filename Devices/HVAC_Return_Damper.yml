@@ -1,6 +1,6 @@
 substitutions:
-  # device_name: central-return-damper
-  device_name: dc-circuit-breaker
+  device_name: central-return-damper
+  # device_name: dc-circuit-breaker
   eth_cs: GPIO9
   eth_clk: GPIO10
   eth_miso: GPIO11
@@ -8,16 +8,16 @@ substitutions:
   eth_int: GPIO13
   eth_rst: GPIO14
 
-  motor_speed_pin: GPIO15
-  motor_dir_A: GPIO16
-  motor_dir_B: GPIO17
-  stop_1: GPIO18
-  stop_2: GPIO8
+  motor_speed_pin: GPIO4
+  motor_dir_A: GPIO5
+  motor_dir_B: GPIO6
+  stop_1: GPIO15
+  stop_2: GPIO16
 
-  one_wire_a: GPIO4
-  one_wire_b: GPIO5
-  one_wire_c: GPIO6
-  one_wire_d: GPIO7
+  one_wire_a: GPIO17
+  one_wire_b: GPIO18
+  one_wire_c: GPIO8
+  one_wire_d: GPIO14
 
   DS18B20_07: "0xa20119280563f828"
 
@@ -26,7 +26,7 @@ substitutions:
 external_components:
   - source:
       type: local
-      path: ..\my_components # path relative to Devices folder
+      path: ../my_components # path relative to Devices folder
 
 esphome:
   name: $device_name
@@ -76,10 +76,10 @@ text_sensor:
     name: "$device_name Version"
 
 output:
-  - platform: gpio # ledc
+  - platform: ledc
     pin: $motor_speed_pin
     id: motor_speed
-    # frequency: 60Hz
+    frequency: 19531Hz
   - platform: gpio
     pin: $motor_dir_A
     id: motor_dir_1
@@ -101,13 +101,15 @@ cover:
     open_action:
       - output.turn_off: motor_dir_1
       - output.turn_on: motor_dir_2
-      - output.turn_on: motor_speed
+      # - output.turn_on: motor_speed
+      - output.set_level: { id: motor_speed, level: 50%}
     open_duration: 30sec
     open_endstop: open_endstop_binary_sensor
     close_action:
       - output.turn_off: motor_dir_2
       - output.turn_on: motor_dir_1
-      - output.turn_on: motor_speed
+      # - output.turn_on: motor_speed
+      - output.set_level: { id: motor_speed, level: 50%}
     close_duration: 30sec
     close_endstop: close_endstop_binary_sensor
     stop_action:
@@ -140,10 +142,10 @@ sensor:
   - { platform: template, id: uptime_days, name: "$device_name uptime", update_interval: 1min, 
       device_class: duration, entity_category: "diagnostic", unit_of_measurement: "d", accuracy_decimals: 2,
       lambda: !lambda "return id(uptime_seconds).state / 86'400;"}
-  - { platform: dallas_temp, address: $DS18B20_07, name: "Slab Edge Temp", id: "slab_one",  one_wire_id: one_wire_bus_a, update_interval: 1s, filters: [ *moving_avg, delta: 0.1 ]}
-  - { platform: dallas_temp, address: $DS18B20_07, name: "Slab Center Temp", id: "slab_two",  one_wire_id: one_wire_bus_b, update_interval: 1s, filters: [ *moving_avg, delta: 0.1 ]}
-  - { platform: dallas_temp, address: $DS18B20_07, name: "Ground Edge Temp", id: "ground_one",  one_wire_id: one_wire_bus_c, update_interval: 1s, filters: [ *moving_avg, delta: 0.1 ]}
-  - { platform: dallas_temp, address: $DS18B20_07, name: "Ground Center Temp", id: "ground_two",  one_wire_id: one_wire_bus_d, update_interval: 1s, filters: [ *moving_avg, delta: 0.1 ]}
+  # - { platform: dallas_temp, address: $DS18B20_07, name: "Slab Edge Temp", id: "slab_one",  one_wire_id: one_wire_bus_b, update_interval: 1s, filters: [ *moving_avg, delta: 0.1 ]}
+  # - { platform: dallas_temp, address: $DS18B20_07, name: "Slab Center Temp", id: "slab_two",  one_wire_id: one_wire_bus_a, update_interval: 1s, filters: [ *moving_avg, delta: 0.1 ]}
+  # - { platform: dallas_temp, address: $DS18B20_07, name: "Ground Edge Temp", id: "ground_one",  one_wire_id: one_wire_bus_b, update_interval: 1s, filters: [ *moving_avg, delta: 0.1 ]}
+  # - { platform: dallas_temp, address: $DS18B20_07, name: "Ground Center Temp", id: "ground_two",  one_wire_id: one_wire_bus_a, update_interval: 1s, filters: [ *moving_avg, delta: 0.1 ]}
     # resolution: 12
     
     
