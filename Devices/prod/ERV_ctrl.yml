@@ -105,6 +105,8 @@ sensor:
     i2c_id: bus_a
     address: 0x25
     filters:
+      - multiply: 100.0
+      # - multiply: 6894.7572931783
       - sliding_window_moving_average:
           window_size: 48
           send_every: 12
@@ -116,9 +118,7 @@ sensor:
       # send to lambda filter 4 times per second lambda sends once every 30 seconds
       # lambda will average over the last 30 seconds
       # if the value is an outlier to the running average, it will send the next 20 values in order to capture transient events
-      - delta: 0.0005
-      - multiply: 100.0
-      # - multiply: 6894.7572931783
+      - delta: 0.05
   - platform: template
     name: "Pressure Delta Average"
     id: pressure_dif_avg
@@ -127,16 +127,10 @@ sensor:
     unit_of_measurement: "Pa"
     accuracy_decimals: 5
     filters:
-      # - quantile:
-      #     window_size: 960
-      #     send_every: 120
-      #     send_first_at: 120
-      #     quantile: .9
-      - sliding_window_moving_average:
-          window_size: 960
+      - exponential_moving_average:
+          alpha: 0.00083    # = 2 / (240 + 1)
           send_every: 120
-      - delta: 0.0005
-      - multiply: 100.0
+      - delta: 0.05
   - platform: template
     name: "Pressure Delta ema"
     id: pressure_dif_ema
@@ -148,8 +142,7 @@ sensor:
       - exponential_moving_average:
           alpha: 0.000208    # = 2 / (960 + 1)
           send_every: 120
-      - delta: 0.0005
-      - multiply: 100.0
+      - delta: 0.05
 
   # - platform: template
   #   internal: true
@@ -176,7 +169,7 @@ globals:
   - id: peak_filter
     type: PressurePeakFilter*
     restore_value: no
-    initial_value: 'new PressurePeakFilter(240, 240, 0.06, 20)'
+    initial_value: 'new PressurePeakFilter(240, 240, 10, 20)'
 
   
   # - { id: erv_pid, type: "struct tm" }

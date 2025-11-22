@@ -25,6 +25,7 @@ public:
         settings.send_every = send_every;
         settings.outlier_threshold = outlier_threshold;
         settings.amount_to_send_after_outlier = amount_to_send_after_outlier;
+        data.last_sent = send_every / 2; // start by sending an average after half the interval
     }
 
     optional<float> apply_filter(float x)

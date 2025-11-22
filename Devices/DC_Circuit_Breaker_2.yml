@@ -7,10 +7,9 @@ substitutions:
   eth_int: GPIO13
   eth_rst: GPIO14
 
-  adc_cs: GPIO4
-  spi_clk: GPIO5
-  spi_miso: GPIO6
-  spi_mosi: GPIO7
+
+  scl_pin: GPIO41
+  sda_pin: GPIO40
 
   bat_raw_voltage_pin: GPIO15
   bat_raw_current_pin: GPIO16
@@ -82,25 +81,38 @@ text_sensor:
   - platform: version
     name: "$device_name Version"
 
+i2c:
+  - id: bus_a
+    sda: $sda_pin
+    scl: $scl_pin
+    scan: true
 
-spi:
-  clk_pin: $spi_clk
-  mosi_pin: $spi_mosi
-  miso_pin: $spi_miso
-  interface: spi3
+pcf8574:
+  - id: 'pcf8574_hub'
+    address: 0x20
+    pcf8575: true
 
-mcp3008:
-  cs_pin: $adc_cs
-  # data_rate: 75kHz
-  data_rate: 1MHz
-  id: mcp_adc
-
-
+# Individual outputs
 switch:
   - platform: gpio
+    name: "PCF8574 Pin #0"
+    pin:
+      pcf8574: pcf8574_hub
+      number: 0
+      mode:
+        output: true
+      inverted: false
+  - platform: gpio
     pin: $bat_charge_en_pin
-    # name: "ERV High Speed"
+    name: "Battery Charge Enabled"
     id: bat_charge_en
+
+binary_sensor:
+  - platform: gpio
+    name: "MCP23S17 Pin #4"
+    pin: { pcf8574: pcf8574_hub, number: 4, mode: INPUT, inverted: false  } 
+    filters: { delayed_on_off: 500ms }
+# , interrupt: CHANGE
 
 
 
@@ -116,8 +128,8 @@ sensor:
       filters: { lambda: !lambda "return x * id(bat_raw_voltage).state;" } 
     }
   - { platform: adc, id: bat_raw_current, name: "Network Battery Current", pin: $bat_raw_current_pin, unit_of_measurement: "A",
-      update_interval: 100ms, attenuation: 0db, 
-      filters: [ sliding_window_moving_average: { window_size: 60, send_every: 30 }, multiply: 1 ],
+      update_interval: 100ms, attenuation: 12db, 
+      filters: [ sliding_window_moving_average: { window_size: 60, send_every: 30 } ], # , multiply: 1
       on_value: { lambda: !lambda "id(bat_power).publish_state(x);" }
     }
   - platform: adc
@@ -135,7 +147,7 @@ sensor:
             if(x > 13.3) {
               id(bat_charge_en).turn_off(); // Turn off charging
             } else if(x < 13.0) {
-              id(bat_charge_en).turn_on(); // Turn on charging
+              // id(bat_charge_en).turn_on(); // Turn on charging
             }
       # on_value_range: [ 
       #   { below: 13.0, then: [ switch.turn_on: bat_charge_en ] },
