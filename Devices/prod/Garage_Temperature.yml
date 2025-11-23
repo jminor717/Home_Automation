@@ -20,7 +20,7 @@ substitutions:
 external_components:
   - source:
       type: local
-      path: ..\..\my_components # path relative to Devices folder
+      path: ../../my_components # path relative to Devices folder
 
 esphome:
   name: $device_name

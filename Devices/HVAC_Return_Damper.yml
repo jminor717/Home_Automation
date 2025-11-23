@@ -17,7 +17,7 @@ substitutions:
   one_wire_a: GPIO17
   one_wire_b: GPIO18
   one_wire_c: GPIO8
-  one_wire_d: GPIO14
+  one_wire_d: GPIO19
 
   DS18B20_07: "0xa20119280563f828"
 
