@@ -1,6 +1,6 @@
 substitutions:
-  # device_name: garage-door
-  device_name: dc-circuit-breaker
+  device_name: garage-controls
+  # device_name: dc-circuit-breaker
   eth_cs: GPIO9
   eth_clk: GPIO10
   eth_miso: GPIO11
@@ -8,12 +8,20 @@ substitutions:
   eth_int: GPIO13
   eth_rst: GPIO14
 
-  motor_speed_pin: GPIO6
-  motor_dir_A: GPIO7
-  motor_dir_B: GPIO15
+  scl: GPIO4
+  sda: GPIO5
+  scl2: GPIO6
+  sda2: GPIO7
 
-  lock_r_lock: GPIO16
-  lock_r_unlock: GPIO17
+  motor_speed: 75%
+  motor_speed_pin: GPIO15
+  motor_dir_A: GPIO16
+  motor_dir_B: GPIO17
+
+  lock_r_lock: GPIO18
+  lock_r_unlock: GPIO8
+
+  man_door_lock_pin: GPIO19
 
 external_components:
   - source:
@@ -24,6 +32,11 @@ esphome:
   name: $device_name
   platformio_options:
     board_build.flash_mode: dio
+  on_boot:
+    - priority: -100
+      then:
+        - lock.lock: man_door_lock
+
 
 esp32:
   board: esp32-s3-devkitc-1
@@ -37,7 +50,7 @@ esp32:
 
 preferences:
   # the default of 1min is far too short--flash chip is rated for approx 100k writes.
-  flash_write_interval: "48h"
+  flash_write_interval: "240h"
 
 api:
   # password: ""
@@ -60,6 +73,8 @@ ethernet:
   cs_pin: $eth_cs
   interrupt_pin: $eth_int
   reset_pin: $eth_rst
+  use_address: "$device_name.local"
+
 
 time:
   - platform: homeassistant
@@ -72,23 +87,71 @@ text_sensor:
   - platform: version
     name: "$device_name Version"
 
+i2c:
+  - id: bus_a
+    sda: $sda
+    scl: $scl
+    scan: true
+    frequency: 10kHz
+  - id: bus_b
+    sda: $sda2
+    scl: $scl2
+    scan: true
+    frequency: 10kHz
+
+
+.defaultfilters:
+  - &moving_avg
+    sliding_window_moving_average:
+      window_size: 30
+      send_every: 30
+
 sensor:
   - { platform: uptime, id: uptime_seconds, update_interval: 1min }
   - { platform: template, id: uptime_days, name: "$device_name uptime", update_interval: 1min, device_class: duration, entity_category: "diagnostic", unit_of_measurement: "d",
       accuracy_decimals: 2, lambda: !lambda "return id(uptime_seconds).state / 86'400;", }
+  - platform: sht4x
+    update_interval: 1s
+    i2c_id: bus_a
+    temperature:
+      name: "ERV Intake Temperature"
+      id: erv_in_temp
+      unit_of_measurement: "°C"
+      filters: [ *moving_avg ]
+    humidity:
+      name: "ERV Intake Humidity"
+      id: erv_in_humid
+      filters: [ *moving_avg ]
+  - platform: sht4x
+    update_interval: 1s
+    i2c_id: bus_b
+    temperature:
+      name: "Garage Attic Temperature"
+      id: garage_attic_temp
+      unit_of_measurement: "°C"
+      filters: [ *moving_avg ]
+    humidity:
+      name: "Garage Attic Humidity"
+      id: garage_attic_humid
+      filters: [ *moving_avg ]
+
 
 output:
   - platform: ledc
     pin: $motor_speed_pin
-    id: motor_speed
+    id: motor_speed_output
     frequency: 19531Hz
     # 39063Hz
   - platform: gpio
-    pin: $motor_dir_A
+    pin: $motor_dir_B
     id: motor_dir_1
   - platform: gpio
-    pin: $motor_dir_B
+    pin: $motor_dir_A
     id: motor_dir_2
+  - platform: ledc
+    pin: $man_door_lock_pin
+    id: man_door_lock_output
+    frequency: 19531Hz
 
 globals:
   - { id: lock_r_moving, type: bool, initial_value: "false" }
@@ -106,8 +169,14 @@ script:
               - and: [ binary_sensor.is_off: r_lock_sensor, binary_sensor.is_off: r_unlock_sensor]
           then:
             - lock.template.publish: { id: door_r_lock, state: JAMMED }
-            - output.turn_off: motor_speed
+            - output.turn_off: motor_speed_output
             - globals.set: { id: lock_r_moving, value: "false"}
+  - id: auto_lock_man_door
+    mode: restart
+    then:
+      - delay: 5s
+      - lock.lock: man_door_lock
+
 
 # track when the lock was commanded to move vs when it was move externally through lock_r_moving
 # track the target state to determine if it reached the target or is jammed
@@ -120,22 +189,36 @@ lock:
       - globals.set: { id: lock_r_target, value: "LOCK_STATE_LOCKING"}
       - output.turn_off: motor_dir_1
       - output.turn_on: motor_dir_2
-      - output.set_level: { id: motor_speed, level: 80% }
+      - output.set_level: { id: motor_speed_output, level: $motor_speed }
       - script.execute: check_lock_jammed
     unlock_action:
       - globals.set: { id: lock_r_moving, value: "true"}
       - globals.set: { id: lock_r_target, value: "LOCK_STATE_UNLOCKING"}
       - output.turn_on: motor_dir_1
       - output.turn_off: motor_dir_2
-      - output.set_level: { id: motor_speed, level: 80% }
+      - output.set_level: { id: motor_speed_output, level: $motor_speed }
       - script.execute: check_lock_jammed
     open_action:
       - globals.set: { id: lock_r_moving, value: "true"}
       - globals.set: { id: lock_r_target, value: "LOCK_STATE_UNLOCKING"}
       - output.turn_on: motor_dir_1
       - output.turn_off: motor_dir_2
-      - output.set_level: { id: motor_speed, level: 80% }
+      - output.set_level: { id: motor_speed_output, level: $motor_speed }
       - script.execute: check_lock_jammed
+  - platform: template
+    id: man_door_lock
+    name: "Garage Man Door Lock"
+    optimistic: true
+    lock_action:
+      - output.turn_off: man_door_lock_output
+    unlock_action:
+      - output.set_level: { id: man_door_lock_output, level: 75% }
+      - script.execute: auto_lock_man_door
+    open_action:
+      - output.set_level: { id: man_door_lock_output, level: 75% }
+      - script.execute: auto_lock_man_door
+
+
 
 #   valid options are 'LOCKED', 'UNLOCKED', 'JAMMED', 'LOCKING', 'UNLOCKING'
 
@@ -145,6 +228,7 @@ binary_sensor:
     on_state:
       then:
         - delay: 3s
+        - lock.lock: man_door_lock
         - if:
             condition: { binary_sensor.is_on: r_lock_sensor }
             then:
@@ -164,7 +248,7 @@ binary_sensor:
     on_press: 
       then:
         - lock.template.publish: { id: door_r_lock, state: LOCKED }
-        - output.turn_off: motor_speed
+        - output.turn_off: motor_speed_output
         - globals.set: { id: lock_r_moving, value: "false"}
     on_release:
       if:
@@ -179,7 +263,7 @@ binary_sensor:
     on_press: 
       then:
         - lock.template.publish: { id: door_r_lock, state: UNLOCKED }
-        - output.turn_off: motor_speed
+        - output.turn_off: motor_speed_output
         - globals.set: { id: lock_r_moving, value: "false"}
     on_release:
       if:
