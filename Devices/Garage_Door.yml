@@ -14,9 +14,9 @@ substitutions:
   sda2: GPIO7
 
   motor_speed: 75%
-  motor_speed_pin: GPIO15
+  motor_speed_pin: GPIO17
   motor_dir_A: GPIO16
-  motor_dir_B: GPIO17
+  motor_dir_B: GPIO15
 
   lock_r_lock: GPIO18
   lock_r_unlock: GPIO8
@@ -64,6 +64,8 @@ logger:
     wifi: INFO
     sensor: INFO
     binary_sensor: INFO
+    lock: debug
+
 
 ethernet:
   type: W5500
@@ -88,12 +90,12 @@ text_sensor:
     name: "$device_name Version"
 
 i2c:
-  - id: bus_a
+  - id: bus_b
     sda: $sda
     scl: $scl
     scan: true
     frequency: 10kHz
-  - id: bus_b
+  - id: bus_a
     sda: $sda2
     scl: $scl2
     scan: true
@@ -162,21 +164,67 @@ script:
     mode: restart
     then:
       - delay: 5s
-      - if:
-          condition:
-            or: # if the target is still LOCKING/UNLOCKING then it wasn't able to move off of the sensor
-              - lambda: 'return id(lock_r_target) == LOCK_STATE_LOCKING || id(lock_r_target) == LOCK_STATE_UNLOCKING;'
-              - and: [ binary_sensor.is_off: r_lock_sensor, binary_sensor.is_off: r_unlock_sensor]
-          then:
-            - lock.template.publish: { id: door_r_lock, state: JAMMED }
-            - output.turn_off: motor_speed_output
-            - globals.set: { id: lock_r_moving, value: "false"}
+      - output.turn_off: motor_speed_output
+      - globals.set: { id: lock_r_moving, value: "false"}
+      - script.execute: eval_lock_state
   - id: auto_lock_man_door
     mode: restart
     then:
       - delay: 5s
       - lock.lock: man_door_lock
-
+  - id: eval_lock_state
+    mode: single
+    then:
+      - lambda: |
+          if (id(r_unlock_sensor).state && id(r_lock_sensor).state) {
+              // Both sensors are active, should not happen
+              id(door_r_lock).publish_state(LOCK_STATE_JAMMED);
+          } else if (id(r_unlock_sensor).state ) {
+              // Unlock sensor is active
+              id(motor_speed_output).turn_off();
+              id(check_lock_jammed).stop();
+              if(id(lock_r_moving)){
+                if(id(lock_r_target) == LOCK_STATE_UNLOCKING || id(lock_r_target) == LOCK_STATE_UNLOCKED ){
+                  id(door_r_lock).publish_state(LOCK_STATE_UNLOCKED);
+                }else{
+                  id(door_r_lock).publish_state(LOCK_STATE_JAMMED);
+                }
+              }else{
+                id(door_r_lock).publish_state(LOCK_STATE_UNLOCKED);
+              }
+              id(lock_r_moving) = false;
+          } else if (id(r_lock_sensor).state) {
+              // Lock sensor is active
+              id(motor_speed_output).turn_off();
+              id(check_lock_jammed).stop();
+              if(id(lock_r_moving)){
+                if(id(lock_r_target) == LOCK_STATE_LOCKING || id(lock_r_target) == LOCK_STATE_LOCKED ){
+                  id(door_r_lock).publish_state(LOCK_STATE_LOCKED);
+                }else{
+                  id(door_r_lock).publish_state(LOCK_STATE_JAMMED);
+                }
+              }else{
+                id(door_r_lock).publish_state(LOCK_STATE_LOCKED);
+              }
+              id(lock_r_moving) = false;
+          } else { 
+              // Neither sensor is active
+              if (id(lock_r_moving)) {
+                if(id(lock_r_target) == LOCK_STATE_LOCKING ){
+                  // lock is moving to the locked position
+                  id(door_r_lock).publish_state(LOCK_STATE_LOCKING);
+                  id(lock_r_target) = LOCK_STATE_LOCKED;
+                }
+                if(id(lock_r_target) == LOCK_STATE_UNLOCKING){
+                  // lock is moving to the unlocked position
+                  id(door_r_lock).publish_state(LOCK_STATE_UNLOCKING);
+                  id(lock_r_target) = LOCK_STATE_UNLOCKED;
+                }
+              } else {
+                // lock was not commanded to move but is being moved manually
+                id(door_r_lock).publish_state(LOCK_STATE_JAMMED);
+              }
+          }
 
 # track when the lock was commanded to move vs when it was move externally through lock_r_moving
 # track the target state to determine if it reached the target or is jammed
@@ -245,30 +293,14 @@ binary_sensor:
     id: r_lock_sensor
     pin: { number: $lock_r_lock, mode: { input: true, pulldown : true } }
     filters: [ delayed_on_off: 100ms]
-    on_press: 
+    on_state: 
       then:
-        - lock.template.publish: { id: door_r_lock, state: LOCKED }
-        - output.turn_off: motor_speed_output
-        - globals.set: { id: lock_r_moving, value: "false"}
-    on_release:
-      if:
-        condition:
-          lambda: 'return id(lock_r_moving);'
-        then: [ lock.template.publish: { id: door_r_lock, state: UNLOCKING }, globals.set: { id: lock_r_target, value: "LOCK_STATE_LOCKED"} ]
-        else: { lock.template.publish: { id: door_r_lock, state: JAMMED } }
+        - script.execute: eval_lock_state
   - platform: gpio
     id: r_unlock_sensor
     pin: { number: $lock_r_unlock, mode: { input: true, pulldown : true } }
     filters: [ delayed_on_off: 100ms]
-    on_press: 
+    on_state: 
       then:
-        - lock.template.publish: { id: door_r_lock, state: UNLOCKED }
-        - output.turn_off: motor_speed_output
-        - globals.set: { id: lock_r_moving, value: "false"}
-    on_release:
-      if:
-        condition:
-          lambda: 'return id(lock_r_moving);'
-        then: [ lock.template.publish: { id: door_r_lock, state: LOCKING }, globals.set: { id: lock_r_target, value: "LOCK_STATE_UNLOCKED"} ]
-        else: { lock.template.publish: { id: door_r_lock, state: JAMMED } }
+        - script.execute: eval_lock_state
 
