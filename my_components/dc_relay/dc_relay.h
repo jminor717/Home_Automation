@@ -23,11 +23,11 @@ namespace dc_relay {
 
     class Dc_Relay;
     class CircuitConfig;
-    class customLEDCOutput : public ledc::LEDCOutput {
-    public:
-        uint8_t get_channel() { return this->channel_; }
-        uint8_t get_pinNum() { return this->pin_->get_pin(); }
-    };
+    // class customLEDCOutput : public ledc::LEDCOutput {
+    // public:
+    //     uint8_t get_channel() { return this->channel_; }
+    //     uint8_t get_pinNum() { return this->pin_->get_pin(); }
+    // };
 
     class Dc_Relay : public PollingComponent {
     public:
@@ -50,7 +50,6 @@ namespace dc_relay {
         void set_Voltage_Divider_Ratio(float val) { this->Voltage_Divider_Ratio = val; };
         void set_Current_Calibration(float val) { this->Current_Calibration = val; };
         void set_circuits(std::vector<CircuitConfig*> _circuits) { this->circuits = std::move(_circuits); };
-        void set_Short_Circuit_Test_Chanel(ledc::LEDCOutput* chan) { this->SC_Test_Chanel = static_cast<customLEDCOutput*>(chan); };
         void set_voltage_sensor(sensor::Sensor* _voltage_sensor) { this->vin_display_sensor = _voltage_sensor; }
 
         void stopIfNecessary();
@@ -66,7 +65,7 @@ namespace dc_relay {
 
     protected:
         voltage_sampler::VoltageSampler* Vin_Sensor;
-        customLEDCOutput* SC_Test_Chanel;
+        // customLEDCOutput* SC_Test_Chanel;
         std::vector<CircuitConfig*> circuits;
         sensor::Sensor* vin_display_sensor { nullptr };
 
@@ -101,19 +100,20 @@ namespace dc_relay {
         void set_power_sensor(sensor::Sensor* _power_sensor) { this->power_sensor = _power_sensor; }
         void set_current_sensor(sensor::Sensor* _current_sensor) { this->current_sensor = _current_sensor; }
         void set_voltage_sensor(sensor::Sensor* _voltage_sensor) { this->voltage_sensor = _voltage_sensor; }
+        void set_Short_Circuit_Test_Chanel(ledc::LEDCOutput* chan) { this->SC_Test_Chanel = chan; };
 
         void set_V_out_sensor(voltage_sampler::VoltageSampler* _V_out_Sensor) { this->V_out_Sensor = _V_out_Sensor; }
         void set_I_out_sensor(voltage_sampler::VoltageSampler* _I_out_Sensor) { this->Current_Sensor = _I_out_Sensor; }
 
-        void set_Enable_pin(InternalGPIOPin* pin) { this->Enable_pin_ = pin; };
-        void set_Short_Circuit_Test_pin(InternalGPIOPin* pin) { this->Short_Circuit_Test_pin = pin; };
+        void set_Enable_pin(GPIOPin* pin) { this->Enable_pin_ = pin; };
+        // void set_Short_Circuit_Test_pin(InternalGPIOPin* pin) { this->Short_Circuit_Test_pin = pin; };
         void set_Enable_Circuit_Switch(CircuitEnable* _switch_) { this->Enable_Circuit_switch = _switch_; };
 
         void set_Max_Current(float max) { this->I_Max = max; };
         void set_Test_Current(float max) { this->I_SC_Test_Max = max; };
 
         uint8_t id;
-        customLEDCOutput* SC_Test_Chanel;
+        ledc::LEDCOutput* SC_Test_Chanel;
         float V_Open_Circuit;
         float Voltage_Divider_Ratio;
         float Current_Calibration;
@@ -124,7 +124,7 @@ namespace dc_relay {
     protected:
         voltage_sampler::VoltageSampler* V_out_Sensor;
         voltage_sampler::VoltageSampler* Current_Sensor;
-        InternalGPIOPin* Enable_pin_;
+        GPIOPin* Enable_pin_;
         InternalGPIOPin* Short_Circuit_Test_pin { nullptr };
         sensor::Sensor* power_sensor { nullptr };
         sensor::Sensor* current_sensor { nullptr };

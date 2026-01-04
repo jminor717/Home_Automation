@@ -68,8 +68,9 @@ SCHEMA_CIRCUIT = {
     ),
     cv.Required(CONF_V_OUT_SENSOR): cv.use_id(voltage_sampler.VoltageSampler),
     cv.Required(CONF_CURRENT_SENSOR): cv.use_id(voltage_sampler.VoltageSampler),
-    cv.Required(CONF_ENABLE_PIN): pins.internal_gpio_input_pin_schema,
-    cv.Optional(CONF_SHORT_CIRCUIT_TEST_PIN): pins.internal_gpio_input_pin_schema,
+    cv.Required(CONF_ENABLE_PIN): pins.gpio_output_pin_schema,
+    # cv.Optional(CONF_SHORT_CIRCUIT_TEST_PIN): pins.internal_gpio_input_pin_schema,
+    cv.Optional(CONF_SHORT_CIRCUIT_TEST_CHANEL): cv.use_id(LEDCOutput),
     cv.Optional(CONF_MAX_CURRENT, default=5): cv.positive_float,
     cv.Optional(CONF_TEST_CURRENT, default=1.2): cv.positive_float,
 
@@ -105,7 +106,7 @@ CONFIG_SCHEMA = cv.All(
             cv.Optional(CONF_VOLTAGE_RATIO, default=1): cv.positive_float,
             cv.Optional(CONF_CURRENT_RATIO, default=1): cv.positive_float,
             cv.Required(CONF_CIRCUITS): cv.ensure_list(SCHEMA_CIRCUIT),
-            cv.Optional(CONF_SHORT_CIRCUIT_TEST_CHANEL): cv.use_id(LEDCOutput),
+            # cv.Optional(CONF_SHORT_CIRCUIT_TEST_CHANEL): cv.use_id(LEDCOutput),
             
             cv.Optional(CONF_V_IN_DISPLAY): sensor.sensor_schema(
                 unit_of_measurement=UNIT_VOLT,
@@ -133,9 +134,7 @@ async def to_code(config):
     vin_sens = await cg.get_variable(config[CONF_V_IN_SENSOR])
     cg.add(var.set_Vin_Sensor(vin_sens))
 
-    if CONF_SHORT_CIRCUIT_TEST_CHANEL in config:
-        chan = await cg.get_variable(config[CONF_SHORT_CIRCUIT_TEST_CHANEL])
-        cg.add(var.set_Short_Circuit_Test_Chanel(chan))
+
 
     if CONF_V_IN_DISPLAY in config:
         voltage_sensor = await sensor.new_sensor(config[CONF_V_IN_DISPLAY])
@@ -151,6 +150,10 @@ async def to_code(config):
     for circuit_config in config[CONF_CIRCUITS]:
         circuit_var = cg.new_Pvariable(circuit_config[CONF_ID], CircuitConfig())
         
+        if CONF_SHORT_CIRCUIT_TEST_CHANEL in circuit_config:
+            chan = await cg.get_variable(circuit_config[CONF_SHORT_CIRCUIT_TEST_CHANEL])
+            cg.add(circuit_var.set_Short_Circuit_Test_Chanel(chan))
+
         # if enable_config := config.get(CONF_ENABLE_CIRCUIT):
         #     b = await switch.new_switch(enable_config)
         #     await cg.register_component(var, enable_config)

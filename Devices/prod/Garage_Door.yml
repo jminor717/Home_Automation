@@ -26,7 +26,7 @@ substitutions:
 external_components:
   - source:
       type: local
-      path: ../my_components # path relative to Devices folder
+      path: ../../my_components # path relative to Devices folder
 
 esphome:
   name: $device_name
@@ -166,7 +166,7 @@ script:
       - delay: 5s
       - output.turn_off: motor_speed_output
       - globals.set: { id: lock_r_moving, value: "false"}
-      - script.execute: eval_lock_state
+      - script.execute: { id: eval_lock_state, is_right_door: true} 
   - id: auto_lock_man_door
     mode: restart
     then:
@@ -174,55 +174,65 @@ script:
       - lock.lock: man_door_lock
   - id: eval_lock_state
     mode: single
+    parameters:
+      is_right_door: bool
     then:
       - lambda: |
-          if (id(r_unlock_sensor).state && id(r_lock_sensor).state) {
+          auto lock = id(door_r_lock);
+          auto target = id(lock_r_target);
+          auto is_moving = id(lock_r_moving);
+          auto lock_sensor = id(r_lock_sensor);
+          auto unlock_sensor = id(r_unlock_sensor);
+          if(!is_right_door){
+
+          }
+          if (unlock_sensor->state && lock_sensor->state) {
               // Both sensors are active, should not happen
-              id(door_r_lock).publish_state(LOCK_STATE_JAMMED);
-          } else if (id(r_unlock_sensor).state ) {
+              lock->publish_state(LOCK_STATE_JAMMED);
+          } else if (unlock_sensor->state ) {
               // Unlock sensor is active
               id(motor_speed_output).turn_off();
               id(check_lock_jammed).stop();
-              if(id(lock_r_moving)){
-                if(id(lock_r_target) == LOCK_STATE_UNLOCKING || id(lock_r_target) == LOCK_STATE_UNLOCKED ){
-                  id(door_r_lock).publish_state(LOCK_STATE_UNLOCKED);
+              if(is_moving){
+                if(target == LOCK_STATE_UNLOCKING || target == LOCK_STATE_UNLOCKED ){
+                  lock->publish_state(LOCK_STATE_UNLOCKED);
                 }else{
-                  id(door_r_lock).publish_state(LOCK_STATE_JAMMED);
+                  lock->publish_state(LOCK_STATE_JAMMED);
                 }
               }else{
-                id(door_r_lock).publish_state(LOCK_STATE_UNLOCKED);
+                lock->publish_state(LOCK_STATE_UNLOCKED);
               }
-              id(lock_r_moving) = false;
-          } else if (id(r_lock_sensor).state) {
+              is_moving = false;
+          } else if (lock_sensor->state) {
               // Lock sensor is active
               id(motor_speed_output).turn_off();
               id(check_lock_jammed).stop();
-              if(id(lock_r_moving)){
-                if(id(lock_r_target) == LOCK_STATE_LOCKING || id(lock_r_target) == LOCK_STATE_LOCKED ){
-                  id(door_r_lock).publish_state(LOCK_STATE_LOCKED);
+              if(is_moving){
+                if(target == LOCK_STATE_LOCKING || target == LOCK_STATE_LOCKED ){
+                  lock->publish_state(LOCK_STATE_LOCKED);
                 }else{
-                  id(door_r_lock).publish_state(LOCK_STATE_JAMMED);
+                 lock->publish_state(LOCK_STATE_JAMMED);
                 }
               }else{
-                id(door_r_lock).publish_state(LOCK_STATE_LOCKED);
+                lock->publish_state(LOCK_STATE_LOCKED);
               }
-              id(lock_r_moving) = false;
+              is_moving = false;
           } else { 
               // Neither sensor is active
-              if (id(lock_r_moving)) {
-                if(id(lock_r_target) == LOCK_STATE_LOCKING ){
+              if (is_moving) {
+                if(target == LOCK_STATE_LOCKING ){
                   // lock is moving to the locked position
-                  id(door_r_lock).publish_state(LOCK_STATE_LOCKING);
-                  id(lock_r_target) = LOCK_STATE_LOCKED;
+                  lock->publish_state(LOCK_STATE_LOCKING);
+                  target = LOCK_STATE_LOCKED;
                 }
-                if(id(lock_r_target) == LOCK_STATE_UNLOCKING){
+                if(target == LOCK_STATE_UNLOCKING){
                   // lock is moving to the unlocked position
-                  id(door_r_lock).publish_state(LOCK_STATE_UNLOCKING);
-                  id(lock_r_target) = LOCK_STATE_UNLOCKED;
+                  lock->publish_state(LOCK_STATE_UNLOCKING);
+                  target = LOCK_STATE_UNLOCKED;
                 }
               } else {
                 // lock was not commanded to move but is being moved manually
-                id(door_r_lock).publish_state(LOCK_STATE_JAMMED);
+                lock->publish_state(LOCK_STATE_JAMMED);
               }
           }
 
@@ -295,12 +305,12 @@ binary_sensor:
     filters: [ delayed_on_off: 100ms]
     on_state: 
       then:
-        - script.execute: eval_lock_state
+        - script.execute: { id: eval_lock_state, is_right_door: true} 
   - platform: gpio
     id: r_unlock_sensor
     pin: { number: $lock_r_unlock, mode: { input: true, pulldown : true } }
     filters: [ delayed_on_off: 100ms]
     on_state: 
       then:
-        - script.execute: eval_lock_state
+        - script.execute: { id: eval_lock_state, is_right_door: true} 
 

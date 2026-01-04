@@ -12,22 +12,33 @@ substitutions:
   eth_int: GPIO13
   eth_rst: GPIO14
 
-  ledc_pin: GPIO46
+  scl_pin: GPIO43
+  sda_pin: GPIO44
 
-  motor_1: GPIO4
-  motor_dir_A: GPIO5
-  motor_dir_B: GPIO6
-  stop_1: GPIO19
-  stop_2: GPIO20
+  bat_raw_voltage_pin: GPIO1
+  bat_raw_current_pin: GPIO2
+  bat_charge_en_pin: GPIO41
 
-  gpio_cs: GPIO7
-  adc_cs: GPIO15
-  spi_clk: GPIO16
-  spi_miso: GPIO17
-  spi_mosi: GPIO18
+  adc_cs: GPIO40
+  spi_clk: GPIO39
+  spi_miso: GPIO38
+  spi_mosi: GPIO21
+  
+  c1_current_pin: GPIO4
+  c2_current_pin: GPIO5
+  c3_current_pin: GPIO6
+  c4_current_pin: GPIO7
+  c5_current_pin: GPIO15
+# 16
+  c1_sc_test: GPIO17
+  c2_sc_test: GPIO18
+  c3_sc_test: GPIO8
+  c4_sc_test: GPIO19
+  c5_sc_test: GPIO20
 
-  scl_pin: GPIO20
-  sda_pin: GPIO19
+#  3, 
+#  0
+
 
 external_components:
   - source:
@@ -88,169 +99,13 @@ button:
   - platform: restart
     name: "$device_name Restart"
 
-# mcp3008:
-#   cs_pin: $adc_cs
-#   # data_rate: 75kHz
-#   data_rate: 1MHz
-#   id: mcp_adc
-
-mcp23s17:
-  - id: mcp_gpio
-    cs_pin: $gpio_cs
-    data_rate: 1MHz
-    deviceaddress: 0
-    open_drain_interrupt: false
-
-# Example configuration entry
-# fan:
-#   - platform: hbridge
-#     id: my_fan
-#     name: "Living Room Fan"
-#     pin_a: my_output_id
-#     pin_b: my_output_id_2
-#     enable_pin: my_output_id_3
-#     decay_mode: slow
-
-output:
-  - platform: gpio
-    pin: $motor_1
-    id: motor_speed
-  - platform: ledc
-    pin: $motor_dir_A
-    id: motor_dir_1
-  - platform: ledc
-    pin: $motor_dir_B
-    id: motor_dir_2
-  # - platform: ledc
-  #   pin: $motor_2
-  #   id: my_output_id_2
-  # - platform: ledc
-  #   pin: $motor_en
-  #   id: my_output_id_3
-
-# timed_traversal_motor:
-
-cover:
-  - platform: endstop
-    name: "Endstop Cover"
-
-    open_action:
-      - output.turn_off: motor_dir_1
-      - output.set_level:
-              id: motor_dir_2
-              level: 25%
-    open_duration: 30sec
-    open_endstop: open_endstop_binary_sensor
-
-    close_action:
-      - output.turn_off: motor_dir_2
-      - output.set_level:
-              id: motor_dir_1
-              level: 25%
-    close_duration: 30sec
-    close_endstop: close_endstop_binary_sensor
-
-    stop_action:
-      - output.turn_off: motor_dir_1
-      - output.turn_off: motor_dir_2
-
-
 switch:
   # - platform: restart
   #   id: needed_for_switch_reference
   - platform: gpio
-    name: "MCP23S17 Pin #1"
-    pin: { mcp23xxx: mcp_gpio, number: 1, mode: { output: true }, inverted: false }
-  - platform: gpio
-    name: "MCP23S17 Pin #2"
-    pin: { mcp23xxx: mcp_gpio, number: 2, mode: { output: true }, inverted: false }
-  - platform: gpio
-    name: "MCP23S17 Pin #3"
-    pin: { mcp23xxx: mcp_gpio, number: 3, mode: { output: true }, inverted: false }
-  - platform: gpio
-    name: "MCP23S17 Pin #4"
-    pin: { mcp23xxx: mcp_gpio, number: 4, mode: { output: true }, inverted: false }
-  - platform: gpio
-    name: "MCP23S17 Pin #5"
-    pin: { mcp23xxx: mcp_gpio, number: 5, mode: { output: true }, inverted: false }
-  - platform: gpio
-    name: "MCP23S17 Pin #6"
-    pin: { mcp23xxx: mcp_gpio, number: 6, mode: { output: true }, inverted: false }
-
-binary_sensor:
-  - platform: gpio
-    id: open_endstop_binary_sensor
-    pin: $stop_1
-  - platform: gpio
-    id: close_endstop_binary_sensor
-    pin: $stop_2
-
-  # - platform: gpio
-  #   name: "MCP23S17 Pin #1"
-  #   pin: { mcp23xxx: mcp_gpio, number: 1, mode: {input: true, pullup: false }, inverted: false, interrupt: CHANGE  }
-  #   filters:
-  #     - delayed_on_off: 500ms
-  # - platform: gpio
-  #   name: "MCP23S17 Pin #2"
-  #   pin: { mcp23xxx: mcp_gpio, number: 2, mode: {input: true, pullup: false}, inverted: false  }
-  #   filters:
-  #     - delayed_on_off: 500ms
-  # - platform: gpio
-  #   name: "MCP23S17 Pin #3"
-  #   pin: { mcp23xxx: mcp_gpio, number: 3, mode: {input: true, pullup: false}, inverted: false  }
-  #   filters:
-  #     - delayed_on_off: 500ms
-  # - platform: gpio
-  #   name: "MCP23S17 Pin #4"
-  #   pin: { mcp23xxx: mcp_gpio, number: 4, mode: {input: true, pullup: false}, inverted: false  }
-  #   filters:
-  #     - delayed_on_off: 500ms
-  # - platform: gpio
-  #   name: "MCP23S17 Pin #5"
-  #   pin: { mcp23xxx: mcp_gpio, number: 5, mode: {input: true, pullup: false}, inverted: false  }
-  #   filters:
-  #     - delayed_on_off: 500ms
-  # - platform: gpio
-  #   name: "MCP23S17 Pin #6"
-  #   pin: { mcp23xxx: mcp_gpio, number: 6, mode: {input: true, pullup: false}, inverted: false  }
-  #   filters:
-  #     - delayed_on_off: 500ms
-  - platform: gpio
-    name: "MCP23S17 Pin #9"
-    pin: { mcp23xxx: mcp_gpio, number: 9, mode: {input: true, pullup: false}, inverted: false  }
-    filters:
-      - delayed_on_off: 500ms
-  - platform: gpio
-    name: "MCP23S17 Pin #10"
-    pin: { mcp23xxx: mcp_gpio, number: 10, mode: {input: true, pullup: false}, inverted: false  }
-    filters:
-      - delayed_on_off: 500ms
-  - platform: gpio
-    name: "MCP23S17 Pin #11"
-    pin: { mcp23xxx: mcp_gpio, number: 11, mode: {input: true, pullup: false}, inverted: false  }
-    filters:
-      - delayed_on_off: 500ms
-  - platform: gpio
-    name: "MCP23S17 Pin #12"
-    pin: { mcp23xxx: mcp_gpio, number: 12, mode: {input: true, pullup: false}, inverted: false  }
-    filters:
-      - delayed_on_off: 500ms
-  - platform: gpio
-    name: "MCP23S17 Pin #13"
-    pin: { mcp23xxx: mcp_gpio, number: 13, mode: {input: true, pullup: false}, inverted: false  }
-    filters:
-      - delayed_on_off: 500ms
-  - platform: gpio
-    name: "MCP23S17 Pin #14"
-    pin: { mcp23xxx: mcp_gpio, number: 14, mode: {input: true, pullup: false}, inverted: false  }
-    filters:
-      - delayed_on_off: 500ms
-  - platform: gpio
-    name: "MCP23S17 Pin #15"
-    pin: { mcp23xxx: mcp_gpio, number: 15, mode: {input: true, pullup: false}, inverted: false  }
-    filters:
-      - delayed_on_off: 500ms
-      # One of INPUT or INPUT_PULLUP
+    pin: $bat_charge_en_pin
+    name: "Battery Charge Enabled"
+    id: bat_charge_en
 
 text_sensor:
   - platform: version
@@ -266,58 +121,61 @@ text_sensor:
       # we push a new value every 5 seconds
       send_every: 10
 
-
-# cd74hc4067:
-#   - id: cd74hc4067_1
-#     pin_s0: GPIO6
-#     pin_s1: GPIO8
-#     pin_s2: GPIO7
-#     pin_s3: GPIO0
-
 spi:
   clk_pin: $spi_clk
   mosi_pin: $spi_mosi
   miso_pin: $spi_miso
   interface: spi3
 
-# i2c:
-#   - id: bus_a
-#     sda: $sda_pin
-#     scl: $scl_pin
-#     scan: true
+i2c:
+  - id: bus_a
+    sda: $sda_pin
+    scl: $scl_pin
+    scan: true
 
-# output:
-#   - platform: ledc
-#     pin: $ledc_pin
-#     id: short_circuit_chanel
-#     frequency: 19531Hz
+pcf8574:
+  - id: pcf8574_hub
+    address: 0x20
+    pcf8575: true
 
-# dc_relay:
-#   - id: dc_breaker_a
-#     v_in_sensor: vin_raw
-#     open_circuit_voltage: 48
-#     uvlo: 42
-#     voltage_divider_ratio: 18.808
-#     current_calibration: 2.15
-#     # short_circuit_test_chanel: short_circuit_chanel
-#     update_interval: 0.5s
-#     v_in: { name: "V In Meas", filters: [ *moving_avg ] }
-#     circuits:
-#       - { enable_circuit: { name: "c5 Enable" }, v_out_sensor:  c1_v, current_sensor:  c1_i, enable_pin: GPIO44, #short_circuit_test_pin: GPIO43, 
-#               power: { name: "c5 power", id:  c1_pow, filters: [ *moving_avg ] },
-#               current: { name: "c5 current", filters: [ *moving_avg ] }, #
-#               voltage: { name: "c5 voltage", filters: [ *moving_avg ] } }
-#       - { enable_circuit: { name: "c2 Enable" }, v_out_sensor:  c2_v, current_sensor:  c2_i, enable_pin: GPIO11, #short_circuit_test_pin: GPIO39, 
-#               power: { name: "c2 power", id:  c2_pow, filters: [ *moving_avg ] },
-#               current: { name: "c2 current", filters: [ *moving_avg ] }, #
-#               voltage: { name: "c2 voltage", filters: [ *moving_avg ] } }
+mcp3008:
+  cs_pin: $adc_cs
+  # data_rate: 75kHz
+  data_rate: 1MHz
+  id: mcp_adc
+
+output:
+  - { platform: ledc, pin: $c1_sc_test, id: c1_sc_chanel, frequency: 78127Hz }
+  - { platform: ledc, pin: $c2_sc_test, id: c2_sc_chanel, frequency: 78127Hz }
+  - { platform: ledc, pin: $c3_sc_test, id: c3_sc_chanel, frequency: 19531Hz }
+  - { platform: ledc, pin: $c4_sc_test, id: c4_sc_chanel, frequency: 19531Hz }
+  - { platform: ledc, pin: $c5_sc_test, id: c5_sc_chanel, frequency: 19531Hz }
+
+dc_relay:
+  - id: dc_breaker_a
+    v_in_sensor: vin_raw
+    open_circuit_voltage: 24
+    uvlo: 20
+    voltage_divider_ratio: 18.808Sd
+    current_calibration: 2.15
+    # short_circuit_test_chanel: short_circuit_chanel
+    update_interval: 0.5s
+    v_in: { name: "V In Meas", filters: [ *moving_avg ] }
+    circuits:
+      - { enable_circuit: { name: "c1 Enable" }, v_out_sensor:  c1_v, current_sensor:  c1_i, enable_pin: { pcf8574: pcf8574_hub, number: 0, mode: { output: true }, inverted: false }, short_circuit_test_chanel: c1_sc_chanel, 
+              power: { name: "c1 power", id:  c1_pow, filters: [ *moving_avg ] },
+              current: { name: "c1 current", filters: [ *moving_avg ] }, #
+              voltage: { name: "c1 voltage", filters: [ *moving_avg ] } }
+      - { enable_circuit: { name: "c2 Enable" }, v_out_sensor:  c2_v, current_sensor:  c2_i, enable_pin: { pcf8574: pcf8574_hub, number: 1, mode: { output: true }, inverted: false }, short_circuit_test_chanel: c2_sc_chanel, 
+              power: { name: "c2 power", id:  c2_pow, filters: [ *moving_avg ] },
+              current: { name: "c2 current", filters: [ *moving_avg ] }, #
+              voltage: { name: "c2 voltage", filters: [ *moving_avg ] } }
+      - { enable_circuit: { name: "c5 Enable" }, v_out_sensor:  c5_v, current_sensor:  c5_i, enable_pin: { pcf8574: pcf8574_hub, number: 2, mode: { output: true }, inverted: false }, short_circuit_test_chanel: c5_sc_chanel, 
+              power: { name: "c5 power", id:  c5_pow, filters: [ *moving_avg ] },
+              current: { name: "c5 current", filters: [ *moving_avg ] }, #
+              voltage: { name: "c5 voltage", filters: [ *moving_avg ] } }
       # - { enable_circuit: { name: "c3 Enable" }, v_out_sensor:  c3_v, current_sensor:  c3_i, enable_pin: GPIO13 }
-#       - { enable_circuit: { name: "c4 Enable" }, v_out_sensor:  c4_v, current_sensor:  c4_i, enable_pin: GPIO15}
-#       - { enable_circuit: { name: "c1 Enable" }, v_out_sensor:  c5_v, current_sensor:  c5_i, enable_pin: GPIO40, #short_circuit_test_pin: GPIO41, 
-#               power: { name: "c1 power", id:  c5_pow, filters: [ *moving_avg ] },
-#               current: { name: "c1 current", filters: [ *moving_avg ] }, #
-#               voltage: { name: "c1 voltage", filters: [ *moving_avg ] } }
-
+      # - { enable_circuit: { name: "c4 Enable" }, v_out_sensor:  c4_v, current_sensor:  c4_i, enable_pin: GPIO15}
 
 
 
@@ -335,14 +193,7 @@ sensor:
   #   pin: GPIO5
   #   attenuation: 12db
   #   # internal: true
-  # - {platform: mcp3008, id: v0, name: voltage 0, update_interval: 5s, number: 0, accuracy_decimals: 2, mcp3008_id: mcp_adc, reference_voltage: 3.3, unit_of_measurement: "V"}
-  # - {platform: mcp3008, id: v1, name: voltage 1, update_interval: 5s, number: 1, accuracy_decimals: 2, mcp3008_id: mcp_adc, reference_voltage: 3.3, unit_of_measurement: "V"}
-  # - {platform: mcp3008, id: v2, name: voltage 2, update_interval: 5s, number: 2, accuracy_decimals: 2, mcp3008_id: mcp_adc, reference_voltage: 3.3, unit_of_measurement: "V"}
-  # - {platform: mcp3008, id: v3, name: voltage 3, update_interval: 5s, number: 3, accuracy_decimals: 2, mcp3008_id: mcp_adc, reference_voltage: 3.3, unit_of_measurement: "V"}
-  # - {platform: mcp3008, id: v4, name: voltage 4, update_interval: 5s, number: 4, accuracy_decimals: 2, mcp3008_id: mcp_adc, reference_voltage: 3.3, unit_of_measurement: "V"}
-  # - {platform: mcp3008, id: v5, name: voltage 5, update_interval: 5s, number: 5, accuracy_decimals: 2, mcp3008_id: mcp_adc, reference_voltage: 3.3, unit_of_measurement: "V"}
-  # - {platform: mcp3008, id: v6, name: voltage 6, update_interval: 5s, number: 6, accuracy_decimals: 2, mcp3008_id: mcp_adc, reference_voltage: 3.3, unit_of_measurement: "V"}
-  # - {platform: mcp3008, id: v7, name: voltage 7, update_interval: 5s, number: 7, accuracy_decimals: 2, mcp3008_id: mcp_adc, reference_voltage: 3.3, unit_of_measurement: "V"}
+
 # 18.808  on_value_range 
   # - platform: adc
   #   name: "V In"
@@ -350,20 +201,43 @@ sensor:
   #   pin: GPIO10
   #   update_interval: 60s
   #   attenuation: 12db
-  # # - { name: "V In",        id: vin_raw,  pin: GPIO4, filters: [multiply: 18.808],             platform: adc,      update_interval: 5s, attenuation: 12db, unit_of_measurement: "V" }
-  # - { name: "$c1 Raw",     id: c1_i, pin: GPIO1,                                            platform: adc,      update_interval: 60s, attenuation: 12db, internal: true }
-  # - { name: "zz 5_1 Voltage", id: c1_v, number: 4, sensor: adc_sensor,                  platform: cd74hc4067,      update_interval: 5s,                    internal: false }
-  # - { name: "$c2 Raw",     id: c2_i, pin: GPIO5,                                            platform: adc,      update_interval: 60s, attenuation: 12db, internal: true }
-  # - { name: "zz 2_2 Voltage", id: c2_v, number: 1, sensor: adc_sensor,                  platform: cd74hc4067,      update_interval: 5s,                    internal: false }
-  # - { name: "$c3 Raw",     id: c3_i, pin: GPIO4,                                            platform: adc,      update_interval: 60s, attenuation: 12db, internal: true }
-  # - { name: "c3 Voltage", id: c3_v, number: 2, sensor: adc_sensor,                  platform: cd74hc4067,      update_interval: 5s,                    internal: true }
-  # - { name: "$c4 Raw",     id: c4_i, pin: GPIO3,                                            platform: adc,      update_interval: 60s, attenuation: 12db, internal: true }
-  # - { name: "zz 4_4 Voltage", id: c4_v, number: 3, sensor: adc_sensor,                  platform: cd74hc4067,      update_interval: 5s,                    internal: true }
-  # - { name: "$c5 Raw",     id: c5_i, pin: GPIO2,                                            platform: adc,      update_interval: 60s, attenuation: 12db, internal: true }
-  # - { name: "zz 1_5 Voltage", id: c5_v, number: 0, sensor: adc_sensor,                  platform: cd74hc4067,      update_interval: 5s,                    internal: false }
-  # - { name: "zz 5 Voltage", id: z5v, number: 5, sensor: adc_sensor,                  platform: cd74hc4067,      update_interval: 5s,                    internal: false }
-  # - { name: "zz 6 Voltage", id: z6_v, number: 6, sensor: adc_sensor,                  platform: cd74hc4067,      update_interval: 5s,                    internal: false }
-  # - { name: "zz 7 Voltage", id: z7_v, number: 7, sensor: adc_sensor,                  platform: cd74hc4067,      update_interval: 5s,                    internal: false }
+  - { name: "V In",        id: vin_raw,  number: 6, platform: mcp3008, mcp3008_id: mcp_adc, filters: [multiply: 18.808],     update_interval: 5s, unit_of_measurement: "V" }
+  - { name: "$c1 Raw",     id: c1_i, pin: $c1_current_pin,          platform: adc,              update_interval: 60s, attenuation: 12db, internal: false }
+  - { name: "$c2 Raw",     id: c2_i, pin: $c2_current_pin,          platform: adc,              update_interval: 60s, attenuation: 12db, internal: false }
+  - { name: "$c3 Raw",     id: c3_i, pin: $c3_current_pin,          platform: adc,              update_interval: 60s, attenuation: 12db, internal: false }
+  - { name: "$c4 Raw",     id: c4_i, pin: $c4_current_pin,          platform: adc,              update_interval: 60s, attenuation: 12db, internal: false }
+  - { name: "$c5 Raw",     id: c5_i, pin: $c5_current_pin,           platform: adc,             update_interval: 60s, attenuation: 12db, internal: false }
+  - { name: "1 Voltage", id: c1_v, number: 1, platform: mcp3008, mcp3008_id: mcp_adc,  update_interval: 5s,                    internal: false }
+  - { name: "2 Voltage", id: c2_v, number: 2, platform: mcp3008, mcp3008_id: mcp_adc,  update_interval: 5s,                    internal: false }
+  - { name: "3 Voltage", id: c3_v, number: 3, platform: mcp3008, mcp3008_id: mcp_adc,  update_interval: 5s,                    internal: false }
+  - { name: "4 Voltage", id: c4_v, number: 4, platform: mcp3008, mcp3008_id: mcp_adc,  update_interval: 5s,                    internal: false }
+  - { name: "5 Voltage", id: c5_v, number: 5, platform: mcp3008, mcp3008_id: mcp_adc,  update_interval: 5s,                    internal: false }
 
+
+  - { platform: template, name: "Network Battery Power", id: bat_power, unit_of_measurement: "W", accuracy_decimals: 2, 
+      filters: { lambda: !lambda "return x * id(bat_raw_voltage).state;" } 
+    }
+  - { platform: adc, id: bat_raw_current, name: "Network Battery Current", pin: $bat_raw_current_pin, unit_of_measurement: "A",
+      update_interval: 100ms, attenuation: 12db, 
+      filters: [ sliding_window_moving_average: { window_size: 60, send_every: 30 } ], # , multiply: 1
+      on_value: { lambda: !lambda "id(bat_power).publish_state(x);" }
+    }
+  - platform: adc
+    id: bat_raw_voltage
+    name: "Network Battery Voltage"
+    pin: $bat_raw_voltage_pin
+    update_interval: 100ms
+    attenuation: 12db
+    filters: [ 
+      sliding_window_moving_average: { window_size: 60, send_every: 30 }, # average last 6 seconds send every 3 seconds
+      multiply: 4.84 # to scale to actual battery voltage from ADC voltage
+    ]
+    on_value:
+        - lambda: |-
+            if(x > 13.3) {
+              id(bat_charge_en).turn_off(); // Turn off charging
+            } else if(x < 13.0) {
+              // id(bat_charge_en).turn_on(); // Turn on charging
+            }
 
 

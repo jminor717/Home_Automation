@@ -20,7 +20,7 @@ namespace dc_relay {
     static const size_t BUFFER_COUNT = 15;
 
     static const char* const TAG = "Dc_Relay";
-
+    static const float current_offset_voltage = 0;
     void Dc_Relay::setup()
     {
         this->inLockOut = false;
@@ -29,7 +29,6 @@ namespace dc_relay {
         for (CircuitConfig* circuit : this->circuits) {
             circuit->setup();
             circuit->id = i;
-            circuit->SC_Test_Chanel = this->SC_Test_Chanel;
             circuit->Voltage_Divider_Ratio = this->Voltage_Divider_Ratio;
             circuit->Current_Calibration = this->Current_Calibration;
             circuit->V_Open_Circuit = this->V_Open_Circuit;
@@ -47,10 +46,10 @@ namespace dc_relay {
         // this->Current_Sensor->stop_poller();
         this->Enable_pin_->setup();
         this->Enable_pin_->pin_mode(gpio::FLAG_OUTPUT | gpio::FLAG_PULLDOWN);
-        if (this->Short_Circuit_Test_pin) {
-            this->Short_Circuit_Test_pin->setup();
-            this->Short_Circuit_Test_pin->pin_mode(gpio::FLAG_OUTPUT | gpio::FLAG_PULLDOWN);
-        }
+        // if (this->Short_Circuit_Test_pin) {
+        //     this->Short_Circuit_Test_pin->setup();
+        //     this->Short_Circuit_Test_pin->pin_mode(gpio::FLAG_OUTPUT | gpio::FLAG_PULLDOWN);
+        // }
     }
 
     void Dc_Relay::dump_config()
@@ -163,8 +162,8 @@ namespace dc_relay {
 
     float CircuitConfig::read_power(float v_in)
     {
-        float V =  2 * (v_in - (this->V_out_Sensor->sample() * this->Voltage_Divider_Ratio));
-        float I = (this->Current_Sensor->sample() - 1.65) * this->Current_Calibration;
+        float V = (this->V_out_Sensor->sample() * this->Voltage_Divider_Ratio);
+        float I = (this->Current_Sensor->sample() - current_offset_voltage) * this->Current_Calibration;
         float P = V * I;
 
         if (this->voltage_sensor) {
@@ -185,19 +184,20 @@ namespace dc_relay {
     void CircuitConfig::Do_State_Change(bool state)
     {
         if (!state) {
-            if (this->Short_Circuit_Test_pin)
-                this->Short_Circuit_Test_pin->digital_write(0);
+            if (this->SC_Test_Chanel){
+                this->SC_Test_Chanel->write_state(0.0);
+            }
             this->Enable_pin_->digital_write(0);
-        } else if (this->Short_Circuit_Test_pin) {
+        } else if (this->SC_Test_Chanel) {
             float V_in = this->parent->readInputVoltage();
 
             // set pwm to zero before switching the pin
             this->SC_Test_Chanel->write_state(0.0);
 
-            auto chan = static_cast<ledc_channel_t>(this->SC_Test_Chanel->get_channel());
-            auto ledc_mode = get_speed_mode(chan);
-            auto pinNum = this->Short_Circuit_Test_pin->get_pin();
-            ledc_set_pin(pinNum, ledc_mode, chan);
+            // auto chan = static_cast<ledc_channel_t>(this->SC_Test_Chanel->get_channel());
+            // auto ledc_mode = get_speed_mode(chan);
+            // auto pinNum = this->Short_Circuit_Test_pin->get_pin();
+            // ledc_set_pin(pinNum, ledc_mode, chan);
 
             // increase the duty through the short circuit buck converter while monitoring output current and voltage
             // look at the current and voltage to figure out if there is a short, or a failing component that is causing a breakdown at higher voltage
@@ -220,13 +220,13 @@ namespace dc_relay {
                 delay(3);
                 float V_sum = 0, I_sum = 0;
                 for (uint8_t aver = 0; aver < 10; aver++) {
-                    V_sum += (V_in - (this->V_out_Sensor->sample() * this->Voltage_Divider_Ratio));
-                    I_sum += ((this->Current_Sensor->sample() - 1.65) * this->Current_Calibration);
+                    V_sum += (this->V_out_Sensor->sample() * this->Voltage_Divider_Ratio);
+                    I_sum += ((this->Current_Sensor->sample() - current_offset_voltage ) * this->Current_Calibration);
                     delayMicroseconds(100);
                 }
 
                 // float  V_sum = this->V_out_Sensor->sample() * this->Voltage_Divider_Ratio;
-                // float  I_sum = ((this->Current_Sensor->sample()- 1.65) * this->Current_Calibration);
+                // float  I_sum = ((this->Current_Sensor->sample()- current_offset_voltage) * this->Current_Calibration);
 
                 // the circuit design used is a negative voltage buck converter to simplify design
                 // so the individual circuits are referenced to Vin instead of ground
@@ -277,11 +277,11 @@ namespace dc_relay {
 
             // set pwm to 0 and set the LEDC output pin back to its original value
             this->SC_Test_Chanel->write_state(0.0);
-            auto pinNumReset = this->SC_Test_Chanel->get_pinNum();
-            ledc_set_pin(pinNumReset, ledc_mode, chan);
+            // auto pinNumReset = this->SC_Test_Chanel->get_pinNum();
+            // ledc_set_pin(pinNumReset, ledc_mode, chan);
 
             this->Enable_pin_->digital_write(!shortCircuit);
-            this->Short_Circuit_Test_pin->digital_write(0);
+            // this->Short_Circuit_Test_pin->digital_write(0);
 
             state = !shortCircuit;
         } else {
