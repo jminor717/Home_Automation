@@ -180,12 +180,15 @@ script:
       - lambda: |
           auto lock = id(door_r_lock);
           auto target = id(lock_r_target);
-          auto is_moving = id(lock_r_moving);
+          auto is_moving = &id(lock_r_moving);
           auto lock_sensor = id(r_lock_sensor);
           auto unlock_sensor = id(r_unlock_sensor);
           if(!is_right_door){
 
           }
+          ESP_LOGI("LockEval", "%s: unlocked: %d, locked: %d, is_moving: %d, target: %d",
+            is_right_door ? "right" : "left", unlock_sensor->state, lock_sensor->state, id(lock_r_moving), target);
+          
           if (unlock_sensor->state && lock_sensor->state) {
               // Both sensors are active, should not happen
               lock->publish_state(LOCK_STATE_JAMMED);
@@ -193,7 +196,7 @@ script:
               // Unlock sensor is active
               id(motor_speed_output).turn_off();
               id(check_lock_jammed).stop();
-              if(is_moving){
+              if(*is_moving){
                 if(target == LOCK_STATE_UNLOCKING || target == LOCK_STATE_UNLOCKED ){
                   lock->publish_state(LOCK_STATE_UNLOCKED);
                 }else{
@@ -202,12 +205,12 @@ script:
               }else{
                 lock->publish_state(LOCK_STATE_UNLOCKED);
               }
-              is_moving = false;
+              *is_moving = false;
           } else if (lock_sensor->state) {
               // Lock sensor is active
               id(motor_speed_output).turn_off();
               id(check_lock_jammed).stop();
-              if(is_moving){
+              if(*is_moving){
                 if(target == LOCK_STATE_LOCKING || target == LOCK_STATE_LOCKED ){
                   lock->publish_state(LOCK_STATE_LOCKED);
                 }else{
@@ -216,10 +219,10 @@ script:
               }else{
                 lock->publish_state(LOCK_STATE_LOCKED);
               }
-              is_moving = false;
+              *is_moving = false;
           } else { 
               // Neither sensor is active
-              if (is_moving) {
+              if (*is_moving) {
                 if(target == LOCK_STATE_LOCKING ){
                   // lock is moving to the locked position
                   lock->publish_state(LOCK_STATE_LOCKING);
