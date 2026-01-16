@@ -156,7 +156,7 @@ dc_relay:
     v_in_sensor: vin_raw
     open_circuit_voltage: 24
     uvlo: 20
-    voltage_divider_ratio: 18.808Sd
+    voltage_divider_ratio: 18.808
     current_calibration: 2.15
     # short_circuit_test_chanel: short_circuit_chanel
     update_interval: 0.5s
@@ -217,11 +217,23 @@ sensor:
   - { platform: template, name: "Network Battery Power", id: bat_power, unit_of_measurement: "W", accuracy_decimals: 2, 
       filters: { lambda: !lambda "return x * id(bat_raw_voltage).state;" } 
     }
-  - { platform: adc, id: bat_raw_current, name: "Network Battery Current", pin: $bat_raw_current_pin, unit_of_measurement: "A",
-      update_interval: 100ms, attenuation: 12db, 
-      filters: [ sliding_window_moving_average: { window_size: 60, send_every: 30 } ], # , multiply: 1
-      on_value: { lambda: !lambda "id(bat_power).publish_state(x);" }
-    }
+  - platform: adc
+    id: bat_raw_current
+    name: "Network Battery Current"
+    pin: $bat_raw_current_pin
+    unit_of_measurement: "A"
+    update_interval: 100ms
+    attenuation: auto 
+    filters: [ sliding_window_moving_average: { window_size: 60, send_every: 30 }, multiply: 1 ]
+    # on_value: { lambda: !lambda "id(bat_power).publish_state(x);" }
+    on_value:
+      - lambda: |-
+          id(bat_power).publish_state(x);
+
+
+
+
+
   - platform: adc
     id: bat_raw_voltage
     name: "Network Battery Voltage"
