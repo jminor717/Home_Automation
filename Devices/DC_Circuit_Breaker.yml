@@ -151,29 +151,35 @@ output:
   - { platform: ledc, pin: $c4_sc_test, id: c4_sc_chanel, frequency: 19531Hz }
   - { platform: ledc, pin: $c5_sc_test, id: c5_sc_chanel, frequency: 19531Hz }
 
-dc_relay:
+
+battery_charge_controller:
   - id: dc_breaker_a
     v_in_sensor: vin_raw
-    open_circuit_voltage: 24
-    uvlo: 20
-    voltage_divider_ratio: 18.808
-    current_calibration: 2.15
-    # short_circuit_test_chanel: short_circuit_chanel
-    update_interval: 0.5s
-    v_in: { name: "V In Meas", filters: [ *moving_avg ] }
-    circuits:
-      - { enable_circuit: { name: "c1 Enable" }, v_out_sensor:  c1_v, current_sensor:  c1_i, enable_pin: { pcf8574: pcf8574_hub, number: 0, mode: { output: true }, inverted: false }, short_circuit_test_chanel: c1_sc_chanel, 
-              power: { name: "c1 power", id:  c1_pow, filters: [ *moving_avg ] },
-              current: { name: "c1 current", filters: [ *moving_avg ] }, #
-              voltage: { name: "c1 voltage", filters: [ *moving_avg ] } }
-      - { enable_circuit: { name: "c2 Enable" }, v_out_sensor:  c2_v, current_sensor:  c2_i, enable_pin: { pcf8574: pcf8574_hub, number: 1, mode: { output: true }, inverted: false }, short_circuit_test_chanel: c2_sc_chanel, 
-              power: { name: "c2 power", id:  c2_pow, filters: [ *moving_avg ] },
-              current: { name: "c2 current", filters: [ *moving_avg ] }, #
-              voltage: { name: "c2 voltage", filters: [ *moving_avg ] } }
-      - { enable_circuit: { name: "c5 Enable" }, v_out_sensor:  c5_v, current_sensor:  c5_i, enable_pin: { pcf8574: pcf8574_hub, number: 2, mode: { output: true }, inverted: false }, short_circuit_test_chanel: c5_sc_chanel, 
-              power: { name: "c5 power", id:  c5_pow, filters: [ *moving_avg ] },
-              current: { name: "c5 current", filters: [ *moving_avg ] }, #
-              voltage: { name: "c5 voltage", filters: [ *moving_avg ] } }
+
+
+# dc_relay:
+#   - id: dc_breaker_a
+#     v_in_sensor: vin_raw
+#     open_circuit_voltage: 24
+#     uvlo: 20
+#     voltage_divider_ratio: 18.808
+#     current_calibration: 2.15
+#     # short_circuit_test_chanel: short_circuit_chanel
+#     update_interval: 0.5s
+#     v_in: { name: "V In Meas", filters: [ *moving_avg ] }
+#     circuits:
+#       - { enable_circuit: { name: "c1 Enable" }, v_out_sensor:  c1_v, current_sensor:  c1_i, enable_pin: { pcf8574: pcf8574_hub, number: 0, mode: { output: true }, inverted: false }, short_circuit_test_chanel: c1_sc_chanel, 
+#               power: { name: "c1 power", id:  c1_pow, filters: [ *moving_avg ] },
+#               current: { name: "c1 current", filters: [ *moving_avg ] }, #
+#               voltage: { name: "c1 voltage", filters: [ *moving_avg ] } }
+#       - { enable_circuit: { name: "c2 Enable" }, v_out_sensor:  c2_v, current_sensor:  c2_i, enable_pin: { pcf8574: pcf8574_hub, number: 1, mode: { output: true }, inverted: false }, short_circuit_test_chanel: c2_sc_chanel, 
+#               power: { name: "c2 power", id:  c2_pow, filters: [ *moving_avg ] },
+#               current: { name: "c2 current", filters: [ *moving_avg ] }, #
+#               voltage: { name: "c2 voltage", filters: [ *moving_avg ] } }
+#       - { enable_circuit: { name: "c5 Enable" }, v_out_sensor:  c5_v, current_sensor:  c5_i, enable_pin: { pcf8574: pcf8574_hub, number: 2, mode: { output: true }, inverted: false }, short_circuit_test_chanel: c5_sc_chanel, 
+#               power: { name: "c5 power", id:  c5_pow, filters: [ *moving_avg ] },
+#               current: { name: "c5 current", filters: [ *moving_avg ] }, #
+#               voltage: { name: "c5 voltage", filters: [ *moving_avg ] } }
       # - { enable_circuit: { name: "c3 Enable" }, v_out_sensor:  c3_v, current_sensor:  c3_i, enable_pin: GPIO13 }
       # - { enable_circuit: { name: "c4 Enable" }, v_out_sensor:  c4_v, current_sensor:  c4_i, enable_pin: GPIO15}
 

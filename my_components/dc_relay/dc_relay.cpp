@@ -37,7 +37,7 @@ namespace dc_relay {
             i++;
         }
         this->circuit_event_queue = xQueueCreate(BUFFER_COUNT, sizeof(ChangeStateEvent));
-        xTaskCreate(Dc_Relay::backgroundCircuitMonitorTask, "circuit_task", 8192 * 2, (void*)this, 0, &this->circuit_task_handle);
+        xTaskCreate(Dc_Relay::backgroundCircuitMonitorTask, "circuit_task", 8192 * 2, (void*)this, 2, &this->circuit_task_handle);
     }
 
     void CircuitConfig::setup()
