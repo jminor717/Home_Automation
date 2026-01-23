@@ -18,27 +18,32 @@ substitutions:
   bat_raw_voltage_pin: GPIO1
   bat_raw_current_pin: GPIO2
   bat_charge_en_pin: GPIO41
+  bat_charge_voltage_pin: GPIO40
+  bat_charge_current_pin: GPIO39
 
-  adc_cs: GPIO40
-  spi_clk: GPIO39
-  spi_miso: GPIO38
-  spi_mosi: GPIO21
+  adc_cs: GPIO16
+  spi_clk: GPIO17
+  spi_miso: GPIO18
+  spi_mosi: GPIO8
   
   c1_current_pin: GPIO4
   c2_current_pin: GPIO5
   c3_current_pin: GPIO6
   c4_current_pin: GPIO7
-  c5_current_pin: GPIO15
-# 16
-  c1_sc_test: GPIO17
-  c2_sc_test: GPIO18
-  c3_sc_test: GPIO8
-  c4_sc_test: GPIO19
-  c5_sc_test: GPIO20
+  # c5_current_pin: GPIO15
 
+  c1_sc_test: GPIO19
+  c2_sc_test: GPIO20
+  c3_sc_test: GPIO38
+  c4_sc_test: GPIO21
+  # c5_sc_test: GPIO20
+# 47
+
+
+# strapping
 #  3, 
 #  0
-
+#  45, 46, 
 
 external_components:
   - source:
@@ -149,13 +154,43 @@ output:
   - { platform: ledc, pin: $c2_sc_test, id: c2_sc_chanel, frequency: 78127Hz }
   - { platform: ledc, pin: $c3_sc_test, id: c3_sc_chanel, frequency: 19531Hz }
   - { platform: ledc, pin: $c4_sc_test, id: c4_sc_chanel, frequency: 19531Hz }
-  - { platform: ledc, pin: $c5_sc_test, id: c5_sc_chanel, frequency: 19531Hz }
+  # - { platform: ledc, pin: $c5_sc_test, id: c5_sc_chanel, frequency: 19531Hz }
+  - { platform: ledc, pin: $bat_charge_voltage_pin, id: bat_cv_chanel, frequency: 1220Hz }
+  - { platform: ledc, pin: $bat_charge_current_pin, id: bat_ci_chanel, frequency: 1220Hz }
 
+number:
+  - platform: template
+    name: "current out"
+    id: i_out
+    min_value: 0
+    max_value: 1
+    step: 0.001
+    optimistic: true
+    on_value:
+      then:
+        - output.set_level:
+            id: bat_ci_chanel
+            level: !lambda "return x;"
+  - platform: template
+    name: "voltage out"
+    id: v_out
+    min_value: 0
+    max_value: 1
+    step: 0.001
+    optimistic: true
+    on_value:
+      then:
+        - output.set_level:
+            id: bat_cv_chanel
+            level: !lambda "return x;"
 
 battery_charge_controller:
   - id: dc_breaker_a
-    v_in_sensor: vin_raw
-
+    update_interval: 500ms
+    v_bat_sensor: bat_raw_voltage
+    i_bat_sensor: bat_raw_current
+    v_bat: { name: "V Bat Meas", filters: [ { sliding_window_moving_average: { window_size: 10, send_every: 10} } ] }
+    i_bat: { name: "I Bat Meas", filters: [ { sliding_window_moving_average: { window_size: 10, send_every: 10} } ] }
 
 # dc_relay:
 #   - id: dc_breaker_a
@@ -165,7 +200,7 @@ battery_charge_controller:
 #     voltage_divider_ratio: 18.808
 #     current_calibration: 2.15
 #     # short_circuit_test_chanel: short_circuit_chanel
-#     update_interval: 0.5s
+#     update_interval: 500ms
 #     v_in: { name: "V In Meas", filters: [ *moving_avg ] }
 #     circuits:
 #       - { enable_circuit: { name: "c1 Enable" }, v_out_sensor:  c1_v, current_sensor:  c1_i, enable_pin: { pcf8574: pcf8574_hub, number: 0, mode: { output: true }, inverted: false }, short_circuit_test_chanel: c1_sc_chanel, 
@@ -176,12 +211,15 @@ battery_charge_controller:
 #               power: { name: "c2 power", id:  c2_pow, filters: [ *moving_avg ] },
 #               current: { name: "c2 current", filters: [ *moving_avg ] }, #
 #               voltage: { name: "c2 voltage", filters: [ *moving_avg ] } }
-#       - { enable_circuit: { name: "c5 Enable" }, v_out_sensor:  c5_v, current_sensor:  c5_i, enable_pin: { pcf8574: pcf8574_hub, number: 2, mode: { output: true }, inverted: false }, short_circuit_test_chanel: c5_sc_chanel, 
-#               power: { name: "c5 power", id:  c5_pow, filters: [ *moving_avg ] },
-#               current: { name: "c5 current", filters: [ *moving_avg ] }, #
-#               voltage: { name: "c5 voltage", filters: [ *moving_avg ] } }
+#       - { enable_circuit: { name: "c3 Enable" }, v_out_sensor:  c3_v, current_sensor:  c3_i, enable_pin: { pcf8574: pcf8574_hub, number: 2, mode: { output: true }, inverted: false }, short_circuit_test_chanel: c3_sc_chanel, 
+#               power: { name: "c3 power", id:  c3_pow, filters: [ *moving_avg ] },
+#               current: { name: "c3 current", filters: [ *moving_avg ] }, #
+#               voltage: { name: "c3 voltage", filters: [ *moving_avg ] } }
+#       - { enable_circuit: { name: "c4 Enable" }, v_out_sensor:  c4_v, current_sensor:  c4_i, enable_pin: { pcf8574: pcf8574_hub, number: 3, mode: { output: true }, inverted: false }, short_circuit_test_chanel: c4_sc_chanel, 
+#               power: { name: "c4 power", id:  c4_pow, filters: [ *moving_avg ] },
+#               current: { name: "c4 current", filters: [ *moving_avg ] }, #
+#               voltage: { name: "c4 voltage", filters: [ *moving_avg ] } }
       # - { enable_circuit: { name: "c3 Enable" }, v_out_sensor:  c3_v, current_sensor:  c3_i, enable_pin: GPIO13 }
-      # - { enable_circuit: { name: "c4 Enable" }, v_out_sensor:  c4_v, current_sensor:  c4_i, enable_pin: GPIO15}
 
 
 
@@ -207,17 +245,15 @@ sensor:
   #   pin: GPIO10
   #   update_interval: 60s
   #   attenuation: 12db
-  - { name: "V In",        id: vin_raw,  number: 6, platform: mcp3008, mcp3008_id: mcp_adc, filters: [multiply: 18.808],     update_interval: 5s, unit_of_measurement: "V" }
+  - { name: "V In",        id: vin_raw,  number: 7, platform: mcp3008, mcp3008_id: mcp_adc, filters: [multiply: 18.808],     update_interval: 5s, unit_of_measurement: "V" }
   - { name: "$c1 Raw",     id: c1_i, pin: $c1_current_pin,          platform: adc,              update_interval: 60s, attenuation: 12db, internal: false }
   - { name: "$c2 Raw",     id: c2_i, pin: $c2_current_pin,          platform: adc,              update_interval: 60s, attenuation: 12db, internal: false }
   - { name: "$c3 Raw",     id: c3_i, pin: $c3_current_pin,          platform: adc,              update_interval: 60s, attenuation: 12db, internal: false }
-  - { name: "$c4 Raw",     id: c4_i, pin: $c4_current_pin,          platform: adc,              update_interval: 60s, attenuation: 12db, internal: false }
-  - { name: "$c5 Raw",     id: c5_i, pin: $c5_current_pin,           platform: adc,             update_interval: 60s, attenuation: 12db, internal: false }
-  - { name: "1 Voltage", id: c1_v, number: 1, platform: mcp3008, mcp3008_id: mcp_adc,  update_interval: 5s,                    internal: false }
-  - { name: "2 Voltage", id: c2_v, number: 2, platform: mcp3008, mcp3008_id: mcp_adc,  update_interval: 5s,                    internal: false }
-  - { name: "3 Voltage", id: c3_v, number: 3, platform: mcp3008, mcp3008_id: mcp_adc,  update_interval: 5s,                    internal: false }
-  - { name: "4 Voltage", id: c4_v, number: 4, platform: mcp3008, mcp3008_id: mcp_adc,  update_interval: 5s,                    internal: false }
-  - { name: "5 Voltage", id: c5_v, number: 5, platform: mcp3008, mcp3008_id: mcp_adc,  update_interval: 5s,                    internal: false }
+  - { name: "$c4 Raw",   id: c4_i, number: 5, platform: mcp3008, mcp3008_id: mcp_adc,           update_interval: 60s,          internal: true }
+  - { name: "1 Voltage", id: c1_v, number: 0, platform: mcp3008, mcp3008_id: mcp_adc,  update_interval: 5s,                    internal: true }
+  - { name: "2 Voltage", id: c2_v, number: 1, platform: mcp3008, mcp3008_id: mcp_adc,  update_interval: 5s,                    internal: true }
+  - { name: "3 Voltage", id: c3_v, number: 2, platform: mcp3008, mcp3008_id: mcp_adc,  update_interval: 5s,                    internal: true }
+  - { name: "4 Voltage", id: c4_v, number: 3, platform: mcp3008, mcp3008_id: mcp_adc,  update_interval: 5s,                    internal: true }
 
 
   - { platform: template, name: "Network Battery Power", id: bat_power, unit_of_measurement: "W", accuracy_decimals: 2, 
@@ -225,16 +261,16 @@ sensor:
     }
   - platform: adc
     id: bat_raw_current
-    name: "Network Battery Current"
+    # name: "Network Battery Current"
     pin: $bat_raw_current_pin
-    unit_of_measurement: "A"
-    update_interval: 100ms
-    attenuation: auto 
-    filters: [ sliding_window_moving_average: { window_size: 60, send_every: 30 }, multiply: 1 ]
+    # unit_of_measurement: "A"
+    update_interval: 100s
+    attenuation: 6db 
+    # filters: [ sliding_window_moving_average: { window_size: 60, send_every: 30 }, multiply: 1 ]
     # on_value: { lambda: !lambda "id(bat_power).publish_state(x);" }
-    on_value:
-      - lambda: |-
-          id(bat_power).publish_state(x);
+    # on_value:
+    #   - lambda: |-
+    #       id(bat_power).publish_state(x);
 
 
 
@@ -242,20 +278,20 @@ sensor:
 
   - platform: adc
     id: bat_raw_voltage
-    name: "Network Battery Voltage"
+    # name: "Network Battery Voltage"
     pin: $bat_raw_voltage_pin
-    update_interval: 100ms
+    update_interval: 100s
     attenuation: 12db
-    filters: [ 
-      sliding_window_moving_average: { window_size: 60, send_every: 30 }, # average last 6 seconds send every 3 seconds
-      multiply: 4.84 # to scale to actual battery voltage from ADC voltage
-    ]
-    on_value:
-        - lambda: |-
-            if(x > 13.3) {
-              id(bat_charge_en).turn_off(); // Turn off charging
-            } else if(x < 13.0) {
-              // id(bat_charge_en).turn_on(); // Turn on charging
-            }
+    # filters: [ 
+    #   sliding_window_moving_average: { window_size: 60, send_every: 30 }, # average last 6 seconds send every 3 seconds
+    #   multiply: 4.84 # to scale to actual battery voltage from ADC voltage
+    # ]
+    # on_value:
+    #     - lambda: |-
+    #         if(x > 13.3) {
+    #           id(bat_charge_en).turn_off(); // Turn off charging
+    #         } else if(x < 13.0) {
+    #           // id(bat_charge_en).turn_on(); // Turn on charging
+    #         }
 
 

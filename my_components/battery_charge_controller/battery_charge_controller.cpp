@@ -45,11 +45,6 @@ namespace charge_controller {
             lastLoopTime = currentLoopTime;
         }
     }
-    float Charge_Controller::readBatCurrent()
-    {
-        return (this->Vin_Sensor->sample() - this->Current_zero_point) * this->Current_gain;
-    }
-
 
     void Charge_Controller::update()
     {
@@ -62,6 +57,12 @@ namespace charge_controller {
         this->lastUpdateTime = currentTime;
     }
 
+    
+    float Charge_Controller::readBatCurrent()
+    {
+        return (this->Vin_Sensor->sample() - this->Current_zero_point) * this->Current_gain;
+    }
 
-} // namespace dc_relay
+
+} // namespace charge_controller
 } // namespace esphome

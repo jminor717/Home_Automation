@@ -32,18 +32,14 @@ namespace charge_controller {
 
         // setters for code gen
         void set_Vin_Sensor(voltage_sampler::VoltageSampler* sen) { this->Vin_Sensor = sen; };
-        void set_UVLO(float uvlo)
-        {
-            // assumes a 5% hysteresis for coming out of UVLO
-            this->UVLO = uvlo;
-            this->Hysteresis = uvlo * 0.05;
-        };
+        void set_current_Sensor(voltage_sampler::VoltageSampler* sen) { this->Current_Sensor = sen; };
         void set_OCV(float vOC) { this->V_Open_Circuit = vOC; };
 
         void set_Voltage_Divider_Ratio(float val) { this->Voltage_Divider_Ratio = val; };
         void set_current_zero_point_voltage(float val) { this->Current_zero_point = val; };
         void set_current_gain(float val) { this->Current_gain = val; };
-        void set_voltage_sensor(sensor::Sensor* _voltage_sensor) { this->vin_display_sensor = _voltage_sensor; }
+        void set_voltage_display(sensor::Sensor* _voltage_sensor) { this->v_bat_display_sensor = _voltage_sensor; }
+        void set_current_display(sensor::Sensor* _current_sensor) { this->i_bat_display_sensor = _current_sensor; }
 
         float readBatCurrent();
 
@@ -57,8 +53,10 @@ namespace charge_controller {
 
     protected:
         voltage_sampler::VoltageSampler* Vin_Sensor;
+        voltage_sampler::VoltageSampler* Current_Sensor;
         // customLEDCOutput* SC_Test_Chanel;
-        sensor::Sensor* vin_display_sensor { nullptr };
+        sensor::Sensor* v_bat_display_sensor { nullptr };
+        sensor::Sensor* i_bat_display_sensor { nullptr };
 
         uint32_t milliAmpSecondsAccumulated { 0 };
         uint32_t loopAmpMicroSecondsAccumulated { 0 };
