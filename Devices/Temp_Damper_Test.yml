@@ -1,0 +1,128 @@
+substitutions:
+  device_name: erv-return-box
+  eth_cs: GPIO9
+  eth_clk: GPIO10
+  eth_miso: GPIO11
+  eth_mosi: GPIO12
+  eth_int: GPIO13
+  eth_rst: GPIO14
+
+  servo_pot_pin: GPIO2
+  servo_pin: GPIO41
+
+
+external_components:
+  - source:
+      type: local
+      path: ../my_components # path relative to Devices folder
+
+esphome:
+  name: $device_name
+  platformio_options:
+    board_build.flash_mode: dio
+
+esp32:
+  board: esp32-s3-devkitc-1
+  variant: esp32s3
+  flash_size: 8MB
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESPTOOLPY_FLASHSIZE_8MB: y
+
+preferences:
+  # the default of 1min is far too short--flash chip is rated for approx 100k writes.
+  flash_write_interval: "240h"
+
+api:
+  # password: ""
+ota:
+  platform: esphome
+  password: ""
+
+logger:
+  level: INFO
+
+ethernet:
+  type: W5500
+  clk_pin: $eth_clk
+  mosi_pin: $eth_mosi
+  miso_pin: $eth_miso
+  cs_pin: $eth_cs
+  interrupt_pin: $eth_int
+  reset_pin: $eth_rst
+
+time:
+  - platform: homeassistant
+
+button:
+  - platform: restart
+    name: "$device_name Restart"
+  - platform: template
+    id: run_call
+    name: "home vent servo"
+    on_press:
+      then:
+        lambda: !lambda |-
+          id(damper)->setup();
+  - platform: template
+    id: center_servo
+    name: "center servo"
+    on_press:
+      then:
+        - servo.write:
+            id: servo_
+            level: !lambda "return 0.5;"
+
+text_sensor:
+  - platform: version
+    name: "$device_name Version"
+
+sensor:
+  - { platform: uptime, id: uptime_seconds, update_interval: 1min }
+  - { platform: template, id: uptime_days, name: "$device_name uptime", update_interval: 1min, 
+      device_class: duration, entity_category: "diagnostic", unit_of_measurement: "d", accuracy_decimals: 2,
+      lambda: !lambda "return id(uptime_seconds).state / 86'400;"}
+  - { platform: adc, id: servo_potentiometer, name: "v_meas", pin: $servo_pot_pin, update_interval: 250ms, attenuation: 12db }
+
+hard_stop_damper:
+  - {id: damper, servo_position_sensor: servo_potentiometer, servo: servo_, 
+    open_at_center: true, switch_open_and_close: false, open_offset: 0 }
+
+
+servo:
+  - { id: servo_, output: servo_output, transition_length: 7s, auto_detach_time: 1000ms, max_level: 50%, min_level: 1%}
+
+output:
+  - {platform: ledc, id: servo_output, pin: $servo_pin, frequency: 200 Hz}
+
+
+number:
+  - platform: template
+    name: vent Control
+    min_value: 0
+    initial_value: 100
+    max_value: 100
+    step: 1
+    optimistic: true
+    set_action:
+      then:
+        - servo.write:
+            id: servo_
+            level: !lambda "return id(damper).tilt_to_servo_position(( x / 100.0));"
+  - platform: template
+    name: servo Control
+    min_value: -8
+    initial_value: 50
+    max_value: 100
+    step: 1
+    optimistic: true
+    set_action:
+      then:
+        - servo.write:
+            id: servo_
+            level: !lambda "return x / 100.0;"
+
+
+
+

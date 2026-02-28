@@ -3,7 +3,7 @@
 #include "esphome.h"
 // #include "esphome/components/button/button.h"
 #include "esphome/components/adc/adc_sensor.h"
-#include "esphome/components/globals/globals_component.h"
+// #include "esphome/components/globals/globals_component.h"
 #include "esphome/components/servo/servo.h"
 // #include "esphome/components/voltage_sampler/voltage_sampler.h"
 #include "esphome/core/automation.h"
@@ -17,6 +17,15 @@ namespace hard_stop_damper {
     struct Position {
         float comand_position;
         float voltage_read;
+    };
+
+    struct PositionVariance {
+        float comand_position;
+        float voltage_read;
+        float predicted_voltage;
+        float diff;
+        float m;
+        float c;
     };
 
     class HardStopDamper : public Component {
@@ -43,6 +52,7 @@ namespace hard_stop_damper {
         float open_position;
         float close_position;
         bool homed = false;
+        bool homing = false;
 
     protected:
         adc::ADCSensor* v_servo_sensor;
@@ -58,6 +68,7 @@ namespace hard_stop_damper {
         Position move_to_hard_stop(float increment, float startingPosition, float lowerLimit, float upperLimit);
         void setPositions(Position _zero, Position _one);
         void setOffsets();
+        void fitLine(const std::deque<Position>& points, float& m, float& c);
     };
 } // namespace hard_stop_damper
 } // namespace esphome

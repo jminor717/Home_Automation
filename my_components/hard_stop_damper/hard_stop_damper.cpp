@@ -51,6 +51,11 @@ namespace hard_stop_damper {
 
     void HardStopDamper::setup()
     {
+        if (this->homing)
+        {
+            return; // if we are already homing from a previous setup call, don't start another one
+        }
+        this->homing = true;
         xTaskCreate(HardStopDamper::find_hard_stops, "hard_stop_task", 8192 * 2, (void*)this, 0, &this->task_handle);
     }
 
@@ -73,28 +78,58 @@ namespace hard_stop_damper {
 
     Position HardStopDamper::move_to_hard_stop(float increment, float startingPosition, float lowerLimit, float upperLimit)
     {
-        this->servo_control->write(startingPosition);
-        delay(3000);
+        this->servo_control->internal_write(startingPosition);
+        delay(1000);
+        this->servo_control->internal_write(startingPosition);
+        delay(1000);
+        this->servo_control->internal_write(startingPosition);
+        delay(1000);
+
+        std::deque<Position> position_queue = {};
+        std::deque<PositionVariance> position_variance_queue = {};
         float reachedPosition = this->v_servo_sensor->sample();
-        float lastReached = reachedPosition, commandedPosition = startingPosition;
+        float commandedPosition = startingPosition;
         while (true) {
             commandedPosition += increment;
             if (commandedPosition > upperLimit || commandedPosition < lowerLimit) {
+                ESP_LOGW(TAG, "commanded position (%.3f) out of bounds before hard stop reached", commandedPosition);
                 break;
             }
-            this->servo_control->write(commandedPosition);
-            delay(500);
-            reachedPosition = this->v_servo_sensor->sample();
-            if (abs(reachedPosition - lastReached) < abs(increment * 0.5)) {
-                break; // when the distance moved gets small
+            this->servo_control->internal_write(commandedPosition);
+            delay(200);
+            // sample the position 10 times and average it to get a more stable reading
+            int count = 0;
+            for (size_t i = 0; i < 10; i++)
+            {
+                reachedPosition += this->v_servo_sensor->sample();
+                count++;
+                delay(1);
             }
-            lastReached = reachedPosition;
+            reachedPosition = reachedPosition / (float)count;
+
+            position_queue.push_back({commandedPosition, reachedPosition});
+
+            // calculate the relation between reachedPosition and commandedPosition using the position_queue
+            float m, c;
+            this->fitLine(position_queue, m, c);
+            float predictedPosition = (commandedPosition * m) + c;
+            ESP_LOGI(TAG, "comand: %.3f, reached: %.3f, predicted: %.3f, diff: %.3f, m: %.3f, c: %.3f", commandedPosition, reachedPosition, predictedPosition, abs(reachedPosition - predictedPosition), m, c);
+
+            position_variance_queue.push_back({commandedPosition, reachedPosition, predictedPosition, abs(reachedPosition - predictedPosition), m, c});
+
+            if (position_queue.size() > 9) {
+                bool hard_stop_reached =
+                position_variance_queue[(position_variance_queue.size() - 1) - 0].diff > 0.02 &&
+                position_variance_queue[(position_variance_queue.size() - 1) - 1].diff > 0.02 &&
+                position_variance_queue[(position_variance_queue.size() - 1) - 2].diff > 0.02;
+                if (hard_stop_reached) {
+                    auto pos = position_variance_queue[(position_variance_queue.size() - 1) - 2];
+                    return { pos.comand_position, pos.voltage_read };
+                }
+            }
         }
 
-        Position pos;
-        pos.comand_position = commandedPosition - increment;
-        pos.voltage_read = reachedPosition;
-        return pos;
+        return { commandedPosition - increment, reachedPosition };
     }
 
     void HardStopDamper::find_hard_stops(void* params)
@@ -106,19 +141,51 @@ namespace hard_stop_damper {
         }
 
         local_this->homed = false;
+        local_this->servo_control->write(0.5);
         delay(2000);
-        auto _zero = local_this->move_to_hard_stop(-0.025, 0.5, 0, 1);
+        auto _zero = local_this->move_to_hard_stop(-0.01, 0.5, 0, 1);
         ESP_LOGI(TAG, "stop 0: %f, %f", _zero.voltage_read, _zero.comand_position);
-        auto _one = local_this->move_to_hard_stop(+0.025, 0.5, 0, 1);
+        auto _one = local_this->move_to_hard_stop(+0.01, 0.5, 0, 1);
         ESP_LOGI(TAG, "stop 1: %f, %f", _one.voltage_read, _one.comand_position);
         local_this->setPositions(_zero, _one);
 
         local_this->setOffsets();
 
         local_this->servo_control->write(local_this->open_position);
-        local_this->homed = true;
 
+        delay(8'000);
+        local_this->servo_control->write(local_this->tilt_to_servo_position(1.0));
+
+        local_this->homed = true;
+        local_this->homing = false;
         vTaskDelete(NULL);
+    }
+
+    void HardStopDamper::fitLine(const std::deque<Position>& points, float& m, float& c)
+    {
+        int n = points.size();
+        if (n < 2)
+            return; // Need at least two points to fit a line
+
+        float sum_x = 0.0, sum_y = 0.0, sum_xy = 0.0, sum_x2 = 0.0;
+
+        for (const auto& point : points) {
+            sum_x += point.comand_position;
+            sum_y += point.voltage_read;
+            sum_xy += point.comand_position * point.voltage_read;
+            sum_x2 += point.comand_position * point.comand_position;
+        }
+
+        float denominator = (n * sum_x2 - sum_x * sum_x);
+
+        if (std::abs(denominator) > 1e-9) { // Avoid division by zero
+            m = (n * sum_xy - sum_x * sum_y) / denominator;
+            c = (sum_y - m * sum_x) / n;
+        } else {
+            // Handle vertical line case or all points have same x
+            m = std::numeric_limits<float>::infinity();
+            c = std::numeric_limits<float>::quiet_NaN();
+        }
     }
 
     void HardStopDamper::setOffsets()

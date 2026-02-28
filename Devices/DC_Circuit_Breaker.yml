@@ -15,6 +15,8 @@ substitutions:
   scl_pin: GPIO43
   sda_pin: GPIO44
 
+  charger_current_pin: GPIO15
+
   bat_raw_voltage_pin: GPIO1
   bat_raw_current_pin: GPIO2
   bat_charge_en_pin: GPIO41
@@ -189,6 +191,7 @@ battery_charge_controller:
     update_interval: 500ms
     v_bat_sensor: bat_raw_voltage
     i_bat_sensor: bat_raw_current
+    charge_current: charger_current
     v_bat: { name: "V Bat Meas", filters: [ { sliding_window_moving_average: { window_size: 10, send_every: 10} } ] }
     i_bat: { name: "I Bat Meas", filters: [ { sliding_window_moving_average: { window_size: 10, send_every: 10} } ] }
 
@@ -256,9 +259,9 @@ sensor:
   - { name: "4 Voltage", id: c4_v, number: 3, platform: mcp3008, mcp3008_id: mcp_adc,  update_interval: 5s,                    internal: true }
 
 
-  - { platform: template, name: "Network Battery Power", id: bat_power, unit_of_measurement: "W", accuracy_decimals: 2, 
-      filters: { lambda: !lambda "return x * id(bat_raw_voltage).state;" } 
-    }
+  # - { platform: template, name: "Network Battery Power", id: bat_power, unit_of_measurement: "W", accuracy_decimals: 2, 
+  #     filters: { lambda: !lambda "return x * id(bat_raw_voltage).state;" } 
+  #   }
   - platform: adc
     id: bat_raw_current
     # name: "Network Battery Current"
@@ -266,32 +269,24 @@ sensor:
     # unit_of_measurement: "A"
     update_interval: 100s
     attenuation: 6db 
-    # filters: [ sliding_window_moving_average: { window_size: 60, send_every: 30 }, multiply: 1 ]
-    # on_value: { lambda: !lambda "id(bat_power).publish_state(x);" }
-    # on_value:
-    #   - lambda: |-
-    #       id(bat_power).publish_state(x);
-
-
-
-
 
   - platform: adc
     id: bat_raw_voltage
     # name: "Network Battery Voltage"
     pin: $bat_raw_voltage_pin
-    update_interval: 100s
+    update_interval: 100ms
     attenuation: 12db
-    # filters: [ 
-    #   sliding_window_moving_average: { window_size: 60, send_every: 30 }, # average last 6 seconds send every 3 seconds
-    #   multiply: 4.84 # to scale to actual battery voltage from ADC voltage
-    # ]
-    # on_value:
-    #     - lambda: |-
-    #         if(x > 13.3) {
-    #           id(bat_charge_en).turn_off(); // Turn off charging
-    #         } else if(x < 13.0) {
-    #           // id(bat_charge_en).turn_on(); // Turn on charging
-    #         }
+    filters:
+      - multiply: 11.0
+      - offset: -0.1
+      - sliding_window_moving_average: { window_size: 5, send_every: 5}
 
-
+  - platform: adc
+    id: charger_current
+    # name: "Network Battery Voltage"
+    pin: $charger_current_pin
+    update_interval: 100ms
+    attenuation: 12db
+    filters:
+      - multiply: 11.0
+      - sliding_window_moving_average: { window_size: 5, send_every: 5}

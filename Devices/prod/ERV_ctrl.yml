@@ -87,6 +87,18 @@ i2c:
     scl: $scl_pin
     scan: true
 
+globals:
+  - id: my_global_struct_instance
+    type: MyCustomStruct*
+    restore_value: no
+    initial_value: 'new MyCustomStruct(1, 2, 3)'
+
+  - id: peak_filter
+    type: PressurePeakFilter*
+    restore_value: no
+    # initial_value: 'new PressurePeakFilter(480, 240, 10.0, 20)'
+    initial_value: 'new PressurePeakFilter(125, 10.0, 41, 8, 0.00158)'
+    # send every 15 sec, 10 Pa outlier, send 5 seconds of data after, 1 sec before, 2 / (125 + 1)
 
 # 0.005715
 sensor:
@@ -111,25 +123,12 @@ sensor:
           window_size: 48
           send_every: 12
       - lambda: |-
-          id(pressure_dif_avg).publish_state(x);
           id(pressure_dif_ema).publish_state(x);
           // id(pressure_dif_internal).publish_state(x);
           return id(peak_filter)->apply_filter(x);;
       # send to lambda filter 4 times per second lambda sends once every 30 seconds
       # lambda will average over the last 30 seconds
       # if the value is an outlier to the running average, it will send the next 20 values in order to capture transient events
-      - delta: 0.05
-  - platform: template
-    name: "Pressure Delta Average"
-    id: pressure_dif_avg
-    device_class: "pressure"
-    state_class: "measurement"
-    unit_of_measurement: "Pa"
-    accuracy_decimals: 5
-    filters:
-      - exponential_moving_average:
-          alpha: 0.00083    # = 2 / (240 + 1)
-          send_every: 120
       - delta: 0.05
   - platform: template
     name: "Pressure Delta ema"
@@ -141,7 +140,7 @@ sensor:
     filters:
       - exponential_moving_average:
           alpha: 0.000208    # = 2 / (960 + 1)
-          send_every: 120
+          send_every: 125
       - delta: 0.05
 
   # - platform: template
@@ -158,19 +157,6 @@ sensor:
   #     then: 
   #       - delay: 100ms
   #       - script.execute: eval_erv_state
-
-
-globals:
-  - id: my_global_struct_instance
-    type: MyCustomStruct*
-    restore_value: no
-    initial_value: 'new MyCustomStruct(1, 2, 3)'
-
-  - id: peak_filter
-    type: PressurePeakFilter*
-    restore_value: no
-    initial_value: 'new PressurePeakFilter(240, 240, 10, 20)'
-
   
   # - { id: erv_pid, type: "struct tm" }
 # , initial_value: ""
@@ -181,7 +167,7 @@ script:
     then:
       - lambda: |-
           // id(erv_pid).tm_sec = 0;
-          float current_pressure = id(pressure_dif_avg).state ;// convert hPa to Pa* 100.0
+          float current_pressure = id(pressure_dif_ema).state ;// convert hPa to Pa* 100.0
           float Fan_l = update_pressure_pid_(current_pressure);
 
           if(Fan_l != NAN) {

@@ -40,7 +40,7 @@ namespace charge_controller {
             uint32_t currentLoopTime = micros();
             uint32_t deltaTime = (currentLoopTime - lastLoopTime);
             auto AmpMicroSeconds = current * deltaTime;
-            this_breaker->loopAmpMicroSecondsAccumulated += AmpMicroSeconds;
+            this_breaker->loopAmpMicroSecondsAccumulated += (int32_t)AmpMicroSeconds;
 
             lastLoopTime = currentLoopTime;
         }
@@ -49,20 +49,44 @@ namespace charge_controller {
     void Charge_Controller::update()
     {
         uint32_t currentTime = micros();
-        auto AccumulatedCurrent = this->loopAmpMicroSecondsAccumulated;
+        int32_t AccumulatedCurrent = this->loopAmpMicroSecondsAccumulated;
         this->loopAmpMicroSecondsAccumulated = 0;
         uint32_t deltaTime = (currentTime - this->lastUpdateTime);
+        this->lastUpdateTime = currentTime;
+
+        this->UpdateChargeCurrent(AccumulatedCurrent);
+
+        float V = this->Vin_Sensor->get_state();
+        float I = AccumulatedCurrent / (float)deltaTime; // convert ampMicroSeconds to Amps
+        float P = V * I;
+
+        if (this->v_bat_display_sensor) {
+            this->v_bat_display_sensor->publish_state(V);
+        }
+
+        if (this->power_display_sensor) {
+            this->power_display_sensor->publish_state(P);
+        }
+
+        if (this->i_bat_display_sensor) {
+            this->i_bat_display_sensor->publish_state(I);
+        }
+    }
+
+    void Charge_Controller::UpdateChargeCurrent(int32_t AccumulatedCurrent)
+    {
 
         this->milliAmpSecondsAccumulated += (AccumulatedCurrent / 1000); // convert ampMicroSeconds to milliAmpSeconds
-        this->lastUpdateTime = currentTime;
+
+
+
+        this->bat_charge_control_channel->write_state(0.5);
     }
 
-    
     float Charge_Controller::readBatCurrent()
     {
-        return (this->Vin_Sensor->sample() - this->Current_zero_point) * this->Current_gain;
+        return (this->Battery_Current_Sensor->sample() - this->Current_zero_point) * this->Current_gain;
     }
-
 
 } // namespace charge_controller
 } // namespace esphome
