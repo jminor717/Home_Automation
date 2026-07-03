@@ -49,7 +49,7 @@ esp32:
 
 preferences:
   # the default of 1min is far too short--flash chip is rated for approx 100k writes.
-  flash_write_interval: "48h"
+  flash_write_interval: "240h"
 
 api:
   # password: ""

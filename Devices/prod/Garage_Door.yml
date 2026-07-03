@@ -273,10 +273,10 @@ lock:
     lock_action:
       - output.turn_off: man_door_lock_output
     unlock_action:
-      - output.set_level: { id: man_door_lock_output, level: 75% }
+      - output.set_level: { id: man_door_lock_output, level: 80% }
       - script.execute: auto_lock_man_door
     open_action:
-      - output.set_level: { id: man_door_lock_output, level: 75% }
+      - output.set_level: { id: man_door_lock_output, level: 80% }
       - script.execute: auto_lock_man_door
 
 

@@ -1,10 +1,5 @@
 substitutions:
   device_name: dc-circuit-breaker
-  c1: chanel_1
-  c2: chanel_2
-  c3: chanel_3
-  c4: chanel_4
-  c5: chanel_5
   eth_cs: GPIO9
   eth_clk: GPIO10
   eth_miso: GPIO11
