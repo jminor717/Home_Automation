@@ -1,0 +1,285 @@
+esphome:
+  name: sunton-esp32-8048s070
+  friendly_name: sunton-esp32-8048s070
+  platformio_options:
+    build_flags: "-DBOARD_HAS_PSRAM"
+    board_build.esp-idf.memory_type: qio_opi
+    board_build.flash_mode: dio
+    board_upload.maximum_ram_size: 524288
+
+esp32:
+  board: esp32-s3-devkitc-1
+  variant: esp32s3
+  flash_size: 16MB
+  partitions: "default_16MB.csv"
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240: y
+      CONFIG_ESP32S3_DATA_CACHE_64KB: y
+      CONFIG_SPIRAM_FETCH_INSTRUCTIONS: y
+      CONFIG_SPIRAM_RODATA: y
+
+
+preferences:
+  # the default of 1min is far too short--flash chip is rated for approx 100k writes.
+  flash_write_interval: "240h"
+
+api:
+  # password: ""
+ota:
+  platform: esphome
+  password: ""
+
+logger:
+  level: INFO
+#   level: DEBUG
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "Sunton-Esp32-8048S070"
+    password: "12345678"
+
+captive_portal:
+
+# external_components:
+#   - source:
+#       type: git
+#       url: https://github.com/clydebarrow/esphome
+#       ref: dev
+#     components: [lvgl]
+
+output:
+  - platform: ledc
+    pin: 2
+    frequency: 1220
+    id: gpio_backlight_pwm
+
+    
+light:
+  - platform: monochromatic
+    output: gpio_backlight_pwm
+    id: back_light
+    name: "Display Backlight"
+    restore_mode: ALWAYS_ON
+      
+image:
+  - file: images/dashboard_bg2.png
+    id: dashboard_bg
+    type: RGB565
+    resize: 800x480
+
+display:
+  - platform: rpi_dpi_rgb
+    id: main_display
+    color_order: RGB
+    invert_colors: true
+    update_interval: 100ms
+    dimensions:
+      width: 800
+      height: 480
+    de_pin: 41
+    hsync_pin: 39
+    vsync_pin: 40
+    pclk_pin: 42
+    pclk_frequency: 12MHz
+    hsync_front_porch: 210
+    hsync_pulse_width: 30
+    hsync_back_porch: 16
+    vsync_front_porch: 22
+    vsync_pulse_width: 13
+    vsync_back_porch: 10
+    data_pins:
+      red: [14, 21, 47, 48, 45]
+      green: [9, 46, 3, 8, 16, 1]
+      blue: [15, 7, 6, 5, 4]
+
+# --- Touchscreen ---
+i2c:
+  sda: 19
+  scl: 20
+  scan: true
+  frequency: 400kHz
+
+touchscreen:
+  - platform: gt911
+    id: my_touchscreen
+    update_interval: 50ms
+    on_touch:
+      - lambda: |-
+            ESP_LOGI("cal", "         x=%3d, y=%3d, x_raw=%3d, y_raw=%3d",
+                touch.x,
+                touch.y,
+                touch.x_raw,
+                touch.y_raw
+                );
+    on_update:
+        - lambda: |-
+              if (touches.size() == 1) {
+                auto touch = touches[0];
+                if (touch.state <= 2) {
+                  ESP_LOGI("cal", "id=%5d x=%3d, y=%3d, x_raw=%3d, y_raw=%3d", touch.id, touch.x, touch.y, touch.x_raw, touch.y_raw);
+                  auto brightness = touch.y / 480.0;
+
+                  auto call = id(back_light).turn_on();
+                  call.set_transition_length(0); // in ms
+                  // set parameters (optional)
+                  call.set_brightness(brightness); // 1.0 is full brightness
+
+                  // perform action:
+                  call.perform();
+
+                }
+              }
+    on_release:
+      then:
+        - lambda: |-
+              ESP_LOGI("cal", "Touch released");
+
+
+time:
+  - platform: homeassistant
+    id: ha_time
+
+font:
+  - file: "fonts/OpenSans-Regular.ttf"
+    id: opensans_24
+    size: 24
+    glyphs: [
+      " ", "0","1","2","3","4","5","6","7","8","9",
+      ":", ".", ",", "%", "°", "+", "-",
+      "A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z",
+      "a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z",
+    ]
+
+  - file: "fonts/Roboto-Bold.ttf"
+    id: roboto_bold_48
+    size: 48
+    glyphs: [
+      " ", "0","1","2","3","4","5","6","7","8","9",
+      ":", ".", ",", "%", "°", "+", "-",
+      "A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z",
+      "a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z",
+    ]
+
+text_sensor:
+  - platform: homeassistant
+    id: weather_condition
+    entity_id: weather.forecast_home
+
+sensor:
+  - platform: homeassistant
+    id: bme_temp
+    entity_id: sensor.bme280test_bme280_temperature_2
+
+
+# --- LVGL ---
+lvgl:
+
+  displays:
+    - main_display
+  touchscreens:
+    - my_touchscreen
+  # bg_color : 0x000000
+  # bg_image_src: dashboard_bg
+
+
+  widgets:
+    - label: { id: clock_label, text: "09:00",       align: CENTER, y: -60, text_font: roboto_bold_48}
+    - label: { id: day_label,   text: "na",          align: CENTER, y: -20, text_font: opensans_24}
+    - label: { id: date_label,  text: "28 december", align: CENTER, y: 0,   text_font: opensans_24}
+    - label: { id: year_label,  text: "1997",        align: CENTER, y: 45,  text_font: roboto_bold_48}  #, text_color: 0x7B112C
+
+    - textarea:
+        id: textarea_id
+        one_line: true
+        placeholder_text: "Enter text here"
+        on_focus:
+          then:
+            - lvgl.widget.show:
+                id: keyboard_id
+        on_defocus:
+          then:
+            - lvgl.widget.hide:
+                id: keyboard_id
+
+    - keyboard:
+        id: keyboard_id
+        textarea: textarea_id
+        mode: TEXT_UPPER
+        hidden: true
+        on_ready:
+          then:
+            - logger.log: 
+                level: INFO
+                format: Keyboard is ready
+            - lvgl.widget.hide:
+                id: keyboard_id
+        on_cancel:
+          then:
+            - logger.log: 
+                level: INFO
+                format: Keyboard cancelled
+            - lvgl.widget.hide:
+                id: keyboard_id
+
+    # # Meteo - temperatură (font mare)
+    # - label:
+    #     id: weather_temp
+    #     text: "0.0 °C"
+    #     x: 70
+    #     y: 80
+    #     text_font: roboto_bold_48
+    #     text_color: 0x7B112C
+
+        
+# --- Actualizare ceas + meteo ---
+interval:
+  - interval: 1s
+    then:
+      - lambda: |-
+          auto t = id(ha_time).now();
+          if (t.is_valid()) {
+            // time
+            char buf[6];
+            sprintf(buf, "%02d:%02d", t.hour % 12, t.minute);
+            lv_label_set_text(id(clock_label), buf);
+
+            // day of week
+            static const char* day[] = {"sunday","monday","tuesday","wednesday","thursday","friday","saturday"};
+            int day_idx = t.day_of_week;
+            if (day_idx < 1 || day_idx > 7) day_idx = 1;
+            lv_label_set_text(id(day_label), day[day_idx - 1]);
+
+            // month
+            static const char* month[] = {"january","february","march","april","may","june","july","august","september","october","november","december"};
+            int month_idx = t.month;
+            if (month_idx < 1 || month_idx > 12) month_idx = 1;
+            char buf2[24];
+            sprintf(buf2, "%02d %s", t.day_of_month, month[month_idx - 1]);
+            lv_label_set_text(id(date_label), buf2);
+
+            // year
+            char buf3[6];
+            sprintf(buf3, "%04d", t.year);
+            lv_label_set_text(id(year_label), buf3);
+          }
+
+          // // Temperatură exterioară
+          // if (!isnan(id(bme_temp).state)) {
+          //   char buf[20];
+          //   sprintf(buf, "%.1f °C", id(bme_temp).state);
+          //   lv_label_set_text(id(weather_temp), buf);
+          // }
+
+
+
+

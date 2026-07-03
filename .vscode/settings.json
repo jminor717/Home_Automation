@@ -110,5 +110,6 @@
         "LEDC",
         "millis"
     ],
-    "C_Cpp.errorSquiggles": "disabled"
+    "C_Cpp.errorSquiggles": "disabled",
+    "snyk.advanced.autoSelectOrganization": true
 }

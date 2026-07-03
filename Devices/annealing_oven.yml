@@ -1,0 +1,205 @@
+
+substitutions:
+  device_name: annealing-oven
+  friendly_name: Annealing Oven
+  left_ntc_pin: GPIO0
+  right_ntc_pin: GPIO1
+  bottom_ntc_pin: GPIO2
+  left_heater_pin: GPIO21
+  right_heater_pin: GPIO22
+  bottom_heater_pin: GPIO23
+
+
+external_components:
+  - source:
+      type: local
+      path: ../my_components # path relative to Devices folder
+
+esphome:
+    name: $device_name
+    friendly_name: $friendly_name
+    on_boot:
+        priority: -10
+        then:
+            # Enable external antenna by default (FM8625H RF switch)
+            - output.turn_off: rf_switch_enable    # LOW -> RF switch power ON
+            - output.turn_off: rf_antenna_select    # HIGH -> external antenna (U.FL) turn_on
+
+esp32:
+    variant: esp32c6
+    board: seeed_xiao_esp32c6
+    framework:
+        type: esp-idf
+        sdkconfig_options:
+            CONFIG_SOC_WIFI_HE_SUPPORT: y
+            CONFIG_ESP_WIFI_11AX_SUPPORT: y
+
+preferences:
+  # the default of 1min is far too short--flash chip is rated for approx 100k writes.
+  flash_write_interval: "480h"
+
+api:
+  # password: ""
+ota:
+  platform: esphome
+  password: ""
+
+logger:
+  level: info
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "$device_name AP"
+    password: "BiSG9yrKP394"
+captive_portal:
+
+time:
+  - platform: homeassistant
+
+button:
+  - platform: restart
+    name: "$device_name Restart"
+  - platform: template
+    name: "PID Left Autotune"
+    on_press:
+      - climate.pid.autotune: pid_left
+  - platform: template
+    name: "PID Right Autotune"
+    on_press:
+      - climate.pid.autotune: pid_right
+  - platform: template
+    name: "PID Bottom Autotune"
+    on_press:
+      - climate.pid.autotune: pid_bottom
+
+text_sensor:
+  - platform: version
+    name: "$device_name Version"
+
+switch:
+  - platform: template
+    name: "External Antenna"
+    optimistic: true
+    restore_mode: ALWAYS_ON
+    turn_on_action:
+        - output.turn_off: rf_switch_enable    # LOW -> RF switch power ON
+        - output.turn_on: rf_antenna_select    # HIGH -> external antenna (U.FL/RF2)
+    turn_off_action:
+        - output.turn_off: rf_switch_enable    # LOW -> RF switch power ON
+        - output.turn_off: rf_antenna_select   # LOW -> internal antenna (PCB/RF1)
+
+
+
+
+# External antenna control using ESPHome 2025.12+ board aliases (FM8625H RF switch)
+# RF_SWITCH_EN (GPIO3) = RF switch power, RF_ANT_SELECT (GPIO14) = antenna selector
+output:
+  - platform: gpio
+    id: rf_switch_enable
+    pin: RF_SWITCH_EN
+
+  - platform: gpio
+    id: rf_antenna_select
+    pin: RF_ANT_SELECT
+  - { platform: ledc, pin: $left_heater_pin, id: heater_left, frequency: 1220Hz}
+  - { platform: ledc, pin: $right_heater_pin, id: heater_right, frequency: 1220Hz}
+  - { platform: ledc, pin: $bottom_heater_pin, id: heater_bottom, frequency: 1220Hz}
+
+
+
+
+# Example configuration entry
+sensor:
+  - { platform: uptime, id: uptime_seconds, update_interval: 1min }
+  - { platform: template, id: uptime_days, name: "$device_name uptime", update_interval: 1min, 
+      device_class: duration, entity_category: "diagnostic", unit_of_measurement: "d", accuracy_decimals: 2,
+      lambda: !lambda "return id(uptime_seconds).state / 86'400;"}
+
+  - { platform: ntc, sensor: r_left, id: temp_left, name: "Temperature Left",
+        calibration: [ 10.0kOhm -> 25°C, 27.219kOhm -> 0°C, 14.674kOhm -> 15°C ]  }
+  - { platform: resistance, id: r_left, sensor: adc_left, configuration: DOWNSTREAM, resistor: 5.6kOhm }
+  - { platform: adc, id: adc_left, pin: $left_ntc_pin, update_interval: 1s }
+  - { platform: pid, climate_id: pid_left, name: "PID Left Result", type: RESULT }
+
+  - { platform: ntc, sensor: r_right, id: temp_right, name: "Temperature Right",
+        calibration: [ 10.0kOhm -> 25°C, 27.219kOhm -> 0°C, 14.674kOhm -> 15°C ]  }
+  - { platform: resistance, id: r_right, sensor: adc_right, configuration: DOWNSTREAM, resistor: 5.6kOhm }
+  - { platform: adc, id: adc_right, pin: $right_ntc_pin, update_interval: 1s }
+  - { platform: pid, climate_id: pid_right, name: "PID Right Result", type: RESULT }
+
+  - { platform: ntc, sensor: r_bottom, id: temp_bottom, name: "Temperature Bottom",
+        calibration: [ 10.0kOhm -> 25°C, 27.219kOhm -> 0°C, 14.674kOhm -> 15°C ]  }
+  - { platform: resistance, id: r_bottom, sensor: adc_bottom, configuration: DOWNSTREAM, resistor: 5.6kOhm }
+  - { platform: adc, id: adc_bottom, pin: $bottom_ntc_pin, update_interval: 1s }
+  - { platform: pid, climate_id: pid_bottom, name: "PID Bottom Result", type: RESULT }
+
+# interval:
+#   - interval: 60s
+#     then:
+#       - switch.turn_on: ntc_vcc
+#       - component.update: source_sensor
+#       - switch.turn_off: ntc_vcc
+
+climate:
+  - platform: pid
+    id: pid_left
+    name: "PID Left"
+    sensor: temp_left
+    default_target_temperature: 40°C
+    heat_output: heater_left
+    visual:
+      min_temperature: 40
+      max_temperature: 110
+      temperature_step: 1
+    control_parameters:
+      kp: 0.49460
+      ki: 0.00487
+      kd: 12.56301
+      output_averaging_samples: 5      # smooth the output over 5 samples
+      derivative_averaging_samples: 10  # smooth the derivative value over 10 samples
+    deadband_parameters:
+      threshold_high: 1°C
+      threshold_low: -2°C
+  - platform: pid
+    id: pid_right
+    name: "PID Right"
+    sensor: temp_right
+    default_target_temperature: 40°C
+    heat_output: heater_right
+    visual:
+      min_temperature: 40
+      max_temperature: 110
+      temperature_step: 1
+    control_parameters:
+      kp: 0.49460
+      ki: 0.00487
+      kd: 12.56301
+      output_averaging_samples: 5      # smooth the output over 5 samples
+      derivative_averaging_samples: 10  # smooth the derivative value over 10 samples
+    deadband_parameters:
+      threshold_high: 1°C
+      threshold_low: -2°C
+  - platform: pid
+    id: pid_bottom
+    name: "PID Bottom"
+    sensor: temp_bottom
+    default_target_temperature: 40°C
+    heat_output: heater_bottom
+    visual:
+      min_temperature: 40
+      max_temperature: 110
+      temperature_step: 1
+    control_parameters:
+      kp: 0.49460
+      ki: 0.00487
+      kd: 12.56301
+      output_averaging_samples: 5      # smooth the output over 5 samples
+      derivative_averaging_samples: 10  # smooth the derivative value over 10 samples
+    deadband_parameters:
+      threshold_high: 1°C
+      threshold_low: -2°C
+
+
+
