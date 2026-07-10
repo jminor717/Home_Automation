@@ -9,6 +9,7 @@ substitutions:
   right_heater_pin: GPIO22
   bottom_heater_pin: GPIO23
 
+#  esphome logs .\Devices\annealing_oven.yml --no-states
 
 external_components:
   - source:
@@ -35,7 +36,7 @@ esp32:
             CONFIG_ESP_WIFI_11AX_SUPPORT: y
 
 preferences:
-  # the default of 1min is far too short--flash chip is rated for approx 100k writes.
+  # the default of 1min is far too short--flash chip is rated for approx 100k writes. 
   flash_write_interval: "480h"
 
 api:
@@ -45,14 +46,15 @@ ota:
   password: ""
 
 logger:
-  level: info
-
+  level: INFO
+  logs:
+    sensor: WARN
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
   ap:
     ssid: "$device_name AP"
-    password: "BiSG9yrKP394"
+    password: "BiSG9yrKP394" 
 captive_portal:
 
 time:
