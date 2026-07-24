@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Setpoint Graph Demo</title>
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at top left, #f7f9ff, #d9e2ff);
+      font-family: Inter, system-ui, sans-serif;
+      color: #202a44;
+    }
+
+    .card {
+      width: min(960px, calc(100% - 32px));
+      background: white;
+      border-radius: 24px;
+      box-shadow: 0 20px 45px rgba(16, 45, 98, 0.12);
+      padding: 32px;
+    }
+
+    h1 {
+      margin: 0 0 12px;
+      font-size: 1.75rem;
+      letter-spacing: -0.03em;
+    }
+
+    p {
+      margin: 0 0 24px;
+      line-height: 1.6;
+      color: #4a5578;
+    }
+
+    .graph-wrapper {
+      position: relative;
+    }
+
+    .graph-info {
+      display: grid;
+      gap: 12px;
+      margin-top: 22px;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    }
+
+    .setpoint-chip {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 12px 14px;
+      border: 1px solid #e8eef7;
+      border-radius: 14px;
+      background: #fafbff;
+      text-align: center;
+      transition: border-color 0.2s ease, transform 0.2s ease;
+    }
+
+    .setpoint-chip.active {
+      border-color: #4965ff;
+      transform: translateY(-2px);
+      background: #eef2ff;
+    }
+
+    .value {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #19234d;
+    }
+
+    .label {
+      font-size: 0.92rem;
+      color: #5f677d;
+    }
+
+    .time-editor {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+      font-size: 0.85rem;
+    }
+
+    .time-editor input {
+      width: 32px;
+      padding: 4px;
+      border: 1px solid #d9e1ff;
+      border-radius: 4px;
+      text-align: center;
+      font-size: 0.85rem;
+    }
+
+    .time-editor input:focus {
+      outline: none;
+      border-color: #4965ff;
+      box-shadow: 0 0 0 2px rgba(73, 101, 255, 0.1);
+    }
+
+    .time-separator {
+      color: #5f677d;
+      font-weight: 600;
+    }
+
+    .graph-svg {
+      width: 100%;
+      max-width: 100%;
+      height: auto;
+      touch-action: none;
+      cursor: grab;
+      user-select: none;
+    }
+
+    .graph-svg:active {
+      cursor: grabbing;
+    }
+
+    .button-row {
+      margin-top: 22px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: none;
+      border-radius: 999px;
+      padding: 12px 20px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: white;
+      background: #3c6cff;
+      box-shadow: 0 12px 20px rgba(60, 108, 255, 0.2);
+      cursor: pointer;
+      transition: transform 0.2s ease, filter 0.2s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.05);
+    }
+
+    button.secondary {
+      background: #5f6690;
+      box-shadow: 0 12px 20px rgba(82, 93, 130, 0.18);
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Temperature Setpoint Schedule</h1>
+    <p>Drag any point to change its setpoint. The graph shows temperature values across a 24-hour schedule.</p>
+
+    <div style="margin-bottom: 20px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+      <div style="display: flex; gap: 12px; align-items: center;">
+        <label for="numSetpoints" style="font-weight: 600; color: #5f677d;">Setpoints:</label>
+        <input 
+          type="number" 
+          id="numSetpoints" 
+          min="2" 
+          max="12" 
+          value="5"
+          style="width: 60px; padding: 8px 12px; border: 2px solid #e8eef7; border-radius: 8px; font-size: 1rem;"
+        />
+      </div>
+      <div style="display: flex; gap: 12px; align-items: center;">
+        <label style="font-weight: 600; color: #5f677d;">Duration:</label>
+        <div style="display: flex; gap: 4px; align-items: center;">
+          <input 
+            type="number" 
+            id="durationHours" 
+            min="0" 
+            max="23" 
+            value="6"
+            style="width: 50px; padding: 8px 12px; border: 2px solid #e8eef7; border-radius: 8px; font-size: 1rem;"
+          />
+          <span style="font-weight: 600; color: #5f677d;">h</span>
+          <input 
+            type="number" 
+            id="durationMinutes" 
+            min="0" 
+            max="59" 
+            value="0"
+            style="width: 50px; padding: 8px 12px; border: 2px solid #e8eef7; border-radius: 8px; font-size: 1rem;"
+          />
+          <span style="font-weight: 600; color: #5f677d;">m</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="graph-wrapper">
+      <svg class="graph-svg" viewBox="0 0 760 420" aria-label="Temperature setpoint graph"></svg>
+    </div>
+
+    <div class="graph-info" id="setpointInfo"></div>
+
+    <div class="button-row">
+      <button id="resetBtn">Reset default setpoints</button>
+    </div>
+  </div>
+
+  <script>
+    const svg = document.querySelector('.graph-svg');
+    const info = document.getElementById('setpointInfo');
+    const resetBtn = document.getElementById('resetBtn');
+    const numSetpointsInput = document.getElementById('numSetpoints');
+    const durationHoursInput = document.getElementById('durationHours');
+    const durationMinutesInput = document.getElementById('durationMinutes');
+
+    const minTemp = 50;
+    const maxTemp = 110;
+    const margin = { top: 36, right: 30, bottom: 42, left: 48 };
+    const width = 760;
+    const height = 420;
+    const contentWidth = width - margin.left - margin.right;
+    const contentHeight = height - margin.top - margin.bottom;
+
+    let numSetpoints = 5;
+    let setpoints = [];
+    let activeIndex = null;
+    let durationSeconds = 6 * 60 * 60;
+
+    const points = [];
+
+    function generateSetpoints(count) {
+      const result = [];
+      for (let i = 0; i < count; i++) {
+        const timePerInterval = durationSeconds / (count - 1);
+        const timeAtIndex = timePerInterval * i;
+        result.push({
+          time: timeAtIndex,
+          temp: 62 + (i * 18) / (count - 1)
+        });
+      }
+      return result;
+    }
+
+    function secondsToTimeString(seconds) {
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      const secs = Math.floor(seconds % 60);
+      return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
+
+    function getTimeLabel(timeInSeconds) {
+      const wrappedTime = timeInSeconds % 86400;
+      return secondsToTimeString(wrappedTime);
+    }
+
+    function clamp(value, min, max) {
+      return Math.min(Math.max(value, min), max);
+    }
+
+    function mapY(temp) {
+      const fraction = (temp - minTemp) / (maxTemp - minTemp);
+      return margin.top + contentHeight - fraction * contentHeight;
+    }
+
+    function mapX(timeInSeconds) {
+      const fraction = timeInSeconds / durationSeconds;
+      return margin.left + fraction * contentWidth;
+    }
+
+    function renderGraph() {
+      svg.innerHTML = '';
+      points.length = 0;
+
+      const grid = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      grid.setAttribute('stroke', '#d9e1ff');
+      grid.setAttribute('stroke-width', '1');
+      grid.setAttribute('opacity', '0.72');
+
+      for (let i = 0; i <= 4; i++) {
+        const y = margin.top + (contentHeight * i) / 4;
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', margin.left);
+        line.setAttribute('x2', width - margin.right);
+        line.setAttribute('y1', y);
+        line.setAttribute('y2', y);
+        if (i === 4) {
+          line.setAttribute('stroke', '#bfc8f1');
+          line.setAttribute('stroke-width', '1.5');
+        }
+        grid.appendChild(line);
+
+        const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        label.setAttribute('x', margin.left - 12);
+        label.setAttribute('y', y + 4);
+        label.setAttribute('text-anchor', 'end');
+        label.setAttribute('fill', '#5a6284');
+        label.setAttribute('font-size', '14');
+        label.textContent = Math.round(maxTemp - ((maxTemp - minTemp) * i) / 4);
+        svg.appendChild(label);
+      }
+
+      svg.appendChild(grid);
+
+      const axis = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      const yAxis = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      yAxis.setAttribute('x1', margin.left);
+      yAxis.setAttribute('y1', margin.top);
+      yAxis.setAttribute('x2', margin.left);
+      yAxis.setAttribute('y2', height - margin.bottom);
+      yAxis.setAttribute('stroke', '#343f66');
+      yAxis.setAttribute('stroke-width', '1.8');
+      axis.appendChild(yAxis);
+
+      const xAxis = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      xAxis.setAttribute('x1', margin.left);
+      xAxis.setAttribute('y1', height - margin.bottom);
+      xAxis.setAttribute('x2', width - margin.right);
+      xAxis.setAttribute('y2', height - margin.bottom);
+      xAxis.setAttribute('stroke', '#343f66');
+      xAxis.setAttribute('stroke-width', '1.8');
+      axis.appendChild(xAxis);
+
+      svg.appendChild(axis);
+
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      const pointsPath = setpoints
+        .map((pt, index) => `${index === 0 ? 'M' : 'L'} ${mapX(pt.time)} ${mapY(pt.temp)}`)
+        .join(' ');
+      line.setAttribute('d', pointsPath);
+      line.setAttribute('fill', 'none');
+      line.setAttribute('stroke', '#6f83ff');
+      line.setAttribute('stroke-width', '4');
+      line.setAttribute('stroke-linecap', 'round');
+      line.setAttribute('stroke-linejoin', 'round');
+      line.setAttribute('opacity', '0.95');
+      svg.appendChild(line);
+
+      setpoints.forEach((pt, index) => {
+        const x = mapX(pt.time);
+        const y = mapY(pt.temp);
+        const isLocked = index === 0 || index === setpoints.length - 1;
+
+        const hit = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        hit.setAttribute('cx', x);
+        hit.setAttribute('cy', y);
+        hit.setAttribute('r', 18);
+        hit.setAttribute('fill', 'transparent');
+        hit.setAttribute('data-index', index);
+        svg.appendChild(hit);
+
+        const marker = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        marker.setAttribute('cx', x);
+        marker.setAttribute('cy', y);
+        marker.setAttribute('r', 12);
+        marker.setAttribute('fill', activeIndex === index ? '#ff9c3b' : '#fff');
+        marker.setAttribute('stroke', activeIndex === index ? '#ff7e00' : '#6f83ff');
+        marker.setAttribute('stroke-width', activeIndex === index ? '4' : '3');
+        marker.setAttribute('data-index', index);
+        svg.appendChild(marker);
+
+        if (isLocked) {
+          const lockIcon = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          lockIcon.setAttribute('cx', x);
+          lockIcon.setAttribute('cy', y);
+          lockIcon.setAttribute('r', 3);
+          lockIcon.setAttribute('fill', '#6f83ff');
+          svg.appendChild(lockIcon);
+        }
+
+        const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        label.setAttribute('x', x);
+        label.setAttribute('y', y - 20);
+        label.setAttribute('text-anchor', 'middle');
+        label.setAttribute('fill', '#1f2a50');
+        label.setAttribute('font-size', '14');
+        label.setAttribute('font-weight', '700');
+        label.textContent = `${pt.temp}°`;
+        svg.appendChild(label);
+
+        const name = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        name.setAttribute('x', x);
+        name.setAttribute('y', height - margin.bottom + 24);
+        name.setAttribute('text-anchor', 'middle');
+        name.setAttribute('fill', '#5a6284');
+        name.setAttribute('font-size', '13');
+        name.textContent = getTimeLabel(pt.time);
+        svg.appendChild(name);
+
+        points.push({ x, y, index, isLocked, time: pt.time, temp: pt.temp });
+      });
+
+      renderInfo();
+    }
+
+    function renderInfo() {
+      info.innerHTML = '';
+      setpoints.forEach((pt, index) => {
+        const chip = document.createElement('div');
+        chip.className = 'setpoint-chip' + (activeIndex === index ? ' active' : '');
+        const isLocked = index === 0 || index === setpoints.length - 1;
+        
+        const hours = Math.floor(pt.time / 3600);
+        const minutes = Math.floor((pt.time % 3600) / 60);
+        const seconds = pt.time % 60;
+
+        let timeContent;
+        if (isLocked) {
+          timeContent = `<div class="label">${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}</div>`;
+        } else {
+          timeContent = `
+            <div class="time-editor">
+              <input type="number" class="time-hours" min="0" max="23" value="${String(hours).padStart(2, '0')}" data-index="${index}" />
+              <span class="time-separator">:</span>
+              <input type="number" class="time-minutes" min="0" max="59" value="${String(minutes).padStart(2, '0')}" data-index="${index}" />
+              <span class="time-separator">:</span>
+              <input type="number" class="time-seconds" min="0" max="59" value="${String(seconds).padStart(2, '0')}" data-index="${index}" />
+            </div>
+          `;
+        }
+        
+        chip.innerHTML = `
+          <div class="value">${pt.temp.toFixed(1)}°</div>
+          ${timeContent}
+        `;
+        info.appendChild(chip);
+      });
+      
+      // Add event listeners to time inputs
+      document.querySelectorAll('.time-hours, .time-minutes').forEach(input => {
+        input.addEventListener('change', (e) => {
+          const index = parseInt(e.target.dataset.index);
+          const hoursInput = document.querySelector(`.time-hours[data-index="${index}"]`);
+          const minutesInput = document.querySelector(`.time-minutes[data-index="${index}"]`);
+          
+          const hours = parseInt(hoursInput.value) || 0;
+          const minutes = parseInt(minutesInput.value) || 0;
+          const newTime = hours * 3600 + minutes * 60;
+          
+          const point = setpoints[index];
+          const minTime = setpoints[index - 1]?.time || 0;
+          const maxTime = setpoints[index + 1]?.time || durationSeconds;
+          
+          point.time = clamp(newTime, minTime, maxTime);
+          renderGraph();
+        });
+      });
+    }
+
+    function getMousePosition(event) {
+      const rect = svg.getBoundingClientRect();
+      const viewBox = svg.viewBox.baseVal;
+      const scaleX = viewBox.width / rect.width;
+      const scaleY = viewBox.height / rect.height;
+      return {
+        x: (event.clientX - rect.left) * scaleX,
+        y: (event.clientY - rect.top) * scaleY,
+      };
+    }
+
+    function findPointAt(position) {
+      return points.find(({ x, y }) => {
+        const dx = position.x - x;
+        const dy = position.y - y;
+        return Math.sqrt(dx * dx + dy * dy) < 20;
+      });
+    }
+
+    function updatePoint(index, x, y) {
+      const point = setpoints[index];
+      const isLocked = index === 0 || index === setpoints.length - 1;
+
+      // Update temperature (always allow vertical movement)
+      const limitedY = clamp(y, margin.top, height - margin.bottom);
+      const temp = minTemp + ((height - margin.bottom - limitedY) / contentHeight) * (maxTemp - minTemp);
+      point.temp = Number(temp.toFixed(1));
+
+      // Update time (only allow horizontal movement for middle points)
+      if (!isLocked) {
+        const limitedX = clamp(x, margin.left, width - margin.right);
+        const newTime = ((limitedX - margin.left) / contentWidth) * durationSeconds;
+        
+        // Clamp time to stay within the range
+        const minTime = setpoints[index - 1]?.time || 0;
+        const maxTime = setpoints[index + 1]?.time || durationSeconds;
+        
+        point.time = Number(clamp(newTime, minTime, maxTime).toFixed(0));
+      }
+
+      renderGraph();
+    }
+
+    svg.addEventListener('pointerdown', (event) => {
+      event.preventDefault();
+      const position = getMousePosition(event);
+      const targetPoint = findPointAt(position);
+      if (!targetPoint) {
+        activeIndex = null;
+        renderGraph();
+        return;
+      }
+      activeIndex = targetPoint.index;
+      svg.setPointerCapture(event.pointerId);
+      updatePoint(activeIndex, position.x, position.y);
+    });
+
+    svg.addEventListener('pointermove', (event) => {
+      if (activeIndex === null) {
+        return;
+      }
+      event.preventDefault();
+      const position = getMousePosition(event);
+      updatePoint(activeIndex, position.x, position.y);
+    });
+
+    svg.addEventListener('pointerup', (event) => {
+      if (activeIndex !== null) {
+        svg.releasePointerCapture(event.pointerId);
+      }
+      activeIndex = null;
+      renderGraph();
+    });
+
+    svg.addEventListener('pointerleave', () => {
+      activeIndex = null;
+      renderGraph();
+    });
+
+    resetBtn.addEventListener('click', () => {
+      setpoints = generateSetpoints(numSetpoints);
+      activeIndex = null;
+      renderGraph();
+    });
+
+    numSetpointsInput.addEventListener('change', (event) => {
+      numSetpoints = parseInt(event.target.value) || 5;
+      setpoints = generateSetpoints(numSetpoints);
+      activeIndex = null;
+      renderGraph();
+    });
+
+    durationHoursInput.addEventListener('change', updateDuration);
+    durationMinutesInput.addEventListener('change', updateDuration);
+
+    function updateDuration() {
+      const hours = parseInt(durationHoursInput.value) || 0;
+      const minutes = parseInt(durationMinutesInput.value) || 0;
+      durationSeconds = hours * 3600 + minutes * 60;
+      
+      if (durationSeconds > 0) {
+        setpoints = generateSetpoints(numSetpoints);
+        activeIndex = null;
+        renderGraph();
+      }
+    }
+
+    setpoints = generateSetpoints(numSetpoints);
+    renderGraph();
+  </script>
+</body>
+</html>

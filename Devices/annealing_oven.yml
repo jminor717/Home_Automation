@@ -59,6 +59,17 @@ captive_portal:
 
 time:
   - platform: homeassistant
+    id: sntp_time
+
+json:
+# initial_value: "{0}"
+globals:
+  - { id: profile_times, type: "float[12]" }
+  - { id: profile_temps, type: "float[12]" } 
+  - { id: profile_points, type: "int32_t", initial_value: "-1" }
+  - { id: running_profile, type: bool, initial_value: "false" }
+  - { id: run_start_time, type: "uint32_t", initial_value: "1" }
+  - { id: run_index, type: "int32_t", initial_value: "-1" }
 
 button:
   - platform: restart
@@ -75,10 +86,136 @@ button:
     name: "PID Bottom Autotune"
     on_press:
       - climate.pid.autotune: pid_bottom
+  - platform: template
+    name: "preheat oven"
+    id: preheat_oven
+    on_press:
+      then:
+        - script.execute: load_profile_from_sensor
+        - lambda: |-
+            if(id(profile_points) > 0){
+              ESP_LOGI("preheat", "preheating to first setpoint: %.2f°C", id(profile_temps)[0]);
+
+              id(pid_left).make_call().set_target_temperature(id(profile_temps)[0]).perform();
+              id(pid_right).make_call().set_target_temperature(id(profile_temps)[0]).perform();
+              id(pid_bottom).make_call().set_target_temperature(id(profile_temps)[0]).perform();
+            }else{
+              ESP_LOGE("preheat", "no setpoints loaded, cannot preheat");
+            }
+  - platform: template
+    name: "run profile"
+    id: run_profile
+    on_press:
+      then:
+        - lambda: |-
+            if(id(profile_points) > 0){
+              auto time = id(sntp_time).now().timestamp;
+              id(run_start_time) = time;
+              id(run_index) = 0;
+              id(running_profile) = true;
+              
+
+            }else{
+              ESP_LOGE("preheat", "no setpoints loaded, cannot preheat");
+            }
+  - platform: template
+    name: "parse reflow profile"
+    id: load_profile
+    on_press:
+      then:
+        - script.execute: load_profile_from_sensor
+
+interval:
+  - interval: 1s
+    then:
+      - if:
+          condition:
+            lambda: 'return id(running_profile);'
+          then:
+            - script.execute: run_reflow_profile
+
+script:
+- id: run_reflow_profile
+  mode: restart
+  then:
+    - lambda: |-
+          auto time = id(sntp_time).now().timestamp;
+          auto elapsed = (time - id(run_start_time));
+          
+          auto localIndex = id(run_index);
+          if(id(profile_times)[localIndex+1] <= elapsed){
+            localIndex++;
+            id(run_index) = localIndex;
+          }
+
+            if(localIndex >= (id(profile_points) - 1)){
+              ESP_LOGI("run_profile", "profile complete, stopping");
+              id(running_profile) = false;
+              return;
+            }
+
+          auto prior_temp = id(profile_temps)[localIndex];
+          auto next_temp = id(profile_temps)[localIndex + 1];
+          auto prior_time = id(profile_times)[localIndex];
+          auto next_time = id(profile_times)[localIndex + 1];
+
+          auto delta = elapsed - prior_time;
+          auto time_delta = next_time - prior_time;
+          auto temp_delta = next_temp - prior_temp;
+          auto interpolated_temp = prior_temp + (temp_delta * delta / time_delta);
+          
+          ESP_LOGI("run_profile", "point: %ld|%ld, delta: %.2f, elapsed %lld, prior: %.2f, next: %.2f, inter: %.2f", 
+                          localIndex, id(profile_points)-1, delta, elapsed, prior_temp, next_temp, interpolated_temp);
+          id(pid_left).make_call().set_target_temperature(interpolated_temp).perform();
+          id(pid_right).make_call().set_target_temperature(interpolated_temp).perform();
+          id(pid_bottom).make_call().set_target_temperature(interpolated_temp).perform();
+
+
+
+
+- id: load_profile_from_sensor
+  mode: restart
+  then:
+    - lambda: |-
+          ESP_LOGI("parse", "Parsing reflow profile json from Home Assistant, %s", id(profile).state.c_str());
+          json::parse_json(id(profile).state, [](JsonObject root) -> bool {
+            if (root["profileName"].is<const char *>()) {
+              const char * ver_str = root["profileName"].as<const char *>();
+              ESP_LOGI("parse", "got setpoint named: %s", ver_str);
+            }
+            if (!root["setpoints"].is<JsonArray>()) { return {}; } // ESP_LOGE("parse", "setpoints is not an array");
+            JsonArray setpoints = root["setpoints"].as<JsonArray>();
+            if (setpoints.size() == 0) { ESP_LOGE("parse", "setpoints array is empty"); return {}; }
+
+            id(profile_points) = setpoints.size();
+
+            int counter=0;
+            for (JsonObject entry : setpoints) {
+              if(!entry["time"].is<float>() || !entry["temp"].is<float>()) { ESP_LOGE("parse", "setpoint entry is missing time or temp"); return {}; }
+              
+              float time = entry["time"].as<float>();
+              float temp = entry["temp"].as<float>();
+              ESP_LOGI("parse", "setpoint %d of %d: time=%.2f, temp=%.2f", counter + 1, setpoints.size(), time, temp);
+              id(profile_times)[counter] = time;
+              id(profile_temps)[counter] = temp;
+              counter++;
+            }
+            return {};
+          });
+
+
 
 text_sensor:
   - platform: version
     name: "$device_name Version"
+  - platform: homeassistant
+    id: profile
+    entity_id: sensor.active_temp_profile
+    attribute: stateAttribute
+    # name: "Annealing Oven active Profile"
+    # internal: false
+
+
 
 switch:
   - platform: template
