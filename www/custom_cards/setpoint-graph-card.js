@@ -446,6 +446,12 @@ class SetpointGraphCard extends LitElement {
         }
     }
 
+
+    GetHistory(){
+        // http://localhost:8123/api/history/period/2026-07-24T12:00:00+04:00?filter_entity_id=sensor.temperature,sensor.kitchen_temperature&minimal_response
+        // http://localhost:8123/api/history/period/2021-09-04T00%3A00%3A00%2B02%3A00?end_time=2023-09-04T00%3A00%3A00%2B02%3A00&filter_entity_id=sensor.temperature
+    }
+
     onProfileNameChange(e) {
         const newName = this.shadowRoot.getElementById('newProfileName');
         console.log("Profile name changed to:", newName, e.target.value, e);

@@ -25,7 +25,9 @@ esphome:
             # Enable external antenna by default (FM8625H RF switch)
             - output.turn_off: rf_switch_enable    # LOW -> RF switch power ON
             - output.turn_off: rf_antenna_select    # HIGH -> external antenna (U.FL) turn_on
-
+            - climate.control: { id: pid_left, mode: "OFF", target_temperature: 18°C }
+            - climate.control: { id: pid_right, mode: "OFF", target_temperature: 18°C }
+            - climate.control: { id: pid_bottom, mode: "OFF", target_temperature: 18°C }
 esp32:
     variant: esp32c6
     board: seeed_xiao_esp32c6
@@ -59,7 +61,7 @@ captive_portal:
 
 time:
   - platform: homeassistant
-    id: sntp_time
+    id: ha_time
 
 json:
 # initial_value: "{0}"
@@ -86,6 +88,24 @@ button:
     name: "PID Bottom Autotune"
     on_press:
       - climate.pid.autotune: pid_bottom
+
+  - platform: template
+    name: "turn off"
+    id: cancel_temp_hold
+    on_press:
+      then:
+        - globals.set:
+            id: running_profile
+            value: 'false'
+        - binary_sensor.template.publish:
+              id: profile_is_running
+              state: false
+        - climate.control: { id: pid_left, mode: "OFF", target_temperature: 18°C }
+        - climate.control: { id: pid_right, mode: "OFF", target_temperature: 18°C }
+        - climate.control: { id: pid_bottom, mode: "OFF", target_temperature: 18°C }
+
+
+
   - platform: template
     name: "preheat oven"
     id: preheat_oven
@@ -109,10 +129,11 @@ button:
       then:
         - lambda: |-
             if(id(profile_points) > 0){
-              auto time = id(sntp_time).now().timestamp;
+              auto time = id(ha_time).now().timestamp;
               id(run_start_time) = time;
               id(run_index) = 0;
               id(running_profile) = true;
+              id(profile_is_running).publish_state(true);
               
 
             }else{
@@ -139,7 +160,7 @@ script:
   mode: restart
   then:
     - lambda: |-
-          auto time = id(sntp_time).now().timestamp;
+          auto time = id(ha_time).now().timestamp;
           auto elapsed = (time - id(run_start_time));
           
           auto localIndex = id(run_index);
@@ -151,6 +172,10 @@ script:
             if(localIndex >= (id(profile_points) - 1)){
               ESP_LOGI("run_profile", "profile complete, stopping");
               id(running_profile) = false;
+              id(profile_is_running).publish_state(false); 
+              id(pid_left).make_call().set_mode(CLIMATE_MODE_OFF).set_target_temperature(18).perform();
+              id(pid_right).make_call().set_mode(CLIMATE_MODE_OFF).set_target_temperature(18).perform();
+              id(pid_bottom).make_call().set_mode(CLIMATE_MODE_OFF).set_target_temperature(18).perform();
               return;
             }
 
@@ -171,8 +196,6 @@ script:
           id(pid_bottom).make_call().set_target_temperature(interpolated_temp).perform();
 
 
-
-
 - id: load_profile_from_sensor
   mode: restart
   then:
@@ -182,6 +205,8 @@ script:
             if (root["profileName"].is<const char *>()) {
               const char * ver_str = root["profileName"].as<const char *>();
               ESP_LOGI("parse", "got setpoint named: %s", ver_str);
+              
+              id(active_profile_name).publish_state(ver_str);
             }
             if (!root["setpoints"].is<JsonArray>()) { return {}; } // ESP_LOGE("parse", "setpoints is not an array");
             JsonArray setpoints = root["setpoints"].as<JsonArray>();
@@ -208,6 +233,9 @@ script:
 text_sensor:
   - platform: version
     name: "$device_name Version"
+  - platform: template
+    id: active_profile_name
+    name: "active profile"
   - platform: homeassistant
     id: profile
     entity_id: sensor.active_temp_profile
@@ -230,8 +258,6 @@ switch:
         - output.turn_off: rf_antenna_select   # LOW -> internal antenna (PCB/RF1)
 
 
-
-
 # External antenna control using ESPHome 2025.12+ board aliases (FM8625H RF switch)
 # RF_SWITCH_EN (GPIO3) = RF switch power, RF_ANT_SELECT (GPIO14) = antenna selector
 output:
@@ -247,7 +273,10 @@ output:
   - { platform: ledc, pin: $bottom_heater_pin, id: heater_bottom, frequency: 1220Hz}
 
 
-
+binary_sensor:
+  - platform: template
+    name: "profile running"
+    id: profile_is_running
 
 # Example configuration entry
 sensor:
@@ -273,7 +302,6 @@ sensor:
   - { platform: resistance, id: r_bottom, sensor: adc_bottom, configuration: DOWNSTREAM, resistor: 5.6kOhm }
   - { platform: adc, id: adc_bottom, pin: $bottom_ntc_pin, update_interval: 1s }
   - { platform: pid, climate_id: pid_bottom, name: "PID Bottom Result", type: RESULT }
-
 # interval:
 #   - interval: 60s
 #     then:
@@ -286,10 +314,10 @@ climate:
     id: pid_left
     name: "PID Left"
     sensor: temp_left
-    default_target_temperature: 40°C
+    default_target_temperature: 18°C
     heat_output: heater_left
     visual:
-      min_temperature: 40
+      min_temperature: 18
       max_temperature: 110
       temperature_step: 1
     control_parameters:
@@ -305,10 +333,10 @@ climate:
     id: pid_right
     name: "PID Right"
     sensor: temp_right
-    default_target_temperature: 40°C
+    default_target_temperature: 18°C
     heat_output: heater_right
     visual:
-      min_temperature: 40
+      min_temperature: 18
       max_temperature: 110
       temperature_step: 1
     control_parameters:
@@ -324,10 +352,10 @@ climate:
     id: pid_bottom
     name: "PID Bottom"
     sensor: temp_bottom
-    default_target_temperature: 40°C
+    default_target_temperature: 18°C
     heat_output: heater_bottom
     visual:
-      min_temperature: 40
+      min_temperature: 18
       max_temperature: 110
       temperature_step: 1
     control_parameters:
