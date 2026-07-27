@@ -5,9 +5,9 @@ substitutions:
   left_ntc_pin: GPIO0
   right_ntc_pin: GPIO1
   bottom_ntc_pin: GPIO2
-  left_heater_pin: GPIO21
-  right_heater_pin: GPIO22
-  bottom_heater_pin: GPIO23
+  left_heater_pin: GPIO18
+  right_heater_pin: GPIO20
+  bottom_heater_pin: GPIO19
 
 #  esphome logs .\Devices\annealing_oven.yml --no-states
 
@@ -116,9 +116,9 @@ button:
             if(id(profile_points) > 0){
               ESP_LOGI("preheat", "preheating to first setpoint: %.2f°C", id(profile_temps)[0]);
 
-              id(pid_left).make_call().set_target_temperature(id(profile_temps)[0]).perform();
-              id(pid_right).make_call().set_target_temperature(id(profile_temps)[0]).perform();
-              id(pid_bottom).make_call().set_target_temperature(id(profile_temps)[0]).perform();
+              id(pid_left).make_call().set_mode(CLIMATE_MODE_HEAT).set_target_temperature(id(profile_temps)[0]).perform();
+              id(pid_right).make_call().set_mode(CLIMATE_MODE_HEAT).set_target_temperature(id(profile_temps)[0]).perform();
+              id(pid_bottom).make_call().set_mode(CLIMATE_MODE_HEAT).set_target_temperature(id(profile_temps)[0]).perform();
             }else{
               ESP_LOGE("preheat", "no setpoints loaded, cannot preheat");
             }
@@ -191,9 +191,9 @@ script:
           
           ESP_LOGI("run_profile", "point: %ld|%ld, delta: %.2f, elapsed %lld, prior: %.2f, next: %.2f, inter: %.2f", 
                           localIndex, id(profile_points)-1, delta, elapsed, prior_temp, next_temp, interpolated_temp);
-          id(pid_left).make_call().set_target_temperature(interpolated_temp).perform();
-          id(pid_right).make_call().set_target_temperature(interpolated_temp).perform();
-          id(pid_bottom).make_call().set_target_temperature(interpolated_temp).perform();
+          id(pid_left).make_call().set_mode(CLIMATE_MODE_HEAT).set_target_temperature(interpolated_temp).perform();
+          id(pid_right).make_call().set_mode(CLIMATE_MODE_HEAT).set_target_temperature(interpolated_temp).perform();
+          id(pid_bottom).make_call().set_mode(CLIMATE_MODE_HEAT).set_target_temperature(interpolated_temp).perform();
 
 
 - id: load_profile_from_sensor
@@ -286,20 +286,23 @@ sensor:
       lambda: !lambda "return id(uptime_seconds).state / 86'400;"}
 
   - { platform: ntc, sensor: r_left, id: temp_left, name: "Temperature Left",
+        # calibration: [ 114.0kOhm -> 25°C, 10kOhm -> 80°C ]  }
         calibration: [ 10.0kOhm -> 25°C, 27.219kOhm -> 0°C, 14.674kOhm -> 15°C ]  }
-  - { platform: resistance, id: r_left, sensor: adc_left, configuration: DOWNSTREAM, resistor: 5.6kOhm }
+  - { platform: resistance, id: r_left, name: "R_left", sensor: adc_left, configuration: DOWNSTREAM, resistor: 9.95kOhm }
   - { platform: adc, id: adc_left, pin: $left_ntc_pin, update_interval: 1s }
   - { platform: pid, climate_id: pid_left, name: "PID Left Result", type: RESULT }
 
   - { platform: ntc, sensor: r_right, id: temp_right, name: "Temperature Right",
+        # calibration: [ 114.0kOhm -> 25°C, 10kOhm -> 80°C ]  }
         calibration: [ 10.0kOhm -> 25°C, 27.219kOhm -> 0°C, 14.674kOhm -> 15°C ]  }
-  - { platform: resistance, id: r_right, sensor: adc_right, configuration: DOWNSTREAM, resistor: 5.6kOhm }
+  - { platform: resistance, id: r_right, name: "R_right", sensor: adc_right, configuration: DOWNSTREAM, resistor: 9.95kOhm }
   - { platform: adc, id: adc_right, pin: $right_ntc_pin, update_interval: 1s }
   - { platform: pid, climate_id: pid_right, name: "PID Right Result", type: RESULT }
 
   - { platform: ntc, sensor: r_bottom, id: temp_bottom, name: "Temperature Bottom",
+        # calibration: [ 114.0kOhm -> 25°C, 10kOhm -> 80°C ]  }
         calibration: [ 10.0kOhm -> 25°C, 27.219kOhm -> 0°C, 14.674kOhm -> 15°C ]  }
-  - { platform: resistance, id: r_bottom, sensor: adc_bottom, configuration: DOWNSTREAM, resistor: 5.6kOhm }
+  - { platform: resistance, id: r_bottom, name: "R_bottom", sensor: adc_bottom, configuration: DOWNSTREAM, resistor: 9.95kOhm }
   - { platform: adc, id: adc_bottom, pin: $bottom_ntc_pin, update_interval: 1s }
   - { platform: pid, climate_id: pid_bottom, name: "PID Bottom Result", type: RESULT }
 # interval:

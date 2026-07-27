@@ -360,7 +360,10 @@ class SetpointGraphCard extends LitElement {
         if (!this.profileStorage || !this.hass.states[this.profileStorage]) return; // No entity configured
         try {
             if (this.currentProfileData.profileName !== this.startingProfileName) {
-                let profileIndex = this.allProfiles.findIndex(p => p.profileName === this.currentProfileData.profileName);
+                if (!this.allProfiles) {
+                    this.allProfiles = [];
+                }
+                let profileIndex =  this.allProfiles.findIndex(p => p.profileName === this.currentProfileData.profileName);
                 if (profileIndex === -1) {
                     this.allProfiles.push(this.currentProfileData);
                 } else {
@@ -436,6 +439,9 @@ class SetpointGraphCard extends LitElement {
 
     async DeleteProfile() {
         if (!this.profileStorage || !this.hass.states[this.profileStorage]) return; // No entity configured
+        if (!this.allProfiles) {
+            this.allProfiles = [];
+        }
         let profileIndex = this.allProfiles.findIndex(p => p.profileName === this.currentProfileData.profileName);
         if (profileIndex !== -1) {
             this.allProfiles.splice(profileIndex, 1);
