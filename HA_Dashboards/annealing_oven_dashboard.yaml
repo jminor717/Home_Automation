@@ -1,0 +1,93 @@
+type: vertical-stack
+cards:
+  - type: custom:setpoint-graph-card
+    profiles: sensor.store_temp_profiles
+    active: sensor.active_temp_profile
+  - type: horizontal-stack
+    cards:
+      - show_name: true
+        show_icon: true
+        type: button
+        name: preheat
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.living_room_annealing_oven_preheat_oven
+          data: {}
+        icon: mdi:heating-coil
+        color: red
+        show_state: true
+        entity: climate.living_room_annealing_oven_pid_bottom
+      - type: markdown
+        content: >
+          profile: {{ states("sensor.living_room_annealing_oven_active_profile") }}
+
+          {% set val2 = state_attr("climate.living_room_annealing_oven_pid_bottom","temperature") %} 
+          {% if val2 is number %} 
+          Target: {{"{:.1f}".format((float(val2)-32) * (5/9)) }} °C 
+          {% else %}
+          *Target: NA*
+          {% endif %}
+
+          {% set val =states("sensor.living_room_annealing_oven_temperature_bottom") %}
+          {% if val not in ['unavailable', 'unknown'] %} 
+          Current: {{"{:.1f}".format((float(val)-32) * (5/9)) }} °C 
+          {% else %}
+          *Current: NA*
+          {% endif %}
+      - show_name: true
+        show_icon: true
+        type: button
+        name: Run Profile
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.living_room_annealing_oven_run_profile
+          data: {}
+        entity: binary_sensor.living_room_annealing_oven_profile_running
+        icon: mdi:play-outline
+        show_state: true
+  - type: horizontal-stack
+    cards:
+      - show_name: true
+        show_icon: true
+        type: button
+        name: Turn Off Heater
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.living_room_annealing_oven_turn_off
+          data: {}
+        icon: mdi:close-octagon
+        color: red
+        show_state: true
+        entity: climate.living_room_annealing_oven_pid_bottom
+
+
+
+
+
+
+
+
+
+
+  - type: entities
+    entities:
+      - entity: button.living_room_annealing_oven_preheat_oven
+        name: Preheat Oven
+        icon: mdi:heating-coil
+      - entity: button.living_room_annealing_oven_run_profile
+        name: Run Profile
+        icon: mdi:timer-play
+      - entity: sensor.living_room_annealing_oven_active_profile
+        name: profile loaded in firmware
+        icon: mdi:rename-outline
+      - entity: binary_sensor.living_room_annealing_oven_profile_running
+        name: is oven running profile
+      - entity: button.living_room_annealing_oven_turn_off
+        name: Turn Off
+        icon: mdi:close-octagon

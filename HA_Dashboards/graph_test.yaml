@@ -1,0 +1,12 @@
+type: custom:config-template-card
+variables:
+  HOURS:states('input_select.graph_hours')
+entities:
+  - input_select.graph_hours
+  - sensor.outside_temperature
+card:
+  type: history-graph
+  title: Dynamic Temperature Graph
+  hours_to_show: '${HOURS}'
+  entities:
+    - sensor.outside_temperature
