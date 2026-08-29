@@ -1,5 +1,6 @@
 substitutions:
   device_name: erv-return-box
+  device_name_opener: garage-door-opener
   eth_cs: GPIO9
   eth_clk: GPIO10
   eth_miso: GPIO11
@@ -46,7 +47,7 @@ ota:
   password: ""
 
 logger:
-  level: INFO
+  level: very_verbose
 
 ethernet:
   type: W5500
@@ -60,105 +61,185 @@ ethernet:
 time:
   - platform: homeassistant
 
-i2c:
-  - id: bus_a
-    sda: $sda_pin
-    scl: $scl_pin
-    scan: true
+# SPI bus for LoRa radio
+spi:
+  interface: software
+  id: spi3
+  clk_pin: GPIO15
+  mosi_pin: GPIO16
+  miso_pin: GPIO17
+
+# i2c:
+#   - id: bus_a
+#     sda: $sda_pin
+#     scl: $scl_pin
+#     scan: true
 
 button:
   - platform: restart
     name: "$device_name Restart"
-  - platform: template
-    id: run_call
-    name: "home vent servo"
-    on_press:
-      then:
-        lambda: !lambda |-
-          id(damper)->setup();
-  - platform: template
-    id: center_servo
-    name: "center servo"
-    on_press:
-      then:
-        - servo.write:
-            id: servo_
-            level: !lambda "return 0.5;"
+  # - platform: template
+  #   id: run_call
+  #   name: "home vent servo"
+  #   on_press:
+  #     then:
+  #       lambda: !lambda |-
+  #         id(damper)->setup();
+  # - platform: template
+  #   id: center_servo
+  #   name: "center servo"
+  #   on_press:
+  #     then:
+  #       - servo.write:
+  #           id: servo_
+  #           level: !lambda "return 0.5;"
 
 text_sensor:
   - platform: version
     name: "$device_name Version"
+
+# LoRa Radio Configuration (SX1276/SX1278)
+sx127x:
+  data_rate: 10khz
+  spi_id: spi3
+  setup_priority: 801
+  dio0_pin: GPIO18
+  cs_pin:
+    number: GPIO7
+    inverted: false
+  rst_pin: GPIO8
+  pa_pin: BOOST
+  pa_power: 10
+  bandwidth: 125_0kHz
+  crc_enable: true
+  frequency: 915MHz
+  # frequency: 433920000
+  modulation: LORA
+  rx_start: true
+  sync_value: 0x12
+  preamble_size: 8
+  spreading_factor: 7
+  coding_rate: CR_4_6
+  on_packet:
+    then:
+      - lambda: |-
+          id(receivedPackets)++;
+          ESP_LOGI("lora", "Received packet RSSI: %.2f dBm, SNR: %.2f dB",
+                   rssi, snr);
+
+globals:
+  - { id: receivedPackets, type: int, initial_value: "0"}
+  - { id: sentPackets, type: int, initial_value: "0"}
+
+# packet_transport:
+#   platform: sx127x
+#   update_interval: 30s
+#   encryption: "780905cb-619f-4663-b246-256ba69c2ea6"
+#   rolling_code_enable: true
+#   ping_pong_enable: true
+#   binary_sensors:
+#     - relay3_sensor
+#   providers:
+#     - name: $device_name_opener
+#       encryption: "780905cb-619f-4663-b246-256ba69c2ea6"
+
+switch:
+  - platform: gpio
+    pin: GPIO1
+    id: relay3
+    name: "receiver switch"
+
+# binary_sensor:
+#   - platform: template
+#     id: relay3_sensor
+#     lambda: "return id(relay3).state;"
+#     internal: false
+
+#   - platform: packet_transport
+#     provider: $device_name_opener
+#     id: relay1_sensor
+#     on_press:
+#       switch.turn_on: relay3
+#     on_release:
+#       switch.turn_off: relay3
+#     name: opener state extra
+#     internal: false
+#   - platform: packet_transport
+#     provider: $device_name_opener
+#     type: status
+#     name: opener connection status extra
+#     internal: false
 
 sensor:
   - { platform: uptime, id: uptime_seconds, update_interval: 1min }
   - { platform: template, id: uptime_days, name: "$device_name uptime", update_interval: 1min, 
       device_class: duration, entity_category: "diagnostic", unit_of_measurement: "d", accuracy_decimals: 2,
       lambda: !lambda "return id(uptime_seconds).state / 86'400;"}
-  - { platform: adc, id: servo_potentiometer, name: "v_meas", pin: $servo_pot_pin, update_interval: 250ms, attenuation: 12db }
-  - platform: mhz19
-    update_interval: 2s
-    co2:
-      name: MH-Z19 CO2 Value
-    temperature:
-      name: MH-Z19 Temperature
-  - platform: mics_4514
-    nitrogen_dioxide:
-      name: Nitrogen Dioxide
-    carbon_monoxide:
-      name: Carbon Monoxide
-    hydrogen:
-      name: Hydrogen
-    ethanol:
-      name: Ethanol
-    methane:
-      name: Methane
-    ammonia:
-      name: Ammonia
-    update_interval: 2s
+  # - { platform: adc, id: servo_potentiometer, name: "v_meas", pin: $servo_pot_pin, update_interval: 250ms, attenuation: 12db }
+  # - platform: mhz19
+  #   update_interval: 2s
+  #   co2:
+  #     name: MH-Z19 CO2 Value
+  #   temperature:
+  #     name: MH-Z19 Temperature
+  # - platform: mics_4514
+  #   nitrogen_dioxide:
+  #     name: Nitrogen Dioxide
+  #   carbon_monoxide:
+  #     name: Carbon Monoxide
+  #   hydrogen:
+  #     name: Hydrogen
+  #   ethanol:
+  #     name: Ethanol
+  #   methane:
+  #     name: Methane
+  #   ammonia:
+  #     name: Ammonia
+  #   update_interval: 2s
 
 
 
 
-hard_stop_damper:
-  - {id: damper, servo_position_sensor: servo_potentiometer, servo: servo_, 
-    open_at_center: true, switch_open_and_close: false, open_offset: 0 }
+# hard_stop_damper:
+#   - {id: damper, servo_position_sensor: servo_potentiometer, servo: servo_, 
+#     open_at_center: true, switch_open_and_close: false, open_offset: 0 }
 
 
-servo:
-  - { id: servo_, output: servo_output, transition_length: 7s, auto_detach_time: 1000ms, max_level: 50%, min_level: 1%}
+# servo:
+#   - { id: servo_, output: servo_output, transition_length: 7s, auto_detach_time: 1000ms, max_level: 50%, min_level: 1%}
 
-output:
-  - {platform: ledc, id: servo_output, pin: $servo_pin, frequency: 200 Hz}
-
-
-number:
-  - platform: template
-    name: vent Control
-    min_value: 0
-    initial_value: 100
-    max_value: 100
-    step: 1
-    optimistic: true
-    set_action:
-      then:
-        - servo.write:
-            id: servo_
-            level: !lambda "return id(damper).tilt_to_servo_position(( x / 100.0));"
-  - platform: template
-    name: servo Control
-    min_value: -8
-    initial_value: 50
-    max_value: 100
-    step: 1
-    optimistic: true
-    set_action:
-      then:
-        - servo.write:
-            id: servo_
-            level: !lambda "return x / 100.0;"
+# output:
+#   - {platform: ledc, id: servo_output, pin: $servo_pin, frequency: 200 Hz}
 
 
-uart:
-  tx_pin: $uart_tx_pin
-  rx_pin: $uart_rx_pin
-  baud_rate: 9600
+# number:
+  # - platform: template
+  #   name: vent Control
+  #   min_value: 0
+  #   initial_value: 100
+  #   max_value: 100
+  #   step: 1
+  #   optimistic: true
+  #   set_action:
+  #     then:
+  #       - servo.write:
+  #           id: servo_
+  #           level: !lambda "return id(damper).tilt_to_servo_position(( x / 100.0));"
+#   - platform: template
+#     name: servo Control
+#     min_value: -8
+#     initial_value: 50
+#     max_value: 100
+#     step: 1
+#     optimistic: true
+#     set_action:
+#       then:
+#         - servo.write:
+#             id: servo_
+#             level: !lambda "return x / 100.0;"
+
+
+# uart:
+#   tx_pin: $uart_tx_pin
+#   rx_pin: $uart_rx_pin
+#   baud_rate: 9600

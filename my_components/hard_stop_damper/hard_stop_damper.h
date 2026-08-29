@@ -9,6 +9,7 @@
 #include "esphome/core/automation.h"
 #include "esphome/core/component.h"
 #include "esphome/core/hal.h"
+#include <deque>
 #include <limits>
 // using namespace i2c;
 

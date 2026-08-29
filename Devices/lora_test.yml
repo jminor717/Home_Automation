@@ -1,0 +1,195 @@
+substitutions:
+  device_name_opener: garage-door-opener
+  device_name_receiver: t3-lora32
+
+external_components:
+  - source:
+      type: local
+      path: ../my_components # path relative to Devices folder
+
+esphome:
+  name: $device_name_receiver
+
+esp32:
+  variant: esp32
+  cpu_frequency: 240MHZ
+  framework:
+    type: esp-idf
+
+preferences:
+  # the default of 1min is far too short--flash chip is rated for approx 100k writes.
+  flash_write_interval: "48h"
+
+api:
+  # password: ""
+ota:
+  platform: esphome
+  password: ""
+
+logger:
+  level: info
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "$device_name_receiver AP"
+    password: "BiSG9yrKP394"
+captive_portal:
+
+time:
+  - platform: homeassistant
+
+text_sensor:
+  - platform: version
+    name: "$device_name_receiver Version"
+
+# SPI bus for LoRa radio
+spi:
+  clk_pin: GPIO5
+  mosi_pin: GPIO27
+  miso_pin: GPIO19
+
+# I2C for OLED display
+i2c:
+  sda: GPIO21
+  scl: GPIO22
+  frequency: 400kHz
+
+sensor:
+  - { platform: uptime, id: uptime_seconds, update_interval: 1min }
+  - { platform: template, id: uptime_days, name: "$device_name_receiver uptime", update_interval: 1min, 
+      device_class: duration, entity_category: "diagnostic", unit_of_measurement: "d", accuracy_decimals: 2,
+      lambda: !lambda "return id(uptime_seconds).state / 86'400;"}
+  - platform: wifi_signal
+    id: wifi_signal_db
+    name: "WiFi Signal"
+    update_interval: 15s
+  - platform: adc
+    pin: GPIO35
+    name: "Battery Voltage"
+    attenuation: 12db
+    filters:
+      - multiply: 2.0  # Voltage divider correction
+    update_interval: 60s
+  - platform: uptime
+    id: uptime_sensor
+    type: seconds
+    name: Uptime Sensor
+    update_interval: 1s
+  - platform: packet_transport
+    provider: $device_name_opener
+    id: opener_uptime_sensor
+    name: opener state uptime
+    internal: false
+
+# LoRa Radio Configuration (SX1276/SX1278)
+sx127x:
+  dio0_pin: GPIO26
+  cs_pin: GPIO18
+  rst_pin: GPIO23
+  pa_pin: BOOST
+  pa_power: 10
+  bandwidth: 125_0kHz
+  crc_enable: true
+  frequency: 915MHz
+  # frequency: 433920000
+  modulation: LORA
+  rx_start: true
+  sync_value: 0x12
+  preamble_size: 8
+  spreading_factor: 7
+  coding_rate: CR_4_6
+  on_packet:
+    then:
+      - lambda: |-
+          id(receivedPackets)++;
+          ESP_LOGI("lora", "Received packet RSSI: %.2f dBm, SNR: %.2f dB",
+                   rssi, snr);
+
+globals:
+  - { id: receivedPackets, type: int, initial_value: "0"}
+  - { id: sentPackets, type: int, initial_value: "0"}
+
+# Example button to send LoRa packet
+button:
+  - platform: restart
+    name: "$device_name_receiver Restart"
+  - platform: template
+    name: "Send LoRa Packet"
+    on_press:
+      then:
+        - lambda: id(sentPackets)++;
+        - sx127x.send_packet:
+            data: [0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE, 0xBA, 0xBE]
+
+
+# OLED Display
+display:
+  - platform: ssd1306_i2c
+    model: "SSD1306 128x64"
+    address: 0x3C
+    lambda: |-
+      it.printf(0, 0, id(display_font), "%.0f", id(uptime_sensor).state);
+      it.printf(0, 16, id(display_font), "TX: %d, RX: %d", id(sentPackets), id(receivedPackets));
+
+
+font:
+  - file: "gfonts://Roboto"
+    id: display_font
+    size: 14
+
+# status_led:
+#   pin:
+#     number: GPIO25
+#     inverted: true
+
+
+packet_transport:
+  platform: sx127x
+  update_interval: 30s
+  encryption: "780905cb-619f-4663-b246-256ba69c2ea6"
+  rolling_code_enable: true
+  ping_pong_enable: true
+  binary_sensors:
+    - relay2_sensor
+  # sensors:
+  #   - wifi_signal_db
+  #   - id: uptime_sensor
+  #     broadcast_id: different_id
+  providers:
+    - name: $device_name_opener
+      encryption: "780905cb-619f-4663-b246-256ba69c2ea6"
+
+
+switch:
+  - platform: gpio
+    pin: GPIO25
+    id: relay2
+    name: "receiver switch"
+
+binary_sensor:
+  - platform: template
+    id: relay2_sensor
+    lambda: "return id(relay2).state;"
+    internal: false
+
+  - platform: packet_transport
+    provider: $device_name_opener
+    id: relay1_sensor
+    on_press:
+      switch.turn_on: relay2
+    on_release:
+      switch.turn_off: relay2
+    name: opener state
+    internal: false
+  - platform: packet_transport
+    provider: $device_name_opener
+    type: status
+    name: opener connection status
+    internal: false
+
+
+
+
+
