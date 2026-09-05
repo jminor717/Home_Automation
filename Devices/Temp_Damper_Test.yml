@@ -49,10 +49,10 @@ esp32:
   flash_size: 8MB
   framework:
     type: esp-idf
-    sdkconfig_options:
-      CONFIG_FREERTOS_USE_TRACE_FACILITY: y
-      CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS: y
-      CONFIG_FREERTOS_USE_STATS_FORMATTING_FUNCTIONS: y
+    # sdkconfig_options:
+    #   CONFIG_FREERTOS_USE_TRACE_FACILITY: y
+    #   CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS: y
+    #   CONFIG_FREERTOS_USE_STATS_FORMATTING_FUNCTIONS: y
       # CONFIG_ESPTOOLPY_FLASHSIZE_8MB: y
 
 
@@ -87,12 +87,12 @@ time:
   - platform: homeassistant
 
 # SPI bus for LoRa radio
-spi:
-  interface: spi3
-  id: spi3
-  clk_pin: GPIO15
-  mosi_pin: GPIO16
-  miso_pin: GPIO17
+# spi:
+#   interface: spi3
+#   id: spi3
+#   clk_pin: GPIO15
+#   mosi_pin: GPIO7
+#   miso_pin: GPIO6
 
 # i2c:
 #   - id: bus_a
@@ -128,11 +128,11 @@ text_sensor:
 #   data_rate: 1000khz
 #   spi_id: spi3
 #   setup_priority: 801
-#   dio0_pin: GPIO18
+#   dio0_pin: GPIO17
 #   cs_pin:
-#     number: GPIO7
+#     number: GPIO16
 #     inverted: false
-#   rst_pin: GPIO8
+#   rst_pin: GPIO18
 #   pa_pin: BOOST
 #   pa_power: 10
 #   bandwidth: 125_0kHz
@@ -149,8 +149,7 @@ text_sensor:
 #     then:
 #       - lambda: |-
 #           id(receivedPackets)++;
-#           ESP_LOGI("lora", "Received packet RSSI: %.2f dBm, SNR: %.2f dB",
-#                    rssi, snr);
+#           ESP_LOGI("lora", "Received packet RSSI: %.2f dBm, SNR: %.2f dB", rssi, snr);
 
 # globals:
 #   - { id: receivedPackets, type: int, initial_value: "0"}
@@ -287,18 +286,18 @@ cover:
     has_position: true
     open_action: 
         - stepper.set_target: { id: right_door_servo, target: !lambda "return 4000 * 8;" }
-        - lambda: |-
-            char buffer[1024]; 
+        # - lambda: |-
+        #     char buffer[1024]; 
             
-            ESP_LOGI("TASKS", "--- Current RTOS Tasks ---");
-            ESP_LOGI("TASKS", "Task Name\tState\tPrio\tStack\tNum\tCore");
+        #     ESP_LOGI("TASKS", "--- Current RTOS Tasks ---");
+        #     ESP_LOGI("TASKS", "Task Name\tState\tPrio\tStack\tNum\tCore");
             
-            // Populate the buffer with task statistics
-            vTaskList(buffer);
+        #     // Populate the buffer with task statistics
+        #     vTaskList(buffer);
             
-            // Print the result
-            ESP_LOGI("TASKS", "%s", buffer);
-            ESP_LOGI("TASKS", "---------------------------\n");
+        #     // Print the result
+        #     ESP_LOGI("TASKS", "%s", buffer);
+        #     ESP_LOGI("TASKS", "---------------------------\n");
 
     close_action: { stepper.set_target: { id: right_door_servo, target: !lambda "return  0;" }}
     tilt_action: { stepper.set_target: { id: right_door_servo, target: !lambda "return 4000 * 4;" }}

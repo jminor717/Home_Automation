@@ -1,0 +1,4 @@
+substitutions:
+  device_name_opener: garage-door-opener
+  device_name_receiver: t3-lora32
+  

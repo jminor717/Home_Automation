@@ -1,6 +1,7 @@
-substitutions:
-  device_name_opener: garage-door-opener
-  device_name_receiver: t3-lora32
+<<: !include lora_garage_door_subs.yml
+
+# substitutions:
+
 
 external_components:
   - source:
@@ -9,6 +10,12 @@ external_components:
 
 esphome:
   name: $device_name_receiver
+  on_boot:
+    - priority: -100
+      then:
+        - sensor.template.publish:
+            id: local_garage_door_state
+            state: 10
 
 esp32:
   variant: esp32
@@ -56,33 +63,6 @@ i2c:
   scl: GPIO22
   frequency: 400kHz
 
-sensor:
-  - { platform: uptime, id: uptime_seconds, update_interval: 1min }
-  - { platform: template, id: uptime_days, name: "$device_name_receiver uptime", update_interval: 1min, 
-      device_class: duration, entity_category: "diagnostic", unit_of_measurement: "d", accuracy_decimals: 2,
-      lambda: !lambda "return id(uptime_seconds).state / 86'400;"}
-  - platform: wifi_signal
-    id: wifi_signal_db
-    name: "WiFi Signal"
-    update_interval: 15s
-  - platform: adc
-    pin: GPIO35
-    name: "Battery Voltage"
-    attenuation: 12db
-    filters:
-      - multiply: 2.0  # Voltage divider correction
-    update_interval: 60s
-  - platform: uptime
-    id: uptime_sensor
-    type: seconds
-    name: Uptime Sensor
-    update_interval: 1s
-  - platform: packet_transport
-    provider: $device_name_opener
-    id: opener_uptime_sensor
-    name: opener state uptime
-    internal: false
-
 # LoRa Radio Configuration (SX1276/SX1278)
 sx127x:
   dio0_pin: GPIO26
@@ -93,7 +73,6 @@ sx127x:
   bandwidth: 125_0kHz
   crc_enable: true
   frequency: 915MHz
-  # frequency: 433920000
   modulation: LORA
   rx_start: true
   sync_value: 0x12
@@ -104,8 +83,7 @@ sx127x:
     then:
       - lambda: |-
           id(receivedPackets)++;
-          ESP_LOGI("lora", "Received packet RSSI: %.2f dBm, SNR: %.2f dB",
-                   rssi, snr);
+          // ESP_LOGI("lora", "Received packet RSSI: %.2f dBm, SNR: %.2f dB", rssi, snr);
 
 globals:
   - { id: receivedPackets, type: int, initial_value: "0"}
@@ -130,8 +108,9 @@ display:
     model: "SSD1306 128x64"
     address: 0x3C
     lambda: |-
-      it.printf(0, 0, id(display_font), "%.0f", id(uptime_sensor).state);
+      it.printf(0, 0, id(display_font), "%.0f", id(uptime_seconds).state);
       it.printf(0, 16, id(display_font), "TX: %d, RX: %d", id(sentPackets), id(receivedPackets));
+      it.printf(0, 32, id(display_font), "L: %.0f, R: %.0f", id(local_garage_door_state).state, id(remote_garage_door_state).state);
 
 
 font:
@@ -151,12 +130,12 @@ packet_transport:
   encryption: "780905cb-619f-4663-b246-256ba69c2ea6"
   rolling_code_enable: true
   ping_pong_enable: true
-  binary_sensors:
-    - relay2_sensor
-  # sensors:
+  # binary_sensors:
+  #   - relay2_sensor
+  sensors:
   #   - wifi_signal_db
-  #   - id: uptime_sensor
-  #     broadcast_id: different_id
+    - id: local_garage_door_state
+      broadcast_id: remote_garage_door_state
   providers:
     - name: $device_name_opener
       encryption: "780905cb-619f-4663-b246-256ba69c2ea6"
@@ -165,23 +144,26 @@ packet_transport:
 switch:
   - platform: gpio
     pin: GPIO25
-    id: relay2
+    id: relay1
     name: "receiver switch"
+  - platform: template
+    name: "Template Switch"
+    optimistic: true
+    id: local_switch
+    turn_on_action:
+      - sensor.template.publish:
+            id: local_garage_door_state
+            state: 12.0
+    turn_off_action:
+      - sensor.template.publish:
+            id: local_garage_door_state
+            state: 8.0
+
 
 binary_sensor:
   - platform: template
-    id: relay2_sensor
-    lambda: "return id(relay2).state;"
-    internal: false
-
-  - platform: packet_transport
-    provider: $device_name_opener
     id: relay1_sensor
-    on_press:
-      switch.turn_on: relay2
-    on_release:
-      switch.turn_off: relay2
-    name: opener state
+    lambda: "return id(relay1).state;"
     internal: false
   - platform: packet_transport
     provider: $device_name_opener
@@ -189,6 +171,36 @@ binary_sensor:
     name: opener connection status
     internal: false
 
+sensor:
+  - { platform: uptime, id: uptime_seconds, update_interval: 1min }
+  - { platform: template, id: uptime_days, name: "$device_name_receiver uptime", update_interval: 1min, 
+      device_class: duration, entity_category: "diagnostic", unit_of_measurement: "d", accuracy_decimals: 2,
+      lambda: !lambda "return id(uptime_seconds).state / 86'400;"}
+  - platform: packet_transport
+    provider: $device_name_opener
+    id: remote_garage_door_state
+    name: remote state
+    internal: false
+    on_value:
+      - if:
+          condition: { lambda: !lambda 'return  !(std::abs(id(local_garage_door_state).state - 10) <= 0.1);' }
+          then:
+            # - sensor.template.publish:
+            #     id: local_garage_door_state
+            #     state: !lambda "if (std::isfinite(x)) { return x; } return 10;"
+            - if:
+                condition: { lambda: !lambda 'return x > 10;' }
+                then:
+                  # - logger.log: "The sensor value is above 10!"
+                  - switch.turn_on: relay1
+                  - delay: 5s
+                else:
+                  - switch.turn_off: relay1
+  - platform: template
+    id: local_garage_door_state
+    name: local state
+    internal: false
+    update_interval: never
 
 
 
