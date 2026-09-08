@@ -17,7 +17,7 @@ substitutions:
   scl_pin: GPIO5
   sda_pin: GPIO4
 
-  step_pin: GPIO19
+  step_pin: GPIO15
   dir_pin: GPIO20
   en_pin: GPIO6
 
@@ -277,6 +277,17 @@ sensor:
   #                         nullptr,                      // handle
   #                         1                             // core
 
+servo_garage_door:
+  id: garage_door_controller
+  motors:
+      dir_pin: $dir_pin
+      step_pin: $step_pin
+      enable_pin: $en_pin
+      # alarm_pin: GPIO41
+      # in_place_pin: GPIO2
+      steps_per_rotation: 400
+
+
 cover:
   - platform: template
     device_class: damper
@@ -285,7 +296,9 @@ cover:
     restore_mode: NO_RESTORE
     has_position: true
     open_action: 
-        - stepper.set_target: { id: right_door_servo, target: !lambda "return 4000 * 8;" }
+        # - stepper.set_target: { id: right_door_servo, target: !lambda "return 4000 * 8;" }
+        - lambda: |-
+            id(garage_door_controller).move_servo(16000 * 1 * 10, true, 16000, 4000, 0);
         # - lambda: |-
         #     char buffer[1024]; 
             
@@ -299,25 +312,29 @@ cover:
         #     ESP_LOGI("TASKS", "%s", buffer);
         #     ESP_LOGI("TASKS", "---------------------------\n");
 
-    close_action: { stepper.set_target: { id: right_door_servo, target: !lambda "return  0;" }}
-    tilt_action: { stepper.set_target: { id: right_door_servo, target: !lambda "return 4000 * 4;" }}
-    tilt_lambda: !lambda "return id(right_door_servo).current_position;"
-    lambda: "return id(right_door_servo).current_position < 200 ? esphome::cover::COVER_CLOSED : esphome::cover::COVER_OPEN;"
+    # close_action: { stepper.set_target: { id: right_door_servo, target: !lambda "return  0;" }}
+    # tilt_action: { stepper.set_target: { id: right_door_servo, target: !lambda "return 4000 * 4;" }}
+    # tilt_lambda: !lambda "return id(right_door_servo).current_position;"
+    # lambda: "return id(right_door_servo).current_position < 200 ? esphome::cover::COVER_CLOSED : esphome::cover::COVER_OPEN;"
+    close_action: { lambda: !lambda "id(garage_door_controller).move_servo(-(400 * 8), false, 400, 200, 20);" }
+    tilt_action: { lambda: !lambda "id(garage_door_controller).move_servo(400 * 8, false, 400, 200, 20);" }
+    tilt_lambda: !lambda "return 0;"
+    lambda: !lambda "return esphome::cover::COVER_CLOSED;"
 
 
 # 400steps per rotation
-stepper:
-  - platform: a4988
-    id: right_door_servo
-    step_pin: $step_pin
-    dir_pin: $dir_pin
-    sleep_pin: $en_pin
-    # max_speed: 16000 steps/s # 2400 RPM
-    # acceleration: 8000
-    # deceleration: 8000
-    max_speed: 4000 steps/s # 2400 RPM
-    acceleration: 2000
-    deceleration: 2000
+# stepper:
+#   - platform: a4988
+#     id: right_door_servo
+#     step_pin: $step_pin
+#     dir_pin: $dir_pin
+#     sleep_pin: $en_pin
+#     # max_speed: 16000 steps/s # 2400 RPM
+#     # acceleration: 8000
+#     # deceleration: 8000
+#     max_speed: 4000 steps/s # 2400 RPM
+#     acceleration: 2000
+#     deceleration: 2000
 
 
 
