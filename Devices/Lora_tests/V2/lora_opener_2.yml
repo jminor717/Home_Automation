@@ -36,6 +36,7 @@ external_components:
   - source:
       type: local
       path: ../../../my_components # path relative to Devices folder
+    components: [packet_transport]
 
 
 
@@ -56,12 +57,15 @@ external_components:
 
 esphome:
   name: $device_name
-  on_boot:
-    - priority: -100
-      then:
-        - sensor.template.publish:
-            id: local_garage_door_state
-            state: 10
+  # on_boot:
+  #   - priority: -100
+  #     then:
+  #       - sensor.template.publish:
+  #           id: garage_door_state_request
+  #           state: -1
+  #       - sensor.template.publish:
+  #           id: local_garage_door_state
+  #           state: 0
 
 esp32:
   board: esp32-s3-devkitc-1
@@ -69,15 +73,6 @@ esp32:
   flash_size: 8MB
   framework:
     type: esp-idf
-    # sdkconfig_options:
-    #   CONFIG_FREERTOS_USE_TRACE_FACILITY: y
-    #   CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS: y
-    #   CONFIG_FREERTOS_USE_STATS_FORMATTING_FUNCTIONS: y
-      # CONFIG_ESPTOOLPY_FLASHSIZE_8MB: y
-
-
-#define configUSE_TRACE_FACILITY        1
-#define configUSE_STATS_FORMATTING_FUNCTIONS 1
 
 
 preferences:
@@ -122,45 +117,30 @@ ethernet:
 time:
   - platform: homeassistant
 
-
-
+text_sensor:
+  - platform: version
+    name: "$device_name Version"
 
 # SPI bus for LoRa radio
 spi:
+  # interface: spi3
+  # id: spi3
+  # clk_pin: GPIO17
+  # mosi_pin: GPIO15
+  # miso_pin: GPIO16
   interface: spi3
   id: spi3
   clk_pin: $lora_clk_pin
   mosi_pin: $lora_mosi_pin
   miso_pin: $lora_miso_pin
 
-
-button:
-  - platform: restart
-    name: "$device_name Restart"
-  - platform: template
-    name: "Send LoRa Packet"
-    on_press:
-      then:
-        - lambda: id(sentPackets)++;
-        - sx127x.send_packet:
-            data: [0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE, 0xBA, 0xBE]
-
-
-
-text_sensor:
-  - platform: version
-    name: "$device_name Version"
-
-
 # LoRa Radio Configuration (SX1276/SX1278)
 sx127x:
-  data_rate: 100khz
+  # data_rate: 100khz
   spi_id: spi3
   setup_priority: 801
   dio0_pin: $lora_dio0_pin
-  cs_pin:
-    number: $lora_cs_pin
-    inverted: false
+  cs_pin: $lora_cs_pin
   rst_pin: $lora_rst_pin
   pa_pin: BOOST
   pa_power: 10
@@ -178,95 +158,72 @@ sx127x:
     then:
       - lambda: |-
           id(receivedPackets)++;
-          // ESP_LOGI("lora", "Received packet RSSI: %.2f dBm, SNR: %.2f dB", rssi, snr);
 
 globals:
   - { id: receivedPackets, type: int, initial_value: "0"}
   - { id: sentPackets, type: int, initial_value: "0"}
 
+# Example button to send LoRa packet
+button:
+  - platform: restart
+    name: "$device_name Restart"
+  - platform: template
+    name: "Send LoRa Packet"
+    on_press:
+      then:
+        - lambda: id(sentPackets)++;
+        - sx127x.send_packet:
+            data: [0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE, 0xBA, 0xBE]
+
+
 packet_transport:
   platform: sx127x
-  update_interval: 5s
+  update_interval: never
   encryption: "780905cb-619f-4663-b246-256ba69c2ea6"
   rolling_code_enable: true
   ping_pong_enable: true
+  retry_sending_sensor_states_enable: true
+  retry_timeout: 10s
   sensors:
-    - id: local_garage_door_state
-      broadcast_id: remote_garage_door_state
+    - id: garage_door_state_request
+      broadcast_id: garage_door_state_request_2
   providers:
-    - name: $device_name_receiver
+    - name: $device_name_opener
       encryption: "780905cb-619f-4663-b246-256ba69c2ea6"
 
-
-
-# .defaultfilters:
-#   - &throttle
-#   - throttle: 0.25s
-#   - &moving_avg
-#   - sliding_window_moving_average:
-#     window_size: 20
-#     send_every: 10
-#   - &delta
-#   - delta: 0.9
-#   - throttle: 5s
+switch:
+  - platform: template
+    name: "remote Switch"
+    optimistic: true
+    id: local_switch
+    turn_on_action:
+      - sensor.template.publish: { id: garage_door_state_request, state: 12}
+    turn_off_action:
+      - sensor.template.publish: { id: garage_door_state_request, state: 8}
 
 
 binary_sensor:
   - platform: packet_transport
-    provider: $device_name_receiver
+    provider: $device_name_opener
     type: status
-    name: receiver connection status
+    name: opener connection status
     internal: false
+
 sensor:
   - { platform: uptime, id: uptime_seconds, update_interval: 1min }
   - { platform: template, id: uptime_days, name: "$device_name uptime", update_interval: 1min, 
       device_class: duration, entity_category: "diagnostic", unit_of_measurement: "d", accuracy_decimals: 2,
       lambda: !lambda "return id(uptime_seconds).state / 86'400;"}
-  - platform: template
-    id: local_garage_door_state
-    name: local state
-    internal: false
-    update_interval: never
   - platform: packet_transport
-    provider: $device_name_receiver
-    id: remote_garage_door_state
+    provider: $device_name_opener
+    id: opener_garage_door_state
     name: remote state
     internal: false
     on_value:
-      - if:
-          condition: 
-            lambda: |-
-              return  !(std::abs(id(local_garage_door_state).state - 10) <= 0.1) 
-                    && id(local_garage_door_state).state != id(remote_garage_door_state).state ;
-          then:
-            - sensor.template.publish:
-                id: local_garage_door_state
-                state: !lambda "if (std::isfinite(x)) { return x; } return 10;"
-
-
-switch:
+      - { lambda: !lambda 'ESP_LOGI("lora", "remote got state: %.2f from opener", x);' }
   - platform: template
-    name: "Template Switch"
-    optimistic: true
-    id: local_switch
-    turn_on_action:
-      - while:
-          condition: { lambda: !lambda 'return id(remote_garage_door_state).state != id(local_garage_door_state).state;' }
-          then:
-          - { lambda: !lambda 'ESP_LOGI("lora", "Still executing open: %.2f  %.2f", id(local_garage_door_state).state, id(remote_garage_door_state).state);' }
-          - sensor.template.publish: { id: local_garage_door_state, state: 12}
-          - delay: 1s
-
-    turn_off_action:
-      - while:
-          condition: { lambda: !lambda 'return id(remote_garage_door_state).state != id(local_garage_door_state).state;' }
-          then:
-          - { lambda: !lambda 'ESP_LOGI("lora", "Still executing close: %.2f  %.2f", id(local_garage_door_state).state, id(remote_garage_door_state).state);' }
-          - sensor.template.publish: { id: local_garage_door_state, state: 8}
-          - delay: 1s
-
-
-
-
-
+    id: garage_door_state_request
+    name: local state
+    internal: false
+    update_interval: never
 

@@ -3,6 +3,7 @@
 substitutions:
   device_name_opener: garage-door-opener
   device_name_receiver: t3-lora32
+  device_name_test: erv-return-box
 
 
 external_components:
@@ -30,7 +31,7 @@ esp32:
 
 preferences:
   # the default of 1min is far too short--flash chip is rated for approx 100k writes.
-  flash_write_interval: "48h"
+  flash_write_interval: "240h"
 
 api:
   # password: ""
@@ -39,18 +40,19 @@ ota:
   password: ""
 
 logger:
-  level: verbose
-  logs:
-    wifi: INFO
-    sensor: INFO
-    binary_sensor: INFO
-    adc.esp32: INFO
-    adc.common: INFO
-    mdns: INFO
-    i2c: INFO
-    i2c.idf: INFO
-    switch: INFO
-    switch.gpio: INFO
+  level: INFO
+  # level: verbose
+  # logs:
+  #   wifi: INFO
+  #   sensor: INFO
+  #   binary_sensor: INFO
+  #   adc.esp32: INFO
+  #   adc.common: INFO
+  #   mdns: INFO
+  #   i2c: INFO
+  #   i2c.idf: INFO
+  #   switch: INFO
+  #   switch.gpio: INFO
 
 wifi:
   ssid: !secret wifi_ssid
@@ -99,8 +101,6 @@ sx127x:
     then:
       - lambda: |-
           id(receivedPackets)++;
-          // char hex[256]; 
-          // ESP_LOGI("lora", "Received packet RSSI: %.2f dBm, SNR: %.2f dB  %s", rssi, snr,  format_hex_to(hex, x));
 
 globals:
   - { id: receivedPackets, type: int, initial_value: "0"}
@@ -141,8 +141,6 @@ font:
 #     inverted: true
 
 
-
-# Example configuration entry
 packet_transport:
   platform: sx127x
   update_interval: never
@@ -159,7 +157,8 @@ packet_transport:
   providers:
     - name: $device_name_receiver
       encryption: "780905cb-619f-4663-b246-256ba69c2ea6"
-
+    - name: $device_name_test
+      encryption: "780905cb-619f-4663-b246-256ba69c2ea6"
 
 switch:
   - platform: gpio
@@ -203,6 +202,22 @@ sensor:
     provider: $device_name_receiver
     id: garage_door_state_request
     name: remote state
+    internal: false
+    on_value:
+      - { lambda: !lambda 'ESP_LOGI("lora", "opener got request: %.2f from remote", x);' }
+      - if:
+          condition: { lambda: !lambda 'return x > 10;' }
+          then:
+            # - logger.log: "The sensor value is above 10!"
+            - switch.turn_on: relay1
+            - delay: 5s
+          else:
+            - switch.turn_off: relay1
+
+  - platform: packet_transport
+    provider: $device_name_test
+    id: garage_door_state_request_2
+    name: remote state 2
     internal: false
     on_value:
       - { lambda: !lambda 'ESP_LOGI("lora", "opener got request: %.2f from remote", x);' }

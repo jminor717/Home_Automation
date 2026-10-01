@@ -27,7 +27,7 @@ esp32:
 
 preferences:
   # the default of 1min is far too short--flash chip is rated for approx 100k writes.
-  flash_write_interval: "48h"
+  flash_write_interval: "240h"
 
 api:
   # password: ""
@@ -36,18 +36,19 @@ ota:
   password: ""
 
 logger:
-  level: verbose
-  logs:
-    wifi: INFO
-    sensor: INFO
-    binary_sensor: INFO
-    adc.esp32: INFO
-    adc.common: INFO
-    mdns: INFO
-    i2c: INFO
-    i2c.idf: INFO
-    switch: INFO
-    switch.gpio: INFO
+  level: INFO
+  # level: verbose
+  # logs:
+  #   wifi: INFO
+  #   sensor: INFO
+  #   binary_sensor: INFO
+  #   adc.esp32: INFO
+  #   adc.common: INFO
+  #   mdns: INFO
+  #   i2c: INFO
+  #   i2c.idf: INFO
+  #   switch: INFO
+  #   switch.gpio: INFO
 
 
 
@@ -98,7 +99,6 @@ sx127x:
     then:
       - lambda: |-
           id(receivedPackets)++;
-          // ESP_LOGI("lora", "Received packet RSSI: %.2f dBm, SNR: %.2f dB", rssi, snr);
 
 globals:
   - { id: receivedPackets, type: int, initial_value: "0"}
@@ -211,7 +211,4 @@ sensor:
     name: local state
     internal: false
     update_interval: never
-
-
-
 
