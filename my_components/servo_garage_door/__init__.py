@@ -1,4 +1,4 @@
-from esphome.components import sensor, voltage_sampler, switch, output  #, i2c, LEDCOutput
+from esphome.components import spi, sensor, voltage_sampler, switch, output  #, i2c, LEDCOutput
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome import pins
@@ -32,6 +32,8 @@ from esphome.const import (
 
 
 CODEOWNERS = ["@jacob"]
+# DEPENDENCIES = ["spi"]
+
 # AUTO_LOAD = ["LEDCOutput"]
 
 
@@ -44,7 +46,7 @@ MULTI_CONF = False
 
 servo_garage_door_ns = cg.esphome_ns.namespace("servo_garage_door")
 
-Servo_Garage_Door = servo_garage_door_ns.class_("ServoGarageDoor", cg.Component)
+Servo_Garage_Door = servo_garage_door_ns.class_("ServoGarageDoor", cg.Component) # , spi.SPIDevice
 
 ServoMotor = servo_garage_door_ns.class_("ServoMotor")
 
@@ -52,7 +54,7 @@ ServoMotor = servo_garage_door_ns.class_("ServoMotor")
 SCHEMA_MOTOR = {
     cv.GenerateID(): cv.declare_id(ServoMotor),
     cv.Required(CONF_STEP_PIN): pins.gpio_output_pin_schema,
-    cv.Required(CONF_DIR_PIN): pins.gpio_output_pin_schema,
+    # cv.Required(CONF_DIR_PIN): pins.gpio_output_pin_schema,
 
     cv.Optional(CONF_ENABLE_PIN): pins.gpio_output_pin_schema,
     cv.Optional(CONF_ALARM_PIN): pins.gpio_output_pin_schema,
@@ -71,6 +73,7 @@ CONFIG_SCHEMA = cv.All(
         }
     )
     .extend(cv.COMPONENT_SCHEMA),
+    # .extend(spi.spi_device_schema(True, 200000, "mode0")),
     cv.only_on_esp32,
 )
 
@@ -78,7 +81,8 @@ CONFIG_SCHEMA = cv.All(
 async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
-
+    # await spi.register_spi_device(var, config)
+    
     motors = []
     for motor_config in config[CONF_MOTORS]:
         motor_var = cg.new_Pvariable(motor_config[CONF_ID], ServoMotor())
@@ -86,8 +90,8 @@ async def to_code(config):
         pin = await cg.gpio_pin_expression(motor_config[CONF_STEP_PIN])
         cg.add(motor_var.set_Step_pin(pin))
 
-        pin = await cg.gpio_pin_expression(motor_config[CONF_DIR_PIN])
-        cg.add(motor_var.set_Dir_pin(pin))
+        # pin = await cg.gpio_pin_expression(motor_config[CONF_DIR_PIN])
+        # cg.add(motor_var.set_Dir_pin(pin))
 
         if CONF_ENABLE_PIN in motor_config:
             pin = await cg.gpio_pin_expression(motor_config[CONF_ENABLE_PIN])
