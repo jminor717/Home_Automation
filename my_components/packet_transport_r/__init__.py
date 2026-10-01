@@ -23,12 +23,12 @@ from esphome.cpp_generator import MockObjClass
 CODEOWNERS = ["@clydebarrow"]
 AUTO_LOAD = ["xxtea"]
 
-packet_transport_ns = cg.esphome_ns.namespace("packet_transport")
+packet_transport_ns = cg.esphome_ns.namespace("packet_transport_r")
 PacketTransport = packet_transport_ns.class_("PacketTransport", cg.PollingComponent)
 
 IS_PLATFORM_COMPONENT = True
 
-DOMAIN = "packet_transport"
+DOMAIN = "packet_transport_r"
 CONF_BROADCAST = "broadcast"
 CONF_BROADCAST_ID = "broadcast_id"
 CONF_PROVIDER = "provider"
