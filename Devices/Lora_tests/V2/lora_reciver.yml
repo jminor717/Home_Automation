@@ -16,7 +16,7 @@ esphome:
     - priority: -100
       then:
         - sensor.template.publish:
-            id: local_garage_door_state
+            id: garage_door_state_request
             state: -1
 
 esp32:
@@ -90,7 +90,6 @@ sx127x:
 globals:
   - { id: receivedPackets, type: int, initial_value: "0"}
   - { id: sentPackets, type: int, initial_value: "0"}
-  - { id: amSending, type: bool, initial_value: "false"}
 
 # Example button to send LoRa packet
 button:
@@ -113,7 +112,7 @@ display:
     lambda: |-
       it.printf(0, 0, id(display_font), "receiver:%.0f", id(uptime_seconds).state);
       it.printf(0, 16, id(display_font), "TX: %d, RX: %d", id(sentPackets), id(receivedPackets));
-      it.printf(0, 32, id(display_font), "L: %.0f, R: %.0f", id(local_garage_door_state).state, id(remote_garage_door_state).state);
+      it.printf(0, 32, id(display_font), "L: %.0f, R: %.0f", id(garage_door_state_request).state, id(opener_garage_door_state).state);
 
 
 font:
@@ -129,7 +128,7 @@ font:
 
 packet_transport:
   platform: sx127x
-  update_interval: 30s
+  update_interval: never
   encryption: "780905cb-619f-4663-b246-256ba69c2ea6"
   rolling_code_enable: true
   ping_pong_enable: true
@@ -137,8 +136,8 @@ packet_transport:
   #   - relay2_sensor
   sensors:
   #   - wifi_signal_db
-    - id: local_garage_door_state
-      broadcast_id: remote_garage_door_state
+    - id: garage_door_state_request
+      broadcast_id: garage_door_state_request
   providers:
     - name: $device_name_opener
       encryption: "780905cb-619f-4663-b246-256ba69c2ea6"
@@ -148,44 +147,16 @@ switch:
   - platform: gpio
     pin: GPIO25
     id: relay1
-    name: "receiver light"
+    name: "remote light"
   - platform: template
-    name: "receiver Switch"
+    name: "remote Switch"
     optimistic: true
     id: local_switch
-    # turn_on_action:
-    #   - sensor.template.publish:
-    #         id: local_garage_door_state
-    #         state: 12.0
-    # turn_off_action:
-    #   - sensor.template.publish:
-    #         id: local_garage_door_state
-    #         state: 8.0
     turn_on_action:
-      - sensor.template.publish: { id: local_garage_door_state, state: 12}
-      - globals.set: { id: amSending, value: 'true'}
-      - delay: 1s
-      - while:
-          condition: { lambda: !lambda 'return id(remote_garage_door_state).state != id(local_garage_door_state).state;' }
-          then:
-          # - logger.log: { format: "Still executing open: L:%.2f  R:%.2f",  args: [ id(local_garage_door_state).state, id(remote_garage_door_state).state ] }
-          - { lambda: !lambda 'ESP_LOGI("lora", "Receiver Still executing open: L:%.2f  R:%.2f", id(local_garage_door_state).state, id(remote_garage_door_state).state);' }
-          - sensor.template.publish: { id: local_garage_door_state, state: 12}
-          - delay: 1s
-      - globals.set: { id: amSending, value: 'false'}
-        
+      - sensor.template.publish: { id: garage_door_state_request, state: 12}
     turn_off_action:
-      - sensor.template.publish: { id: local_garage_door_state, state: 8}
-      - globals.set: { id: amSending, value: 'true'}
-      - delay: 1s
-      - while:
-          condition: { lambda: !lambda 'return id(remote_garage_door_state).state != id(local_garage_door_state).state;' }
-          then:
-          # - logger.log: { format: "Still executing close: L:%.2f  R:%.2f",  args: [ id(local_garage_door_state).state, id(remote_garage_door_state).state ] }
-          - { lambda: !lambda 'ESP_LOGI("lora", "Receiver Still executing close: L:%.2f  R:%.2f", id(local_garage_door_state).state, id(remote_garage_door_state).state);' }
-          - sensor.template.publish: { id: local_garage_door_state, state: 8}
-          - delay: 1s
-      - globals.set: { id: amSending, value: 'false'}
+      - sensor.template.publish: { id: garage_door_state_request, state: 8}
+
 
 
 
@@ -207,20 +178,11 @@ sensor:
       lambda: !lambda "return id(uptime_seconds).state / 86'400;"}
   - platform: packet_transport
     provider: $device_name_opener
-    id: remote_garage_door_state
+    id: opener_garage_door_state
     name: remote state
     internal: false
     on_value:
-      - if:
-          condition: 
-            lambda: |-
-              return  !id(amSending) && x >= 0 && id(local_garage_door_state).state != x; //!(std::abs(id(local_garage_door_state).state - 10) <= 0.1); // 
-          then:
-            # - logger.log: { format: "Receiver got state: %.2f from sender, amSending:%s",  args: [ x,  "id(amSending) ? 'true' : 'false'" ] }
-            - sensor.template.publish:
-                id: local_garage_door_state
-                state: !lambda "if (std::isfinite(x)) { return x; } return 10;"
-      - { lambda: !lambda 'ESP_LOGI("lora", "Receiver got state: %.2f from sender, amSending:%s", x, id(amSending) ? "true" : "false");' }
+      - { lambda: !lambda 'ESP_LOGI("lora", "remote got state: %.2f from opener", x);' }
       - if:
           condition: { lambda: !lambda 'return x > 10;' }
           then:
@@ -230,7 +192,7 @@ sensor:
           else:
             - switch.turn_off: relay1
   - platform: template
-    id: local_garage_door_state
+    id: garage_door_state_request
     name: local state
     internal: false
     update_interval: never

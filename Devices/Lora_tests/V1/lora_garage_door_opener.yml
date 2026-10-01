@@ -1,6 +1,5 @@
 # <<: !include ../../secrets.yaml
 
-
 substitutions:
   device_name_opener: garage-door-opener
   device_name_receiver: t3-lora32
@@ -18,7 +17,7 @@ esphome:
       then:
         - sensor.template.publish:
             id: local_garage_door_state
-            state: 10
+            state: -1
 
 esp32:
   variant: esp32
@@ -102,6 +101,7 @@ sx127x:
 globals:
   - { id: receivedPackets, type: int, initial_value: "0"}
   - { id: sentPackets, type: int, initial_value: "0"}
+  - { id: amSending, type: bool, initial_value: "false"}
 
 # Example button to send LoRa packet
 button:
@@ -122,7 +122,7 @@ display:
     model: "SSD1306 128x64"
     address: 0x3C
     lambda: |-
-      it.printf(0, 0, id(display_font), "uptime:%.0f", id(uptime_seconds).state);
+      it.printf(0, 0, id(display_font), "sender:%.0f", id(uptime_seconds).state);
       it.printf(0, 16, id(display_font), "TX: %d, RX: %d", id(sentPackets), id(receivedPackets));
       it.printf(0, 32, id(display_font), "L: %.0f, R: %.0f", id(local_garage_door_state).state, id(remote_garage_door_state).state);
 
@@ -167,22 +167,29 @@ switch:
     id: local_switch
     turn_on_action:
       - sensor.template.publish: { id: local_garage_door_state, state: 12}
+      - globals.set: { id: amSending, value: 'true'}
       - delay: 1s
       - while:
           condition: { lambda: !lambda 'return id(remote_garage_door_state).state != id(local_garage_door_state).state;' }
           then:
-          - { lambda: !lambda 'ESP_LOGI("lora", "Still executing open: %.2f  %.2f", id(local_garage_door_state).state, id(remote_garage_door_state).state);' }
+          # - logger.log: { format: "Still executing open: L:%.2f  R:%.2f",  args: [ id(local_garage_door_state).state, id(remote_garage_door_state).state ] }
+          - { lambda: !lambda 'ESP_LOGI("lora", "sender Still executing open: L:%.2f  R:%.2f", id(local_garage_door_state).state, id(remote_garage_door_state).state);' }
           - sensor.template.publish: { id: local_garage_door_state, state: 12}
           - delay: 1s
+      - globals.set: { id: amSending, value: 'false'}
+        
     turn_off_action:
       - sensor.template.publish: { id: local_garage_door_state, state: 8}
+      - globals.set: { id: amSending, value: 'true'}
       - delay: 1s
       - while:
           condition: { lambda: !lambda 'return id(remote_garage_door_state).state != id(local_garage_door_state).state;' }
           then:
-          - { lambda: !lambda 'ESP_LOGI("lora", "Still executing close: %.2f  %.2f", id(local_garage_door_state).state, id(remote_garage_door_state).state);' }
+          # - logger.log: { format: "Still executing close: L:%.2f  R:%.2f",  args: [ id(local_garage_door_state).state, id(remote_garage_door_state).state ] }
+          - { lambda: !lambda 'ESP_LOGI("lora", "sender Still executing close: L:%.2f  R:%.2f", id(local_garage_door_state).state, id(remote_garage_door_state).state);' }
           - sensor.template.publish: { id: local_garage_door_state, state: 8}
           - delay: 1s
+      - globals.set: { id: amSending, value: 'false'}
 
 
 binary_sensor:
@@ -217,13 +224,12 @@ sensor:
       - if:
           condition: 
             lambda: |-
-              return  !(std::abs(id(local_garage_door_state).state - 10) <= 0.1) 
-                    && id(local_garage_door_state).state != id(remote_garage_door_state).state ;
+              return  !id(amSending) && x >= 0 && id(local_garage_door_state).state != x; // !(std::abs(id(local_garage_door_state).state - 10) <= 0.1) && 
           then:
-            - { lambda: !lambda 'ESP_LOGI("lora", "Opener got state: %.2f from receiver ", x);' }
             - sensor.template.publish:
                 id: local_garage_door_state
                 state: !lambda "if (std::isfinite(x)) { return x; } return 10;"
+      - { lambda: !lambda 'ESP_LOGI("lora", "sender got state: %.2f from receiver, amSending:%s", x, id(amSending) ? "true" : "false");' }
       - if:
           condition: { lambda: !lambda 'return x > 10;' }
           then:
@@ -240,4 +246,25 @@ sensor:
 
 
 
+# servo_garage_door:
+#   id: garage_door_controller
+#   motors:
+#       step_pin: GPIO41
+#       # alarm_pin: GPIO41
+#       # in_place_pin: GPIO2
+#       steps_per_rotation: 400
 
+
+
+cover:
+  - platform: template
+    device_class: garage
+    id: right_garage_door
+    name: right garage door
+    restore_mode: NO_RESTORE
+    has_position: true
+    open_action: { }
+    close_action: { }
+    tilt_action: { }
+    tilt_lambda: !lambda "return 0.5;"
+    lambda: "return 0.5;"

@@ -1,6 +1,5 @@
 substitutions:
   device_name: erv-return-box
-  device_name_opener: garage-door-opener
   eth_cs: GPIO9
   eth_clk: GPIO10
   eth_miso: GPIO11
@@ -17,9 +16,12 @@ substitutions:
   scl_pin: GPIO5
   sda_pin: GPIO4
 
-  step_pin: GPIO15
-  dir_pin: GPIO20
-  en_pin: GPIO6
+  step_pin: GPIO20
+  dir_pin: GPIO21
+  en_pin: GPIO8
+
+  device_name_opener: garage-door-opener
+  device_name_receiver: t3-lora32
 
 external_components:
   - source:
@@ -32,10 +34,10 @@ external_components:
 #include ""
 esphome:
   name: $device_name
-  includes:
+  # includes:
     # - <erv_ctrl\pressurePeakFilter.h>
-    - <freertos/FreeRTOS.h>
-    - <freertos/task.h>
+    # - <freertos/FreeRTOS.h>
+    # - <freertos/task.h>
   # on_boot:
   #   - priority: -100
   #     then:
@@ -72,7 +74,23 @@ ota:
 
 logger:
   # level: very_verbose
-  level: info
+  level: INFO
+  # logs:
+  #   sensor: WARN
+  #   button: INFO
+  #   wifi: INFO
+  #   adc: INFO
+  #   adc.common: INFO
+  #   adc.esp32: INFO
+  #   ntc: INFO
+  #   mdns: INFO
+  #   climate: INFO
+  #   resistance: INFO
+  #   ledc.output: INFO
+  #   homeassistant.text_sensor: INFO
+  #   pid.sensor: INFO
+
+
 
 ethernet:
   type: W5500
@@ -87,12 +105,12 @@ time:
   - platform: homeassistant
 
 # SPI bus for LoRa radio
-# spi:
-#   interface: spi3
-#   id: spi3
-#   clk_pin: GPIO15
-#   mosi_pin: GPIO7
-#   miso_pin: GPIO6
+spi:
+  interface: spi3
+  id: spi3
+  clk_pin: GPIO17
+  mosi_pin: GPIO15
+  miso_pin: GPIO16
 
 # i2c:
 #   - id: bus_a
@@ -118,87 +136,118 @@ button:
   #       - servo.write:
   #           id: servo_
   #           level: !lambda "return 0.5;"
+  # - platform: ld2450
+  #   ld2450_id: ld2450_radar
+  #   factory_reset:
+  #     name: "LD2450 Factory Reset"
+  #     entity_category: "config"
+  #   restart:
+  #     name: "LD2450 Restart"
+  #     entity_category: "config"
+
 
 text_sensor:
   - platform: version
     name: "$device_name Version"
+  # - platform: ld2450
+  #   ld2450_id: ld2450_radar
+  #   version:
+  #     name: "LD2450 Firmware"
+  #   mac_address:
+  #     name: "LD2450 BT MAC"
+    # target_1:
+    #   direction:
+    #     name: "Target-1 Direction"
+    # target_2:
+    #   direction:
+    #     name: "Target-2 Direction"
+    # target_3:
+    #   direction:
+    #     name: "Target-3 Direction"
 
-# LoRa Radio Configuration (SX1276/SX1278)
-# sx127x:
-#   data_rate: 1000khz
-#   spi_id: spi3
-#   setup_priority: 801
-#   dio0_pin: GPIO17
-#   cs_pin:
-#     number: GPIO16
-#     inverted: false
-#   rst_pin: GPIO18
-#   pa_pin: BOOST
-#   pa_power: 10
-#   bandwidth: 125_0kHz
-#   crc_enable: true
-#   frequency: 915MHz
-#   # frequency: 433920000
-#   modulation: LORA
-#   rx_start: true
-#   sync_value: 0x12
-#   preamble_size: 8
-#   spreading_factor: 7
-#   coding_rate: CR_4_6
-#   on_packet:
-#     then:
-#       - lambda: |-
-#           id(receivedPackets)++;
-#           ESP_LOGI("lora", "Received packet RSSI: %.2f dBm, SNR: %.2f dB", rssi, snr);
 
-# globals:
-#   - { id: receivedPackets, type: int, initial_value: "0"}
-#   - { id: sentPackets, type: int, initial_value: "0"}
+uart:
+  id: uart_ld2450
+  tx_pin: GPIO19
+  rx_pin: 
+    number: GPIO20
+    mode:
+      input: true
+      pullup: true
+  baud_rate: 256000
+  parity: NONE
+  stop_bits: 1
 
-# packet_transport:
-#   platform: sx127x
-#   update_interval: 30s
-#   encryption: "780905cb-619f-4663-b246-256ba69c2ea6"
-#   rolling_code_enable: true
-#   ping_pong_enable: true
-#   binary_sensors:
-#     - relay3_sensor
-#   providers:
-#     - name: $device_name_opener
-#       encryption: "780905cb-619f-4663-b246-256ba69c2ea6"
+ld2450:
+  id: ld2450_radar
+  uart_id: uart_ld2450
 
-switch:
-  - platform: gpio
-    pin: GPIO1
-    id: relay3
-    name: "receiver switch"
+# select:
+#   - platform: ld2450
+#     ld2450_id: ld2450_radar
+#     baud_rate:
+#       name: "Baud rate"
+#     zone_type:
+#       name: "Zone Type"
 
-# binary_sensor:
-#   - platform: template
-#     id: relay3_sensor
-#     lambda: "return id(relay3).state;"
-#     internal: false
+# switch:
+#   - platform: ld2450
+#     ld2450_id: ld2450_radar
+#     bluetooth:
+#       name: "Bluetooth"
+#     multi_target:
+#       name: "Multi Target Tracking"
 
-#   - platform: packet_transport
-#     provider: $device_name_opener
-#     id: relay1_sensor
-#     on_press:
-#       switch.turn_on: relay3
-#     on_release:
-#       switch.turn_off: relay3
-#     name: opener state extra
-#     internal: false
-#   - platform: packet_transport
-#     provider: $device_name_opener
-#     type: status
-#     name: opener connection status extra
-#     internal: false
+
+# number:
+#   - platform: ld2450
+#     ld2450_id: ld2450_radar
+#     presence_timeout:
+#       name: "Timeout"
+#     zone_1:
+#       x1:
+#         name: Zone-1 X1
+#       y1:
+#         name: Zone-1 Y1
+#       x2:
+#         name: Zone-1 X2
+#       y2:
+#         name: Zone-1 Y2
+
+.defaultfilters:
+  - &moving_avg  [ throttle: 0.25s, sliding_window_moving_average: { window_size: 20, send_every: 10 } ]
+  - &slow  [ delta: 0.9, throttle: 5s ]
+
 
 sensor:
   - { platform: uptime, id: uptime_seconds, update_interval: 1min }
   - { platform: template, id: uptime_days, name: "$device_name uptime", update_interval: 1min, 
       device_class: duration, entity_category: "diagnostic", unit_of_measurement: "d", accuracy_decimals: 2,
       lambda: !lambda "return id(uptime_seconds).state / 86'400;"}
+  - platform: ld2450
+    ld2450_id: ld2450_radar
+    target_count: { name: Presence Target Count, filters: *slow }
+    still_target_count: { name: Still Target Count, filters: *slow }
+    moving_target_count: { name: Moving Target Count, filters: *slow }
+    target_1:
+      x: { name: Target-1 X, filters: *moving_avg }
+      y: { name: Target-1 Y, filters: *moving_avg  }
+      speed: { name: Target-1 Speed, filters: *moving_avg  }
+      angle: { name: Target-1 Angle, filters: *moving_avg  }
+      distance: { name: Target-1 Distance, filters: *moving_avg  }
+      resolution: { name: Target-1 Resolution, filters: [ throttle: 5s ] }
+    target_2:
+      x: { name: Target-2 X, filters: *moving_avg  }
+      y: { name: Target-2 Y, filters: *moving_avg  }
+      speed: { name: Target-2 Speed, filters: *moving_avg  }
+      angle: { name: Target-2 Angle, filters: *moving_avg  }
+      distance: { name: Target-2 Distance, filters: *moving_avg  }
+      resolution: { name: Target-2 Resolution, filters: [ throttle: 5s ] }
+    zone_1:
+      target_count: { name: Zone-1 All Target Count, filters: *slow }
+      still_target_count: { name: Zone-1 Still Target Count, filters: *slow }
+      moving_target_count: { name: Zone-1 Moving Target Count, filters: *slow }
+        
   # - { platform: adc, id: servo_potentiometer, name: "v_meas", pin: $servo_pot_pin, update_interval: 250ms, attenuation: 12db }
   # - platform: mhz19
   #   update_interval: 2s
@@ -277,49 +326,51 @@ sensor:
   #                         nullptr,                      // handle
   #                         1                             // core
 
-servo_garage_door:
-  id: garage_door_controller
-  motors:
-      dir_pin: $dir_pin
-      step_pin: $step_pin
-      enable_pin: $en_pin
-      # alarm_pin: GPIO41
-      # in_place_pin: GPIO2
-      steps_per_rotation: 400
+# servo_garage_door:
+#   id: garage_door_controller
+#   motors:
+#       # dir_pin: $dir_pin
+#       # step_pin: $step_pin
+#       # enable_pin: $en_pin
+#       # alarm_pin: GPIO41
+#       # in_place_pin: GPIO2
+#       steps_per_rotation: 400
+#   cs_pin:
+#     number: GPIO18
+#     inverted: false
 
+# cover:
+#   - platform: template
+#     device_class: damper
+#     id: attic_return_vent
+#     name: attic return vent
+#     restore_mode: NO_RESTORE
+#     has_position: true
+#     open_action: 
+#         # - stepper.set_target: { id: right_door_servo, target: !lambda "return 4000 * 8;" }
+#         - lambda: |-
+#             id(garage_door_controller).move_servo(16000 * 1 * 10, true, 16000, 4000, 0);
+#         # - lambda: |-
+#         #     char buffer[1024]; 
+            
+#         #     ESP_LOGI("TASKS", "--- Current RTOS Tasks ---");
+#         #     ESP_LOGI("TASKS", "Task Name\tState\tPrio\tStack\tNum\tCore");
+            
+#         #     // Populate the buffer with task statistics
+#         #     vTaskList(buffer);
+            
+#         #     // Print the result
+#         #     ESP_LOGI("TASKS", "%s", buffer);
+#         #     ESP_LOGI("TASKS", "---------------------------\n");
 
-cover:
-  - platform: template
-    device_class: damper
-    id: attic_return_vent
-    name: attic return vent
-    restore_mode: NO_RESTORE
-    has_position: true
-    open_action: 
-        # - stepper.set_target: { id: right_door_servo, target: !lambda "return 4000 * 8;" }
-        - lambda: |-
-            id(garage_door_controller).move_servo(16000 * 1 * 10, true, 16000, 4000, 0);
-        # - lambda: |-
-        #     char buffer[1024]; 
-            
-        #     ESP_LOGI("TASKS", "--- Current RTOS Tasks ---");
-        #     ESP_LOGI("TASKS", "Task Name\tState\tPrio\tStack\tNum\tCore");
-            
-        #     // Populate the buffer with task statistics
-        #     vTaskList(buffer);
-            
-        #     // Print the result
-        #     ESP_LOGI("TASKS", "%s", buffer);
-        #     ESP_LOGI("TASKS", "---------------------------\n");
-
-    # close_action: { stepper.set_target: { id: right_door_servo, target: !lambda "return  0;" }}
-    # tilt_action: { stepper.set_target: { id: right_door_servo, target: !lambda "return 4000 * 4;" }}
-    # tilt_lambda: !lambda "return id(right_door_servo).current_position;"
-    # lambda: "return id(right_door_servo).current_position < 200 ? esphome::cover::COVER_CLOSED : esphome::cover::COVER_OPEN;"
-    close_action: { lambda: !lambda "id(garage_door_controller).move_servo(-(400 * 8), false, 400, 200, 20);" }
-    tilt_action: { lambda: !lambda "id(garage_door_controller).move_servo(400 * 8, false, 400, 200, 20);" }
-    tilt_lambda: !lambda "return 0;"
-    lambda: !lambda "return esphome::cover::COVER_CLOSED;"
+#     # close_action: { stepper.set_target: { id: right_door_servo, target: !lambda "return  0;" }}
+#     # tilt_action: { stepper.set_target: { id: right_door_servo, target: !lambda "return 4000 * 4;" }}
+#     # tilt_lambda: !lambda "return id(right_door_servo).current_position;"
+#     # lambda: "return id(right_door_servo).current_position < 200 ? esphome::cover::COVER_CLOSED : esphome::cover::COVER_OPEN;"
+#     close_action: { lambda: !lambda "id(garage_door_controller).move_servo(-(400 * 8), false, 400, 200, 20);" }
+#     tilt_action: { lambda: !lambda "id(garage_door_controller).move_servo(400 * 8, false, 400, 200, 20);" }
+#     tilt_lambda: !lambda "return 0;"
+#     lambda: !lambda "return esphome::cover::COVER_CLOSED;"
 
 
 # 400steps per rotation

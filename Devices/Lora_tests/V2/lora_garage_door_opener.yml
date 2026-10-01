@@ -11,14 +11,16 @@ external_components:
       path: ../../../my_components # path relative to Devices folder
 
 esphome:
-  name: $device_name_receiver
+  name: $device_name_opener
   on_boot:
     - priority: -100
       then:
         - sensor.template.publish:
-            id: local_garage_door_state
+            id: garage_door_state_request
             state: -1
-
+        - sensor.template.publish:
+            id: local_garage_door_state
+            state: 0
 esp32:
   variant: esp32
   cpu_frequency: 240MHZ
@@ -36,13 +38,23 @@ ota:
   password: ""
 
 logger:
-  level: info
+  level: INFO
+  # logs:
+  #   wifi: warn
+  #   sensor: INFO
+  #   adc.esp32: INFO
+  #   adc.common: INFO
+  #   mdns: INFO
+  #   i2c: INFO
+  #   i2c.idf: INFO
+  #   switch: INFO
+  #   switch.gpio: INFO
 
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
   ap:
-    ssid: "$device_name_receiver AP"
+    ssid: "$device_name_opener AP"
     password: "BiSG9yrKP394"
 captive_portal:
 
@@ -51,7 +63,7 @@ time:
 
 text_sensor:
   - platform: version
-    name: "$device_name_receiver Version"
+    name: "$device_name_opener Version"
 
 # SPI bus for LoRa radio
 spi:
@@ -85,17 +97,17 @@ sx127x:
     then:
       - lambda: |-
           id(receivedPackets)++;
-          // ESP_LOGI("lora", "Received packet RSSI: %.2f dBm, SNR: %.2f dB", rssi, snr);
+          // char hex[256]; 
+          // ESP_LOGI("lora", "Received packet RSSI: %.2f dBm, SNR: %.2f dB  %s", rssi, snr,  format_hex_to(hex, x));
 
 globals:
   - { id: receivedPackets, type: int, initial_value: "0"}
   - { id: sentPackets, type: int, initial_value: "0"}
-  - { id: amSending, type: bool, initial_value: "false"}
 
 # Example button to send LoRa packet
 button:
   - platform: restart
-    name: "$device_name_receiver Restart"
+    name: "$device_name_opener Restart"
   - platform: template
     name: "Send LoRa Packet"
     on_press:
@@ -111,9 +123,9 @@ display:
     model: "SSD1306 128x64"
     address: 0x3C
     lambda: |-
-      it.printf(0, 0, id(display_font), "receiver:%.0f", id(uptime_seconds).state);
+      it.printf(0, 0, id(display_font), "sender:%.0f", id(uptime_seconds).state);
       it.printf(0, 16, id(display_font), "TX: %d, RX: %d", id(sentPackets), id(receivedPackets));
-      it.printf(0, 32, id(display_font), "L: %.0f, R: %.0f", id(local_garage_door_state).state, id(remote_garage_door_state).state);
+      it.printf(0, 32, id(display_font), "L: %.0f, R: %.0f", id(local_garage_door_state).state, id(garage_door_state_request).state);
 
 
 font:
@@ -127,20 +139,21 @@ font:
 #     inverted: true
 
 
+
+# Example configuration entry
 packet_transport:
   platform: sx127x
-  update_interval: 30s
+  update_interval: never
   encryption: "780905cb-619f-4663-b246-256ba69c2ea6"
   rolling_code_enable: true
   ping_pong_enable: true
   # binary_sensors:
-  #   - relay2_sensor
+  #   - relay1_sensor
   sensors:
-  #   - wifi_signal_db
     - id: local_garage_door_state
-      broadcast_id: remote_garage_door_state
+      broadcast_id: opener_garage_door_state
   providers:
-    - name: $device_name_opener
+    - name: $device_name_receiver
       encryption: "780905cb-619f-4663-b246-256ba69c2ea6"
 
 
@@ -148,45 +161,15 @@ switch:
   - platform: gpio
     pin: GPIO25
     id: relay1
-    name: "receiver light"
+    name: "opener light"
   - platform: template
-    name: "receiver Switch"
+    name: "opener stitch"
     optimistic: true
     id: local_switch
-    # turn_on_action:
-    #   - sensor.template.publish:
-    #         id: local_garage_door_state
-    #         state: 12.0
-    # turn_off_action:
-    #   - sensor.template.publish:
-    #         id: local_garage_door_state
-    #         state: 8.0
     turn_on_action:
       - sensor.template.publish: { id: local_garage_door_state, state: 12}
-      - globals.set: { id: amSending, value: 'true'}
-      - delay: 1s
-      - while:
-          condition: { lambda: !lambda 'return id(remote_garage_door_state).state != id(local_garage_door_state).state;' }
-          then:
-          # - logger.log: { format: "Still executing open: L:%.2f  R:%.2f",  args: [ id(local_garage_door_state).state, id(remote_garage_door_state).state ] }
-          - { lambda: !lambda 'ESP_LOGI("lora", "Receiver Still executing open: L:%.2f  R:%.2f", id(local_garage_door_state).state, id(remote_garage_door_state).state);' }
-          - sensor.template.publish: { id: local_garage_door_state, state: 12}
-          - delay: 1s
-      - globals.set: { id: amSending, value: 'false'}
-        
     turn_off_action:
       - sensor.template.publish: { id: local_garage_door_state, state: 8}
-      - globals.set: { id: amSending, value: 'true'}
-      - delay: 1s
-      - while:
-          condition: { lambda: !lambda 'return id(remote_garage_door_state).state != id(local_garage_door_state).state;' }
-          then:
-          # - logger.log: { format: "Still executing close: L:%.2f  R:%.2f",  args: [ id(local_garage_door_state).state, id(remote_garage_door_state).state ] }
-          - { lambda: !lambda 'ESP_LOGI("lora", "Receiver Still executing close: L:%.2f  R:%.2f", id(local_garage_door_state).state, id(remote_garage_door_state).state);' }
-          - sensor.template.publish: { id: local_garage_door_state, state: 8}
-          - delay: 1s
-      - globals.set: { id: amSending, value: 'false'}
-
 
 
 binary_sensor:
@@ -195,32 +178,30 @@ binary_sensor:
     lambda: "return id(relay1).state;"
     internal: false
   - platform: packet_transport
-    provider: $device_name_opener
+    provider: $device_name_receiver
     type: status
-    name: opener connection status
+    name: receiver connection status
     internal: false
 
 sensor:
   - { platform: uptime, id: uptime_seconds, update_interval: 1min }
-  - { platform: template, id: uptime_days, name: "$device_name_receiver uptime", update_interval: 1min, 
+  - { platform: template, id: uptime_days, name: "$device_name_opener uptime", update_interval: 1min, 
       device_class: duration, entity_category: "diagnostic", unit_of_measurement: "d", accuracy_decimals: 2,
       lambda: !lambda "return id(uptime_seconds).state / 86'400;"}
+  - platform: adc
+    pin: GPIO35
+    name: "Battery Voltage"
+    attenuation: 12db
+    filters:
+      - multiply: 2.0  # Voltage divider correction
+    update_interval: 60s
   - platform: packet_transport
-    provider: $device_name_opener
-    id: remote_garage_door_state
+    provider: $device_name_receiver
+    id: garage_door_state_request
     name: remote state
     internal: false
     on_value:
-      - if:
-          condition: 
-            lambda: |-
-              return  !id(amSending) && x >= 0 && id(local_garage_door_state).state != x; //!(std::abs(id(local_garage_door_state).state - 10) <= 0.1); // 
-          then:
-            # - logger.log: { format: "Receiver got state: %.2f from sender, amSending:%s",  args: [ x,  "id(amSending) ? 'true' : 'false'" ] }
-            - sensor.template.publish:
-                id: local_garage_door_state
-                state: !lambda "if (std::isfinite(x)) { return x; } return 10;"
-      - { lambda: !lambda 'ESP_LOGI("lora", "Receiver got state: %.2f from sender, amSending:%s", x, id(amSending) ? "true" : "false");' }
+      - { lambda: !lambda 'ESP_LOGI("lora", "opener got request: %.2f from remote", x);' }
       - if:
           condition: { lambda: !lambda 'return x > 10;' }
           then:
@@ -237,4 +218,25 @@ sensor:
 
 
 
+# servo_garage_door:
+#   id: garage_door_controller
+#   motors:
+#       step_pin: GPIO41
+#       # alarm_pin: GPIO41
+#       # in_place_pin: GPIO2
+#       steps_per_rotation: 400
 
+
+
+cover:
+  - platform: template
+    device_class: garage
+    id: right_garage_door
+    name: right garage door
+    restore_mode: NO_RESTORE
+    has_position: true
+    open_action: { }
+    close_action: { }
+    tilt_action: { }
+    tilt_lambda: !lambda "return 0.5;"
+    lambda: "return 0.5;"
