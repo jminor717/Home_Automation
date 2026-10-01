@@ -9,7 +9,7 @@ external_components:
   - source:
       type: local
       path: ../../../my_components # path relative to Devices folder
-
+    components: [packet_transport]
 esphome:
   name: $device_name_receiver
   on_boot:
@@ -139,7 +139,7 @@ font:
 #     inverted: true
 
 
-packet_transport_r:
+packet_transport:
   platform: sx127x
   update_interval: never
   encryption: "780905cb-619f-4663-b246-256ba69c2ea6"
@@ -178,7 +178,7 @@ binary_sensor:
     id: relay1_sensor
     lambda: "return id(relay1).state;"
     internal: false
-  - platform: packet_transport_r
+  - platform: packet_transport
     provider: $device_name_opener
     type: status
     name: opener connection status
@@ -189,7 +189,7 @@ sensor:
   - { platform: template, id: uptime_days, name: "$device_name_receiver uptime", update_interval: 1min, 
       device_class: duration, entity_category: "diagnostic", unit_of_measurement: "d", accuracy_decimals: 2,
       lambda: !lambda "return id(uptime_seconds).state / 86'400;"}
-  - platform: packet_transport_r
+  - platform: packet_transport
     provider: $device_name_opener
     id: opener_garage_door_state
     name: remote state

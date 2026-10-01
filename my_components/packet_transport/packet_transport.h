@@ -22,7 +22,7 @@
  * On receipt of a data packet, it should call `this->process_()` with the data.
  */
 
-namespace esphome::packet_transport_r {
+namespace esphome::packet_transport {
 
 // std::less provides allocation-free comparison with const char *
 template<typename T> using string_map_t = std::map<std::string, T, std::less<>>;

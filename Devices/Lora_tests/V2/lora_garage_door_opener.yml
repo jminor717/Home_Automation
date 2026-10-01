@@ -9,7 +9,7 @@ external_components:
   - source:
       type: local
       path: ../../../my_components # path relative to Devices folder
-    components: [packet_transport_r, sx127x]
+    components: [packet_transport]
 
 esphome:
   name: $device_name_opener
@@ -143,7 +143,7 @@ font:
 
 
 # Example configuration entry
-packet_transport_r:
+packet_transport:
   platform: sx127x
   update_interval: never
   encryption: "780905cb-619f-4663-b246-256ba69c2ea6"
@@ -179,7 +179,7 @@ binary_sensor:
     id: relay1_sensor
     lambda: "return id(relay1).state;"
     internal: false
-  - platform: packet_transport_r
+  - platform: packet_transport
     provider: $device_name_receiver
     type: status
     name: receiver connection status
@@ -197,7 +197,7 @@ sensor:
     filters:
       - multiply: 2.0  # Voltage divider correction
     update_interval: 60s
-  - platform: packet_transport_r
+  - platform: packet_transport
     provider: $device_name_receiver
     id: garage_door_state_request
     name: remote state
