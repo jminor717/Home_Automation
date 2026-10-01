@@ -2,6 +2,7 @@
 #include "esphome/core/helpers.h"
 #include "esphome/core/log.h"
 #include <algorithm>
+#include <bitset>
 #include <driver/ledc.h>
 
 namespace esphome {
@@ -9,6 +10,9 @@ namespace servo_garage_door {
     static const char *const TAG = "ServoGarageDoor";
     void ServoGarageDoor::setup()
     {
+        // start spi
+        // this->spi_setup();
+
         for (ServoMotor* motor : this->motors) {
             motor->setup();
         }
@@ -64,6 +68,29 @@ namespace servo_garage_door {
         ESP_LOGCONFIG(TAG, "ServoGarageDoor reader:");
     }
 
+    std::string ServoGarageDoor::format_32bit_binary(uint32_t value) {
+        return std::bitset<32>(value).to_string();
+    }
+
+    // uint32_t ServoGarageDoor::spi_Test(uint8_t reg, uint8_t value) {
+    //     this->enable();
+    //     delay(50);
+    //     this->write_byte(reg);
+    //     delayMicroseconds(500);
+    //     uint8_t byte1 = this->transfer_byte(value);
+    //     delayMicroseconds(500);
+    //     uint8_t byte2 = this->transfer_byte(0x0);
+    //     delayMicroseconds(500);
+    //     uint8_t byte3 = this->transfer_byte(0x0);
+    //     delayMicroseconds(500);
+
+    //     this->disable();
+
+    //     uint32_t ret = byte1 << 16 | byte2 << 8 | byte3;
+    //     return ret;
+    // }
+
+
     void ServoGarageDoor::backgroundServoControlTask(void* params)
     {
         ServoGarageDoor* this_controller = static_cast<ServoGarageDoor*>(params);
@@ -103,6 +130,9 @@ namespace servo_garage_door {
                     continue;
                 }
                 
+                // ESP_LOGI(TAG, "sending spi data to controller");
+                // uint32_t data_remote = this_controller->spi_Test(0b1010'1101, 0b1101'1010);
+                // ESP_LOGI(TAG, "data_remote = %s", ServoGarageDoor::format_32bit_binary(data_remote).c_str());
 
                 motorToUse->dir_pin->digital_write(event.direction ? 1 : 0);
                 if (motorToUse->enable_pin != nullptr) {

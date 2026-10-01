@@ -9,7 +9,9 @@
 #include "esphome/core/automation.h"
 #include "esphome/core/component.h"
 #include "esphome/core/hal.h"
+// #include "esphome/components/spi/spi.h"
 #include <limits>
+#include <string>
 // using namespace i2c;
 
 namespace esphome {
@@ -25,7 +27,9 @@ namespace servo_garage_door {
 
     class ServoMotor;
 
-    class ServoGarageDoor : public Component {
+    class ServoGarageDoor : public Component { //, 
+                    // public spi::SPIDevice<spi::BIT_ORDER_MSB_FIRST, spi::CLOCK_POLARITY_LOW, spi::CLOCK_PHASE_LEADING,
+                    //                        spi::DATA_RATE_200KHZ> {
     public:
         float get_setup_priority() const override { return setup_priority::LATE; }
         void setup() override;
@@ -34,14 +38,16 @@ namespace servo_garage_door {
         void set_motors(std::vector<ServoMotor*> _motors) { this->motors = std::move(_motors); };
 
         void move_servo(uint32_t steps, bool direction, uint32_t max_speed, uint32_t acceleration, uint32_t jerks);
+        static std::string format_32bit_binary(uint32_t value);
     protected:
 
         std::vector<ServoMotor*> motors;
 
+        // uint32_t spi_Test(uint8_t reg, uint8_t value);
+
         QueueHandle_t servo_event_queue;
         TaskHandle_t servo_task_handle { nullptr };
         static void backgroundServoControlTask(void* params);
-        
     };
 
 
