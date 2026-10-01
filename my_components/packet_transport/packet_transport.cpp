@@ -742,7 +742,10 @@ void PacketTransport::loop() {
   }
   uint32_t now = millis();
   uint32_t last_send_age = now - this->last_send_time;
-  if (this->updated_ || (this->waiting_for_ack && (last_send_age > 10 * 1000u)) ) {
+  if (this->updated_ || (
+      this->retry_sending_sensor_states_ && 
+      this->waiting_for_ack && 
+      (last_send_age > this->retry_sending_sensor_time_ * 1000u)) ) {
     ESP_LOGV(TAG, "loop sending data updated: %d, for ACK: %d, age: %ld ", this->updated_, this->waiting_for_ack, last_send_age);
     this->waiting_for_ack = false;
 

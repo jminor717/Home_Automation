@@ -145,6 +145,8 @@ packet_transport:
   encryption: "780905cb-619f-4663-b246-256ba69c2ea6"
   rolling_code_enable: true
   ping_pong_enable: true
+  retry_sending_sensor_states_enable: true
+  retry_timeout: 10s
   # binary_sensors:
   #   - relay2_sensor
   sensors:

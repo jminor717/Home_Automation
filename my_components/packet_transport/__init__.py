@@ -37,6 +37,8 @@ CONF_REMOTE_ID = "remote_id"
 CONF_PING_PONG_ENABLE = "ping_pong_enable"
 CONF_PING_PONG_RECYCLE_TIME = "ping_pong_recycle_time"
 CONF_ROLLING_CODE_ENABLE = "rolling_code_enable"
+CONF_RETRY_SENDING_SENSOR_STATES_ENABLE = "retry_sending_sensor_states_enable"
+CONF_RETRY_TIMEOUT = "retry_timeout"
 CONF_TRANSPORT_ID = "transport_id"
 
 
@@ -101,6 +103,8 @@ TRANSPORT_SCHEMA = (
     .extend(
         {
             cv.Optional(CONF_ROLLING_CODE_ENABLE, default=False): cv.boolean,
+            cv.Optional(CONF_RETRY_SENDING_SENSOR_STATES_ENABLE, default=False): cv.boolean,
+            cv.Optional(CONF_RETRY_TIMEOUT, default="16s"): cv.positive_time_period_seconds,
             cv.Optional(CONF_PING_PONG_ENABLE, default=False): cv.boolean,
             cv.Optional(
                 CONF_PING_PONG_RECYCLE_TIME, default="600s"
@@ -159,6 +163,8 @@ def hash_encryption_key(config: dict):
 async def register_packet_transport(var, config):
     var = await cg.register_component(var, config)
     cg.add(var.set_rolling_code_enable(config[CONF_ROLLING_CODE_ENABLE]))
+    cg.add(var.set_retry_sending_sensor_states_enable(config[CONF_RETRY_SENDING_SENSOR_STATES_ENABLE]))
+    cg.add(var.set_retry_timeout(config[CONF_RETRY_TIMEOUT].total_seconds))
     cg.add(var.set_ping_pong_enable(config[CONF_PING_PONG_ENABLE]))
     cg.add(
         var.set_ping_pong_recycle_time(
