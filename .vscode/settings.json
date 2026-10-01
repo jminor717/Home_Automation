@@ -108,6 +108,9 @@
         "epaper",
         "esphome",
         "LEDC",
+        "LOGV",
+        "LOGVV",
+        "LOGW",
         "millis"
     ],
     "C_Cpp.errorSquiggles": "disabled",

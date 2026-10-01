@@ -42,6 +42,37 @@ static constexpr size_t PACKET_MAX_LOG_BYTES = 168;
  *
  * Padded to a 4 byte boundary with nulls
  *
+ * =====================================================================
+ * 
+ * Structure of a data acknowledgement packet; everything is little-endian
+ *
+ * --- In clear text ---
+ * MAGIC_NUMBER: 16 bits
+ * host name length: 1 byte
+ * host name: (length) bytes
+ * padding: 0 or more null bytes to a 4 byte boundary
+ *
+ * --- Encrypted (if key set) ----
+ * ACK_KEY: 1 byte
+ * Ping keys: if any
+ * repeat:
+ *      PING_KEY: 1 byte
+ *      ping code: 4 bytes
+ * Sensors:
+ * repeat:
+ *      SENSOR_KEY: 1 byte
+ *      name length: 1 byte
+ *      name
+ * Binary Sensors:
+ * repeat:
+ *      BINARY_SENSOR_KEY: 1 byte
+ *      name length: 1 byte
+ *      name
+ *
+ * Padded to a 4 byte boundary with nulls
+ * 
+ * =====================================================================
+ * 
  * Structure of a ping request packet:
  * --- In clear text ---
  * MAGIC_PING: 16 bits
@@ -69,6 +100,7 @@ enum DataKey {
   BINARY_SENSOR_KEY,
   PING_KEY,
   ROLLING_CODE_KEY,
+  ACK_KEY
 };
 
 enum DecodeResult {
@@ -147,6 +179,15 @@ class PacketDecoder {
     return this->decode_string(buf, buflen);
   }
 
+  DecodeResult decode_name(uint8_t key, char *buf, size_t buflen) {
+    if (this->position_ == this->len_)
+      return DECODE_EMPTY;
+    if (this->buffer_[this->position_] != key)
+      return DECODE_UNMATCHED;
+    this->position_++;
+    return this->decode_string(buf, buflen);
+  }
+
   DecodeResult decode(uint8_t key) {
     if (this->position_ == this->len_)
       return DECODE_EMPTY;
@@ -197,6 +238,14 @@ static void add(std::vector<uint8_t> &vec, const char *str) {
   for (size_t i = 0; i != len; i++) {
     vec.push_back(*str++);
   }
+}
+
+static void add_ack_name(std::vector<std::string> &names, const char *name) {
+  for (const auto &existing : names) {
+    if (existing == name)
+      return;
+  }
+  names.emplace_back(name);
 }
 
 void PacketTransport::setup() {
@@ -262,6 +311,16 @@ void PacketTransport::init_data_() {
   }
 }
 
+void PacketTransport::init_ack_() {
+  this->data_.clear();
+  add(this->data_, ACK_KEY);
+
+  for (auto &value : this->ping_keys_ | std::views::values) {
+    add(this->data_, PING_KEY);
+    add(this->data_, value);
+  }
+}
+
 void PacketTransport::flush_() {
   if (!this->should_send() || this->data_.empty())
     return;
@@ -304,28 +363,70 @@ void PacketTransport::add_data_(uint8_t key, const char *id, uint32_t data) {
   add(this->data_, data);
   add(this->data_, id);
 }
+
+
+void PacketTransport::add_ack_(uint8_t key, const char *id) {
+  auto len = 1 + 1 + 1 + strlen(id);
+  if (round4(this->header_.size()) + round4(this->data_.size() + len) > this->get_max_packet_size()) {
+    this->flush_();
+    this->init_data_();
+  }
+  add(this->data_, key);
+  add(this->data_, id);
+}
+
 void PacketTransport::send_data_(bool all) {
   if (!this->should_send())
     return;
   this->init_data_();
+  this->last_send_time = millis();
 #ifdef USE_SENSOR
   for (auto &sensor : this->sensors_) {
-    if (all || sensor.updated) {
+    if (all || sensor.updated || !sensor.got_ack) {
       sensor.updated = false;
+      sensor.got_ack = false;
+      this->waiting_for_ack = true;
       this->add_data_(SENSOR_KEY, sensor.id, sensor.sensor->get_state());
+      ESP_LOGV(TAG, "sending sensor data for %s ", sensor.id);
+
     }
   }
 #endif
 #ifdef USE_BINARY_SENSOR
   for (auto &sensor : this->binary_sensors_) {
-    if (all || sensor.updated) {
+    if (all || sensor.updated || !sensor.got_ack) {
       sensor.updated = false;
+      sensor.got_ack = false;
+      this->waiting_for_ack = true;
       this->add_binary_data_(BINARY_SENSOR_KEY, sensor.id, sensor.sensor->state);
+      ESP_LOGV(TAG, "sending binary sensor data for %s ", sensor.id);
+
     }
   }
 #endif
   this->flush_();
   this->updated_ = false;
+  ESP_LOGV(TAG, "finished sending sensor data");
+
+}
+
+
+void PacketTransport::send_ack_() {
+  if (this->should_send()) {
+    this->init_ack_();
+    
+    for (const auto &name : this->binary_sensors_to_acknowledge) {
+      this->add_ack_(BINARY_SENSOR_KEY, name.c_str());
+    }
+
+    for (const auto &name : this->sensors_to_acknowledge) {
+      this->add_ack_(SENSOR_KEY, name.c_str());
+    }
+    this->flush_();
+  }
+
+  this->remote_sensors_need_ack = false;
+  this->sensors_to_acknowledge.clear();
 }
 
 void PacketTransport::update() {
@@ -491,7 +592,46 @@ void PacketTransport::process_(std::span<const uint8_t> data) {
   if (byte == ROLLING_CODE_KEY) {
     if (!process_rolling_code(provider, decoder))
       return;
-  } else if (byte != DATA_KEY) {
+  } else if (byte == ACK_KEY) {
+    uint32_t key;
+    while (decoder.get_remaining_size() != 0) {
+      if (decoder.decode(ZERO_FILL_KEY) == DECODE_OK)
+        continue;
+      if (decoder.decode(PING_KEY, key) == DECODE_OK) {
+        continue;
+      }
+      if (decoder.decode_name(BINARY_SENSOR_KEY, namebuf, sizeof(namebuf)) == DECODE_OK) {
+#ifdef USE_BINARY_SENSOR
+        for (auto &sensor : this->binary_sensors_) {
+          if (strcmp(sensor.id, namebuf) == 0) {
+            sensor.got_ack = true;
+            ESP_LOGV(TAG, "got ACK for binary sensor: %s", sensor.id);
+            break;
+          }
+        }
+#endif
+        continue;
+      }
+      if (decoder.decode_name(SENSOR_KEY, namebuf, sizeof(namebuf)) == DECODE_OK) {
+#ifdef USE_SENSOR
+        for (auto &sensor : this->sensors_) {
+          if (strcmp(sensor.id, namebuf) == 0) {
+            sensor.got_ack = true;
+            ESP_LOGV(TAG, "got ACK for sensor: %s", sensor.id);
+            break;
+          }
+        }
+#endif
+        continue;
+      }
+      if (decoder.get(byte) == DECODE_OK) {
+        ESP_LOGW(TAG, "Unknown ACK key %X", byte);
+      }
+      break;
+    }
+    return;
+  }
+  else if (byte != DATA_KEY) {
     ESP_LOGV(TAG, "Expected rolling_key or data_key, got %X", byte);
     return;
   }
@@ -520,6 +660,8 @@ void PacketTransport::process_(std::span<const uint8_t> data) {
       auto bs = binary_sensors.find(namebuf);
       if (bs != binary_sensors.end()) {
         bs->second->publish_state(byte != 0);
+        add_ack_name(this->binary_sensors_to_acknowledge, namebuf);
+        this->remote_sensors_need_ack = true;
       }
 #endif
       continue;
@@ -528,8 +670,11 @@ void PacketTransport::process_(std::span<const uint8_t> data) {
       ESP_LOGV(TAG, "Got sensor %s %f", namebuf, rdata.f32);
 #ifdef USE_SENSOR
       auto sensor_it = sensors.find(namebuf);
-      if (sensor_it != sensors.end())
+      if (sensor_it != sensors.end()) {
         sensor_it->second->publish_state(rdata.f32);
+        add_ack_name(this->sensors_to_acknowledge, namebuf);
+        this->remote_sensors_need_ack = true;
+      }
 #endif
       continue;
     }
@@ -591,7 +736,16 @@ void PacketTransport::increment_code_() {
 void PacketTransport::loop() {
   if (this->resend_ping_key_)
     this->send_ping_pong_request_();
-  if (this->updated_) {
+  if (this->remote_sensors_need_ack) {
+    ESP_LOGV(TAG, "sending ACK data");
+    this->send_ack_();
+  }
+  uint32_t now = millis();
+  uint32_t last_send_age = now - this->last_send_time;
+  if (this->updated_ || (this->waiting_for_ack && (last_send_age > 10 * 1000u)) ) {
+    ESP_LOGV(TAG, "loop sending data updated: %d, for ACK: %d, age: %ld ", this->updated_, this->waiting_for_ack, last_send_age);
+    this->waiting_for_ack = false;
+
     this->send_data_(false);
   }
 }

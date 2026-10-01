@@ -9,6 +9,7 @@ external_components:
   - source:
       type: local
       path: ../../../my_components # path relative to Devices folder
+    components: [packet_transport_r, sx127x]
 
 esphome:
   name: $device_name_opener
@@ -38,17 +39,18 @@ ota:
   password: ""
 
 logger:
-  level: INFO
-  # logs:
-  #   wifi: warn
-  #   sensor: INFO
-  #   adc.esp32: INFO
-  #   adc.common: INFO
-  #   mdns: INFO
-  #   i2c: INFO
-  #   i2c.idf: INFO
-  #   switch: INFO
-  #   switch.gpio: INFO
+  level: verbose
+  logs:
+    wifi: INFO
+    sensor: INFO
+    binary_sensor: INFO
+    adc.esp32: INFO
+    adc.common: INFO
+    mdns: INFO
+    i2c: INFO
+    i2c.idf: INFO
+    switch: INFO
+    switch.gpio: INFO
 
 wifi:
   ssid: !secret wifi_ssid
@@ -141,7 +143,7 @@ font:
 
 
 # Example configuration entry
-packet_transport:
+packet_transport_r:
   platform: sx127x
   update_interval: never
   encryption: "780905cb-619f-4663-b246-256ba69c2ea6"
@@ -177,7 +179,7 @@ binary_sensor:
     id: relay1_sensor
     lambda: "return id(relay1).state;"
     internal: false
-  - platform: packet_transport
+  - platform: packet_transport_r
     provider: $device_name_receiver
     type: status
     name: receiver connection status
@@ -195,7 +197,7 @@ sensor:
     filters:
       - multiply: 2.0  # Voltage divider correction
     update_interval: 60s
-  - platform: packet_transport
+  - platform: packet_transport_r
     provider: $device_name_receiver
     id: garage_door_state_request
     name: remote state

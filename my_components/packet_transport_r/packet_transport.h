@@ -44,6 +44,7 @@ struct Sensor {
   sensor::Sensor *sensor;
   const char *id;
   bool updated;
+  bool got_ack;
   PacketTransport *parent;
 };
 #endif
@@ -52,6 +53,7 @@ struct BinarySensor {
   binary_sensor::BinarySensor *sensor;
   const char *id;
   bool updated;
+  bool got_ack;
   PacketTransport *parent;
 };
 #endif
@@ -66,7 +68,7 @@ class PacketTransport : public PollingComponent {
 #ifdef USE_SENSOR
   void set_sensor_count(size_t count) { this->sensors_.init(count); }
   void add_sensor(const char *id, sensor::Sensor *sensor) {
-    Sensor st{sensor, id, true, this};
+    Sensor st{sensor, id, true, false, this};
     this->sensors_.push_back(st);
   }
   void add_remote_sensor(const char *hostname, const char *remote_id, sensor::Sensor *sensor) {
@@ -77,7 +79,7 @@ class PacketTransport : public PollingComponent {
 #ifdef USE_BINARY_SENSOR
   void set_binary_sensor_count(size_t count) { this->binary_sensors_.init(count); }
   void add_binary_sensor(const char *id, binary_sensor::BinarySensor *sensor) {
-    BinarySensor st{sensor, id, true, this};
+    BinarySensor st{sensor, id, true, false, this};
     this->binary_sensors_.push_back(st);
   }
 
@@ -125,12 +127,15 @@ class PacketTransport : public PollingComponent {
   // to be called by child classes when a data packet is received.
   void process_(std::span<const uint8_t> data);
   void send_data_(bool all);
+  void send_ack_();
   void flush_();
   void add_data_(uint8_t key, const char *id, float data);
   void add_data_(uint8_t key, const char *id, uint32_t data);
   void increment_code_();
   void add_binary_data_(uint8_t key, const char *id, bool data);
+  void add_ack_(uint8_t key, const char *id);
   void init_data_();
+  void init_ack_();
 
   bool updated_{};
   uint32_t ping_key_{};
@@ -145,6 +150,12 @@ class PacketTransport : public PollingComponent {
   ESPPreferenceObject pref_{};
 
   std::vector<uint8_t> encryption_key_{};
+
+  bool remote_sensors_need_ack = false;
+  bool waiting_for_ack = false;
+  uint32_t last_send_time = 0;
+  std::vector<std::string> sensors_to_acknowledge{};
+  std::vector<std::string> binary_sensors_to_acknowledge{};
 
 #ifdef USE_SENSOR
   FixedVector<Sensor> sensors_{};
