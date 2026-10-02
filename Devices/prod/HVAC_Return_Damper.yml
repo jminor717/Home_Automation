@@ -154,14 +154,14 @@ cover:
       - output.turn_on: motor_dir_1
       # - output.turn_on: motor_speed
       - output.set_level: { id: motor_speed, level: 75%}
-    open_duration: 30sec
+    open_duration: 9s
     open_endstop: open_endstop_binary_sensor
     close_action:
       - output.turn_off: motor_dir_1
       - output.turn_on: motor_dir_2
       # - output.turn_on: motor_speed
       - output.set_level: { id: motor_speed, level: 75%}
-    close_duration: 30sec
+    close_duration: 9s
     close_endstop: close_endstop_binary_sensor
     stop_action:
       - output.turn_off: motor_speed

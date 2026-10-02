@@ -17,6 +17,8 @@ CONF_OPEN_AT_CENTER = "open_at_center"
 CONF_FLIP_OPEN = "switch_open_and_close"
 CONF_OPEN_OFFSET = "open_offset"
 CONF_CLOSE_OFFSET = "close_offset"
+CHECK_POSITION_PHYSICALLY = "check_position_physically"
+DAMPER_IS_CIRCULAR = "damper_is_circular"
 
 hard_stop_damper_ns = cg.esphome_ns.namespace("hard_stop_damper")
 
@@ -31,6 +33,8 @@ CONFIG_SCHEMA = cv.Schema(
         cv.Optional(CONF_FLIP_OPEN, default=False): cv.boolean,
         cv.Optional(CONF_OPEN_OFFSET, default=0.0): cv.float_range(min=-1.0, max=1.0),
         cv.Optional(CONF_CLOSE_OFFSET, default=0.0): cv.float_range(min=-1.0, max=1.0),
+        cv.Optional(CHECK_POSITION_PHYSICALLY, default=False): cv.boolean,
+        cv.Optional(DAMPER_IS_CIRCULAR, default=True): cv.boolean,
     }
 )
 
@@ -42,7 +46,8 @@ async def to_code(config):
     cg.add(var.set_switch_open_and_close(config[CONF_FLIP_OPEN]))
     cg.add(var.set_open_offset(config[CONF_OPEN_OFFSET]))
     cg.add(var.set_close_offset(config[CONF_CLOSE_OFFSET]))
-
+    cg.add(var.set_check_position_physically(config[CHECK_POSITION_PHYSICALLY]))
+    cg.add(var.set_damper_is_circular(config[DAMPER_IS_CIRCULAR]))
     sensor = await cg.get_variable(config[CONF_POSITION_SENSOR])
     cg.add(var.set_v_servo_sensor(sensor))
     servo = await cg.get_variable(config[CONF_SERVO])

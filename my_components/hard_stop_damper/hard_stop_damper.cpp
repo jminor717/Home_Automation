@@ -61,15 +61,34 @@ namespace hard_stop_damper {
 
     float HardStopDamper::tilt_to_servo_position(float tilt)
     {
-        uint16_t tilt_index = std::min((int)(tilt * 100), (int)(sizeof(flow_compensation_LUT) / sizeof(flow_compensation_LUT[0])) - 1);
-        return remap(flow_compensation_LUT[tilt_index], float(0), float(1), this->close_position, this->open_position);
+        if(this->damper_is_circular){
+            uint16_t tilt_index = std::min((int)(tilt * 100), (int)(sizeof(flow_compensation_LUT) / sizeof(flow_compensation_LUT[0])) - 1);
+            return remap(flow_compensation_LUT[tilt_index], float(0), float(1), this->close_position, this->open_position);
+        }else{
+            return remap(tilt, float(0), float(1), this->close_position, this->open_position);
+        }
+
     }
     float HardStopDamper::get_tilt()
     {
-        // remap damper position to the percentage flow at that angle
-        int reverse_index = remap(this->v_servo_sensor->state, this->upper_limit, this->lower_limit, float(1), float(0)) * 100;
-        reverse_index = std::min(reverse_index, (int)(sizeof(revers_LUT) / sizeof(revers_LUT[0])) - 1);
-        return revers_LUT[reverse_index];
+        float flow = 0;
+        if(this->damper_is_circular){
+            // remap damper position to the percentage flow at that angle
+            int reverse_index = remap(this->v_servo_sensor->state, this->upper_limit, this->lower_limit, float(1), float(0)) * 100;
+            reverse_index = std::min(reverse_index, (int)(sizeof(revers_LUT) / sizeof(revers_LUT[0])) - 1);
+            flow = revers_LUT[reverse_index];
+        }else{
+            flow = remap(this->v_servo_sensor->state, this->upper_limit, this->lower_limit, float(1), float(0));
+        }
+
+
+        if (flow < 0.1) {
+            flow = esphome::cover::COVER_CLOSED;
+        }
+        if (flow > 0.9) {
+            flow = esphome::cover::COVER_OPEN;
+        }
+        return flow;
     }
     float HardStopDamper::get_cover_state()
     {
@@ -97,15 +116,7 @@ namespace hard_stop_damper {
             }
             this->servo_control->internal_write(commandedPosition);
             delay(200);
-            // sample the position 10 times and average it to get a more stable reading
-            int count = 0;
-            for (size_t i = 0; i < 10; i++)
-            {
-                reachedPosition += this->v_servo_sensor->sample();
-                count++;
-                delay(1);
-            }
-            reachedPosition = reachedPosition / (float)count;
+            reachedPosition = this->sample_servo_position();
 
             position_queue.push_back({commandedPosition, reachedPosition});
 
@@ -132,6 +143,21 @@ namespace hard_stop_damper {
         return { commandedPosition - increment, reachedPosition };
     }
 
+    float HardStopDamper::sample_servo_position()
+    {
+        float Position = 0;
+        // sample the position 10 times and average it to get a more stable reading
+        int count = 0;
+        for (size_t i = 0; i < 10; i++)
+        {
+            Position += this->v_servo_sensor->sample();
+            count++;
+            delay(1);
+        }
+        Position = Position / (float)count;
+        return Position;
+    }
+
     void HardStopDamper::find_hard_stops(void* params)
     {
         HardStopDamper* local_this = (HardStopDamper*)params;
@@ -151,9 +177,19 @@ namespace hard_stop_damper {
 
         local_this->setOffsets();
 
-        local_this->servo_control->write(local_this->open_position);
+        if(local_this->check_position_physically) {
+            local_this->servo_control->write(local_this->tilt_to_servo_position(1.0));
+            delay(3'000);
+            
+            local_this->upper_limit = local_this->sample_servo_position();
 
-        delay(8'000);
+            local_this->servo_control->write(local_this->tilt_to_servo_position(0));
+            delay(3'000);
+            local_this->lower_limit = local_this->sample_servo_position();
+
+        }
+
+
         local_this->servo_control->write(local_this->tilt_to_servo_position(1.0));
 
         local_this->homed = true;

@@ -42,6 +42,8 @@ namespace hard_stop_damper {
         void set_switch_open_and_close(bool val) { this->switch_open_and_close = val; };
         void set_open_offset(float val) { this->open_offset = val; };
         void set_close_offset(float val) { this->close_offset = val; };
+        void set_check_position_physically(bool val) { this->check_position_physically = val; };
+        void set_damper_is_circular(bool val) { this->damper_is_circular = val; };
 
         float tilt_to_servo_position(float tilt);
         float get_tilt();
@@ -63,10 +65,12 @@ namespace hard_stop_damper {
         bool switch_open_and_close;
         float open_offset;
         float close_offset;
-
+        bool check_position_physically;
+        bool damper_is_circular;
         static void find_hard_stops(void* params);
 
         Position move_to_hard_stop(float increment, float startingPosition, float lowerLimit, float upperLimit);
+        float sample_servo_position();
         void setPositions(Position _zero, Position _one);
         void setOffsets();
         void fitLine(const std::deque<Position>& points, float& m, float& c);

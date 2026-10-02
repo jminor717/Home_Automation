@@ -104,218 +104,114 @@ ethernet:
 time:
   - platform: homeassistant
 
-# SPI bus for LoRa radio
-spi:
-  interface: spi3
-  id: spi3
-  clk_pin: GPIO17
-  mosi_pin: GPIO15
-  miso_pin: GPIO16
+uart:
+  tx_pin: $uart_tx_pin
+  rx_pin: $uart_rx_pin
+  baud_rate: 9600
 
-# i2c:
-#   - id: bus_a
-#     sda: $sda_pin
-#     scl: $scl_pin
-#     scan: true
+i2c:
+  - id: bus_a
+    sda: $sda_pin
+    scl: $scl_pin
+    scan: true
 
 button:
   - platform: restart
     name: "$device_name Restart"
-  # - platform: template
-  #   id: run_call
-  #   name: "home vent servo"
-  #   on_press:
-  #     then:
-  #       lambda: !lambda |-
-  #         id(damper)->setup();
-  # - platform: template
-  #   id: center_servo
-  #   name: "center servo"
-  #   on_press:
-  #     then:
-  #       - servo.write:
-  #           id: servo_
-  #           level: !lambda "return 0.5;"
-  # - platform: ld2450
-  #   ld2450_id: ld2450_radar
-  #   factory_reset:
-  #     name: "LD2450 Factory Reset"
-  #     entity_category: "config"
-  #   restart:
-  #     name: "LD2450 Restart"
-  #     entity_category: "config"
-
+  - platform: template
+    id: run_call
+    name: "home vent servo"
+    on_press:
+      then:
+        lambda: !lambda |-
+          id(damper)->setup();
+  - platform: template
+    id: center_servo
+    name: "center servo"
+    on_press:
+      then:
+        - servo.write:
+            id: servo_
+            level: !lambda "return 0.5;"
 
 text_sensor:
   - platform: version
     name: "$device_name Version"
-  # - platform: ld2450
-  #   ld2450_id: ld2450_radar
-  #   version:
-  #     name: "LD2450 Firmware"
-  #   mac_address:
-  #     name: "LD2450 BT MAC"
-    # target_1:
-    #   direction:
-    #     name: "Target-1 Direction"
-    # target_2:
-    #   direction:
-    #     name: "Target-2 Direction"
-    # target_3:
-    #   direction:
-    #     name: "Target-3 Direction"
-
-
-uart:
-  id: uart_ld2450
-  tx_pin: GPIO19
-  rx_pin: 
-    number: GPIO20
-    mode:
-      input: true
-      pullup: true
-  baud_rate: 256000
-  parity: NONE
-  stop_bits: 1
-
-ld2450:
-  id: ld2450_radar
-  uart_id: uart_ld2450
-
-# select:
-#   - platform: ld2450
-#     ld2450_id: ld2450_radar
-#     baud_rate:
-#       name: "Baud rate"
-#     zone_type:
-#       name: "Zone Type"
-
-# switch:
-#   - platform: ld2450
-#     ld2450_id: ld2450_radar
-#     bluetooth:
-#       name: "Bluetooth"
-#     multi_target:
-#       name: "Multi Target Tracking"
-
-
-# number:
-#   - platform: ld2450
-#     ld2450_id: ld2450_radar
-#     presence_timeout:
-#       name: "Timeout"
-#     zone_1:
-#       x1:
-#         name: Zone-1 X1
-#       y1:
-#         name: Zone-1 Y1
-#       x2:
-#         name: Zone-1 X2
-#       y2:
-#         name: Zone-1 Y2
-
-.defaultfilters:
-  - &moving_avg  [ throttle: 0.25s, sliding_window_moving_average: { window_size: 20, send_every: 10 } ]
-  - &slow  [ delta: 0.9, throttle: 5s ]
 
 
 sensor:
   - { platform: uptime, id: uptime_seconds, update_interval: 1min }
   - { platform: template, id: uptime_days, name: "$device_name uptime", update_interval: 1min, 
-      device_class: duration, entity_category: "diagnostic", unit_of_measurement: "d", accuracy_decimals: 2,
-      lambda: !lambda "return id(uptime_seconds).state / 86'400;"}
-  - platform: ld2450
-    ld2450_id: ld2450_radar
-    target_count: { name: Presence Target Count, filters: *slow }
-    still_target_count: { name: Still Target Count, filters: *slow }
-    moving_target_count: { name: Moving Target Count, filters: *slow }
-    target_1:
-      x: { name: Target-1 X, filters: *moving_avg }
-      y: { name: Target-1 Y, filters: *moving_avg  }
-      speed: { name: Target-1 Speed, filters: *moving_avg  }
-      angle: { name: Target-1 Angle, filters: *moving_avg  }
-      distance: { name: Target-1 Distance, filters: *moving_avg  }
-      resolution: { name: Target-1 Resolution, filters: [ throttle: 5s ] }
-    target_2:
-      x: { name: Target-2 X, filters: *moving_avg  }
-      y: { name: Target-2 Y, filters: *moving_avg  }
-      speed: { name: Target-2 Speed, filters: *moving_avg  }
-      angle: { name: Target-2 Angle, filters: *moving_avg  }
-      distance: { name: Target-2 Distance, filters: *moving_avg  }
-      resolution: { name: Target-2 Resolution, filters: [ throttle: 5s ] }
-    zone_1:
-      target_count: { name: Zone-1 All Target Count, filters: *slow }
-      still_target_count: { name: Zone-1 Still Target Count, filters: *slow }
-      moving_target_count: { name: Zone-1 Moving Target Count, filters: *slow }
-        
-  # - { platform: adc, id: servo_potentiometer, name: "v_meas", pin: $servo_pot_pin, update_interval: 250ms, attenuation: 12db }
-  # - platform: mhz19
-  #   update_interval: 2s
-  #   co2:
-  #     name: MH-Z19 CO2 Value
-  #   temperature:
-  #     name: MH-Z19 Temperature
-  # - platform: mics_4514
-  #   nitrogen_dioxide:
-  #     name: Nitrogen Dioxide
-  #   carbon_monoxide:
-  #     name: Carbon Monoxide
-  #   hydrogen:
-  #     name: Hydrogen
-  #   ethanol:
-  #     name: Ethanol
-  #   methane:
-  #     name: Methane
-  #   ammonia:
-  #     name: Ammonia
-  #   update_interval: 2s
+        device_class: duration, entity_category: "diagnostic", unit_of_measurement: "d", accuracy_decimals: 2,
+        lambda: !lambda "return id(uptime_seconds).state / 86'400;"}
+  - { platform: mhz19, update_interval: 5s, co2: { name: MH-Z19 CO2 Value }, temperature: { name: MH-Z19 Temperature } }
+  - { platform: mics_4514, update_interval: 5s, nitrogen_dioxide: { name: Nitrogen Dioxide }, carbon_monoxide: { name: Carbon Monoxide },
+        hydrogen: { name: Hydrogen }, ethanol: { name: Ethanol }, methane: { name: Methane }, ammonia: { name: Ammonia } }
+
+
+
+  - { platform: adc, id: servo_potentiometer, name: "A v_meas", pin: $servo_pot_pin, update_interval: 250ms, attenuation: 12db }
+
+hard_stop_damper:
+  - {id: damper, servo_position_sensor: servo_potentiometer, servo: servo_, 
+    open_at_center: true, switch_open_and_close: false, check_position_physically: true }
+
+servo:
+  - { id: servo_, output: servo_output, transition_length: 0s, auto_detach_time: 1000ms, max_level: 50%, min_level: 1%} # transition_length: 7s
+
+output:
+  - {platform: ledc, id: servo_output, pin: $servo_pin, frequency: 200 Hz}
+
+cover:
+  - platform: template
+    device_class: damper
+    id: test_vent
+    name: vent under test
+    restore_mode: NO_RESTORE
+    has_position: true
+    open_action: { servo.write: { id: servo_, level: !lambda "return id(damper).open_position;" } }
+    close_action: { servo.write: { id: servo_, level: !lambda "return  id(damper).close_position;" }}
+    position_action: { servo.write: { id: servo_, level: !lambda "return id(damper).tilt_to_servo_position(pos);" }}
+    lambda: "return id(damper).get_tilt();"
+    tilt_action: { servo.write: { id: servo_, level: !lambda "return id(damper).tilt_to_servo_position(tilt);" }}
+    tilt_lambda: !lambda "return id(damper).get_tilt();"
 
 
 
 
-# hard_stop_damper:
-#   - {id: damper, servo_position_sensor: servo_potentiometer, servo: servo_, 
-#     open_at_center: true, switch_open_and_close: false, open_offset: 0 }
 
 
-# servo:
-#   - { id: servo_, output: servo_output, transition_length: 7s, auto_detach_time: 1000ms, max_level: 50%, min_level: 1%}
-
-# output:
-#   - {platform: ledc, id: servo_output, pin: $servo_pin, frequency: 200 Hz}
 
 
-# number:
-  # - platform: template
-  #   name: vent Control
-  #   min_value: 0
-  #   initial_value: 100
-  #   max_value: 100
-  #   step: 1
-  #   optimistic: true
-  #   set_action:
-  #     then:
-  #       - servo.write:
-  #           id: servo_
-  #           level: !lambda "return id(damper).tilt_to_servo_position(( x / 100.0));"
-#   - platform: template
-#     name: servo Control
-#     min_value: -8
-#     initial_value: 50
-#     max_value: 100
-#     step: 1
-#     optimistic: true
-#     set_action:
-#       then:
-#         - servo.write:
-#             id: servo_
-#             level: !lambda "return x / 100.0;"
 
 
-# uart:
-#   tx_pin: $uart_tx_pin
-#   rx_pin: $uart_rx_pin
-#   baud_rate: 9600
+
+
+number:
+  - platform: template
+    name: vent Control
+    min_value: 0
+    initial_value: 100
+    max_value: 100
+    step: 1
+    optimistic: true
+    set_action:
+      then:
+        - servo.write:
+            id: servo_
+            level: !lambda "return id(damper).tilt_to_servo_position(( x / 100.0));"
+  - platform: template
+    name: servo Control
+    min_value: -8
+    initial_value: 50
+    max_value: 100
+    step: 1
+    optimistic: true
+    set_action:
+      then:
+        - servo.write:
+            id: servo_
+            level: !lambda "return x / 100.0;"
 
 
   # xTaskCreatePinnedToCore(&ESP32Camera::framebuffer_task,
