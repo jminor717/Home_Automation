@@ -17,12 +17,15 @@ substitutions:
   one_wire_a: GPIO15
   one_wire_b: GPIO16
 
+  servo_pot_pin: GPIO18
+  servo_pin: GPIO8
+
   DS18B20_02: "0x0a3c01d6077f2128" 
   DS18B20_03: "0xfd3c01d60725b328" 
   DS18B20_04: "0x5b3c01d607cabd28"
   DS18B20_05: "0x343c01d6076b0428"
 
-
+#  19, 20, 3
 
 external_components: 
   - source:
@@ -97,19 +100,22 @@ output:
   - platform: ledc
     pin: $motor_speed_pin
     id: motor_speed
-    frequency: 19531Hz
+    # frequency: 19531Hz
+    frequency: 120Hz
   - platform: gpio
     pin: $motor_dir_A
     id: motor_dir_1
   - platform: gpio
     pin: $motor_dir_B
     id: motor_dir_2
+  - {platform: ledc, id: servo_output, pin: $servo_pin, frequency: 200 Hz}
 
 globals:
   - { id: running_startup, type: bool, initial_value: "true" }
   - { id: startup_setup, type: bool, initial_value: "false" }
   - { id: open_start_time, type: uint32_t, initial_value: "0" }
   - { id: close_start_time, type: uint32_t, initial_value: "0" }
+  - { id: speed, type: uint32_t, initial_value: "50" }
 
 binary_sensor:
   - platform: gpio
@@ -123,7 +129,7 @@ binary_sensor:
             ESP_LOGI("cover", "Open endstop triggered");
             if (id(running_startup)) {
               auto now = millis();
-              ESP_LOGI("cover", "Open endstop triggered at %u ms, started at %u: dif %u", now, id(open_start_time), now - id(open_start_time));
+              ESP_LOGI("cover", "Open endstop triggered at %lu ms, started at %lu: dif %lu", now, id(open_start_time), now - id(open_start_time));
               // id(running_startup) = false;
             }
   - platform: gpio
@@ -141,7 +147,7 @@ binary_sensor:
                 id(startup_setup) = false;
               }
               // id(running_startup) = false;
-              ESP_LOGI("cover", "close endstop triggered at %u ms, started at %u: dif %u", now, id(close_start_time), now - id(close_start_time));
+              ESP_LOGI("cover", "close endstop triggered at %lu ms, started at %lu: dif %lu", now, id(close_start_time), now - id(close_start_time));
 
             }
 
@@ -153,20 +159,33 @@ cover:
       - output.turn_off: motor_dir_2
       - output.turn_on: motor_dir_1
       # - output.turn_on: motor_speed
-      - output.set_level: { id: motor_speed, level: 75%}
+      - output.set_level: { id: motor_speed, level: !lambda "return id(speed);" }
     open_duration: 9s
     open_endstop: open_endstop_binary_sensor
     close_action:
       - output.turn_off: motor_dir_1
       - output.turn_on: motor_dir_2
       # - output.turn_on: motor_speed
-      - output.set_level: { id: motor_speed, level: 75%}
+      - output.set_level: { id: motor_speed, level:  !lambda "return id(speed);" }
     close_duration: 9s
     close_endstop: close_endstop_binary_sensor
     stop_action:
       - output.turn_off: motor_speed
       - output.turn_off: motor_dir_1
       - output.turn_off: motor_dir_2
+  # - platform: template
+  #   device_class: damper
+  #   id: test_vent
+  #   name: printer vent_erv
+  #   restore_mode: NO_RESTORE
+  #   has_position: true
+  #   open_action: { servo.write: { id: servo_, level: !lambda "return id(damper).open_position;" } }
+  #   close_action: { servo.write: { id: servo_, level: !lambda "return  id(damper).close_position;" }}
+  #   position_action: { servo.write: { id: servo_, level: !lambda "return id(damper).tilt_to_servo_position(pos);" }}
+  #   lambda: "return id(damper).get_tilt();"
+  #   tilt_action: { servo.write: { id: servo_, level: !lambda "return id(damper).tilt_to_servo_position(tilt);" }}
+  #   tilt_lambda: !lambda "return id(damper).get_tilt();"
+
 
 .defaultfilters:
   - &moving_avg
@@ -194,7 +213,30 @@ sensor:
   - { platform: dallas_temp, address: $DS18B20_03, name: "Ground Center Temp", id: "ground_two",  one_wire_id: one_wire_bus_a, update_interval: 1s, filters: [ *moving_avg, delta: 0.05 ]}
     # resolution: 12
     
-    
-    
+  - { platform: adc, id: servo_potentiometer, name: "A v_meas", pin: $servo_pot_pin, update_interval: 250ms, attenuation: 12db }
+
+# hard_stop_damper:
+#   - {id: damper, servo_position_sensor: servo_potentiometer, servo: servo_, 
+#     open_at_center: true, switch_open_and_close: false, check_position_physically: true }
+
+servo:
+  - { id: servo_, output: servo_output, transition_length: 0s, auto_detach_time: 1000ms, max_level: 50%, min_level: 1%} # transition_length: 7s
 
 
+
+
+
+number:
+  - platform: template
+    name: vent Control
+    min_value: 0
+    initial_value: 50
+    max_value: 100
+    step: 1
+    optimistic: true
+    set_action:
+      then:
+        - globals.set: { id: speed, value: x }
+        # - servo.write:
+        #     id: servo_
+        #     level: !lambda "return id(speed).tilt_to_servo_position(( x / 100.0));"
