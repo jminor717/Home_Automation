@@ -157,7 +157,7 @@ hard_stop_damper:
     open_at_center: true, switch_open_and_close: false, check_position_physically: true }
 
 servo:
-  - { id: servo_, output: servo_output, transition_length: 0s, auto_detach_time: 1000ms, max_level: 50%, min_level: 1%} # transition_length: 7s
+  - { id: servo_, output: servo_output, transition_length: 0s, auto_detach_time: 1000ms, max_level: 47%, min_level: 0%} # transition_length: 7s
 
 output:
   - {platform: ledc, id: servo_output, pin: $servo_pin, frequency: 200 Hz}
@@ -166,7 +166,7 @@ cover:
   - platform: template
     device_class: damper
     id: test_vent
-    name: vent under test
+    name: vent under test_erv
     restore_mode: NO_RESTORE
     has_position: true
     open_action: { servo.write: { id: servo_, level: !lambda "return id(damper).open_position;" } }
@@ -202,7 +202,7 @@ number:
             level: !lambda "return id(damper).tilt_to_servo_position(( x / 100.0));"
   - platform: template
     name: servo Control
-    min_value: -8
+    min_value: 0
     initial_value: 50
     max_value: 100
     step: 1

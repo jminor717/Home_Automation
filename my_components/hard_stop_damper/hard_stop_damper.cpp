@@ -72,13 +72,19 @@ namespace hard_stop_damper {
     float HardStopDamper::get_tilt()
     {
         float flow = 0;
+        float vMeas = this->v_servo_sensor->state;
+        if (vMeas > this->upper_limit)
+            vMeas = this->upper_limit;
+        if (vMeas < this->lower_limit)
+            vMeas = this->lower_limit;
+
         if(this->damper_is_circular){
             // remap damper position to the percentage flow at that angle
-            int reverse_index = remap(this->v_servo_sensor->state, this->upper_limit, this->lower_limit, float(1), float(0)) * 100;
+            int reverse_index = remap(vMeas, this->upper_limit, this->lower_limit, float(1), float(0)) * 100;
             reverse_index = std::min(reverse_index, (int)(sizeof(revers_LUT) / sizeof(revers_LUT[0])) - 1);
             flow = revers_LUT[reverse_index];
         }else{
-            flow = remap(this->v_servo_sensor->state, this->upper_limit, this->lower_limit, float(1), float(0));
+            flow = remap(vMeas, this->upper_limit, this->lower_limit, float(1), float(0));
         }
 
 

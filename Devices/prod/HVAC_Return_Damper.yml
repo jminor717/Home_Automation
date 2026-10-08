@@ -101,7 +101,7 @@ output:
     pin: $motor_speed_pin
     id: motor_speed
     # frequency: 19531Hz
-    frequency: 120Hz
+    frequency: 2500Hz
   - platform: gpio
     pin: $motor_dir_A
     id: motor_dir_1
@@ -115,7 +115,7 @@ globals:
   - { id: startup_setup, type: bool, initial_value: "false" }
   - { id: open_start_time, type: uint32_t, initial_value: "0" }
   - { id: close_start_time, type: uint32_t, initial_value: "0" }
-  - { id: speed, type: uint32_t, initial_value: "50" }
+  - { id: speed, type: float, initial_value: "0.5" }
 
 binary_sensor:
   - platform: gpio
@@ -230,9 +230,9 @@ number:
   - platform: template
     name: vent Control
     min_value: 0
-    initial_value: 50
-    max_value: 100
-    step: 1
+    initial_value: 0.5
+    max_value: 1
+    step: 0.01
     optimistic: true
     set_action:
       then:
