@@ -160,14 +160,17 @@ class SetpointGraphCard extends LitElement {
 
         this.setCurrentProfile(this.defaultProfile());
 
-        this.loadProfiles();
-        this.profileIsActive = this.currentProfileIsActive();
-        this.renderGraph();
+        this.loadProfiles().then(() => {
+            this.profileIsActive = this.currentProfileIsActive();
+            this.renderGraph();
+        });
+
     }
 
     setConfig(config) {
         this.profileStorage = config.profiles;
         this.activeProfile = config.active;
+        this.todoEntityId = "todo.z_data_storage_temp_profiles";
     }
 
     getCardSize() { return 6; }
@@ -357,8 +360,9 @@ class SetpointGraphCard extends LitElement {
     }
 
     async saveToEntity() {
-        if (!this.profileStorage || !this.hass.states[this.profileStorage]) return; // No entity configured
+        if (!this.todoEntityId || !this.hass.states[this.todoEntityId]) return; // No entity configured
         try {
+            // add the current Profile to all profiles or update it if needed
             if (this.currentProfileData.profileName !== this.startingProfileName) {
                 if (!this.allProfiles) {
                     this.allProfiles = [];
@@ -371,21 +375,33 @@ class SetpointGraphCard extends LitElement {
                 }
             }
 
-            // const profileJson = JSON.stringify(this.allProfiles);
-            // console.log('[SetpointGraphCard] Saved profile to entity:', profileJson, this.config);
+            // get currently stored profiles to determine if a profile needs added or updated
+            const response = await this.hass.callService("todo", "get_items", { entity_id: this.todoEntityId }, undefined, false, true);
+            const profileList = response.response?.[this.todoEntityId]?.items ?? response.response?.items ?? [];
+            const profileName = this.currentProfileData?.profileName;
+            const matchingItem = profileName ? profileList.find(item => item?.summary === profileName) : profileList[0];
 
-            let attribute = { ...this.hass.states[this.profileStorage].attributes };
-            attribute.stateAttribute = this.allProfiles;
-            console.log('[SetpointGraphCard] Saved profile to entity:', attribute, attribute.stateAttribute);
+            const profileJson = JSON.stringify(this.currentProfileData);
+            console.log('[SetpointGraphCard] Saved profile to entity:', profileJson, this.config);
 
-            // sensor.store_temp_profiles
-            await this.hass.callApi('POST', `states/${this.profileStorage}`,
-                { state: "stateAttribute", attributes: attribute });
+            if (matchingItem?.description) {
+                await this.hass.callService("todo", "update_item", { 
+                    entity_id: this.todoEntityId,
+                    item: profileName,
+                    description: profileJson
+                });
+            } else {
+                await this.hass.callService("todo", "add_item", { 
+                    entity_id: this.todoEntityId,
+                    item: profileName,
+                    description: profileJson
+                 });
+            }
 
         } catch (e) {
             console.error('[SetpointGraphCard] Failed to save to entity:', e);
         }
-        this.loadProfiles();
+        await this.loadProfiles();
     }
 
     async activateProfile() {
@@ -428,26 +444,45 @@ class SetpointGraphCard extends LitElement {
 
     }
 
-    loadProfiles() {
-        if (!this.profileStorage || !this.hass.states[this.profileStorage]) return; // No entity configured
-        let entityFromHass = this.hass.states[this.profileStorage];
+    async loadProfiles() {
+        if (!this.todoEntityId || !this.hass.states[this.todoEntityId]) return; // No entity configured
 
-        console.log("Loading profiles from entity:", entityFromHass.attributes.stateAttribute, entityFromHass);
+        const response = await this.hass.callService("todo", "get_items", { entity_id: this.todoEntityId }, undefined, false, true);
+        const profiles = response.response?.[this.todoEntityId]?.items ?? response.response?.items ?? [];
 
-        this.allProfiles = entityFromHass.attributes.stateAttribute;
+        let parsedProfiles = [];
+        for (const profile of profiles) {
+            try{
+                let fromJson = JSON.parse(profile.description);
+                if (fromJson.profileName == profile.summary) {
+                    parsedProfiles.push(fromJson);
+                } else {
+                    console.log('[SetpointGraphCard] incorrectly formatted profile:', profile);
+                }
+            } catch (e) {
+                console.log('[SetpointGraphCard] incorrectly formatted profile error:', e);
+            }
+
+        }
+        this.allProfiles = parsedProfiles;
     }
 
     async DeleteProfile() {
-        if (!this.profileStorage || !this.hass.states[this.profileStorage]) return; // No entity configured
+        if (!this.todoEntityId || !this.hass.states[this.todoEntityId]) return; // No entity configured
+
         if (!this.allProfiles) {
             this.allProfiles = [];
         }
         let profileIndex = this.allProfiles.findIndex(p => p.profileName === this.currentProfileData.profileName);
         if (profileIndex !== -1) {
+            await this.hass.callService("todo", "remove_item", {
+                entity_id: this.todoEntityId,
+                item: this.currentProfileData.profileName,
+            });
+
             this.allProfiles.splice(profileIndex, 1);
             this.setCurrentProfile(this.defaultProfile());
 
-            this.saveToEntity();
             this.renderGraph();
         }
     }

@@ -53,26 +53,29 @@ class CoverControllerCustomCard extends LitElement {
 		`;
 	}
 
-	setConfig(config) { this.config = config || {}; }
+	setConfig(config) { 
+        this.title = config.title || "ERV Covers";
+        this.searchValue = config.entityFilter || null;
+        console.log(this.title, this.searchValue, config);
+    }
 
 	get covers() {
 		if (!this.hass || !this.hass.states) return [];
 		return Object.values(this.hass.states).filter((entity) =>
-			entity.entity_id.startsWith("cover.") && entity.entity_id.endsWith("_erv")
+            entity.entity_id.startsWith("cover.") && (this.searchValue ? entity.entity_id.endsWith(this.searchValue) : true)
 		);
 	}
 
 	render() {
 		const covers = this.covers;
-		const title = this.config?.title || "ERV Covers";
 
 		return html`
 			<ha-card>
 				<div class="card">
-					<h2>${title}</h2>
+					<h2>${this.title}</h2>
 					${covers.length
 						? covers.map((cover) => this.renderCover(cover))
-						: html`<div class="empty">No cover entities ending in _erv found.</div>`}
+						: html`<div class="empty">No cover entities ending in ${this.searchValue} found.</div>`}
 				</div>
 			</ha-card>
 		`;
