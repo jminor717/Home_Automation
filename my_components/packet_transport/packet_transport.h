@@ -1,5 +1,6 @@
 #pragma once
 
+#include "esphome/core/automation.h"
 #include "esphome/core/component.h"
 #include "esphome/core/helpers.h"
 #include "esphome/core/preferences.h"
@@ -13,6 +14,7 @@
 #include <map>
 #include <span>
 #include <vector>
+
 
 /**
  * Providing packet encoding functions for exchanging data with a remote host.
@@ -38,6 +40,7 @@ struct Provider {
 };
 
 class PacketTransport;
+class PacketDecoder;
 
 #ifdef USE_SENSOR
 struct Sensor {
@@ -107,9 +110,13 @@ class PacketTransport : public PollingComponent {
   void set_encryption_key(std::vector<uint8_t> key) { this->encryption_key_ = std::move(key); }
   void set_rolling_code_enable(bool enable) { this->rolling_code_enable_ = enable; }
   void set_retry_sending_sensor_states_enable(bool enable) { this->retry_sending_sensor_states_ = enable; }
-  void set_retry_timeout(uint32_t timeout) { this->retry_sending_sensor_time_ = timeout; }
+  void set_retry_timeout(uint32_t timeout) { this->retry_sending_sensor_timeout_ = timeout; }
+  void set_retry_rate(uint32_t rate) { this->retry_rate_ = rate; }
   void set_ping_pong_enable(bool enable) { this->ping_pong_enable_ = enable; }
+  void set_dont_send_sensor_states_in_update(bool enable) { this->dont_send_sensor_states_in_update_ = enable; }
   void set_ping_pong_recycle_time(uint32_t recycle_time) { this->ping_pong_recyle_time_ = recycle_time; }
+  Trigger<uint32_t, std::vector<uint8_t>> *get_command_trigger() { return &this->command_trigger_; }
+  
   void set_provider_encryption(const char *name, std::vector<uint8_t> key) {
     this->providers_[name].encryption_key = std::move(key);
   }
@@ -130,6 +137,7 @@ class PacketTransport : public PollingComponent {
   void process_(std::span<const uint8_t> data);
   void send_data_(bool all);
   void send_ack_();
+  void send_command_();
   void flush_();
   void add_data_(uint8_t key, const char *id, float data);
   void add_data_(uint8_t key, const char *id, uint32_t data);
@@ -138,20 +146,36 @@ class PacketTransport : public PollingComponent {
   void add_ack_(uint8_t key, const char *id);
   void init_data_();
   void init_ack_();
+  void init_command_();
+  void call_command_listeners_(uint32_t cmd, const std::vector<uint8_t> &data);
+  void process_command(Provider &provider, PacketDecoder &decoder);
+  void process_ack(Provider &provider, PacketDecoder &decoder);
+  void process_data(Provider &provider, PacketDecoder &decoder, bool ping_key_seen, 
+#ifdef USE_SENSOR
+    string_map_t<sensor::Sensor *> sensors,
+#endif
+#ifdef USE_BINARY_SENSOR
+    string_map_t<binary_sensor::BinarySensor *> binary_sensors
+#endif
+    );
+
 
   bool updated_{};
   uint32_t ping_key_{};
   uint32_t rolling_code_[2]{};
   bool rolling_code_enable_{};
   bool retry_sending_sensor_states_{};
-  uint32_t retry_sending_sensor_time_{};
+  uint32_t retry_sending_sensor_timeout_{};
+  uint32_t retry_rate_{};
   bool ping_pong_enable_{};
+  bool dont_send_sensor_states_in_update_{};
   uint32_t ping_pong_recyle_time_{};
   uint32_t last_key_time_{};
   bool resend_ping_key_{};
   bool is_provider_{};
   const char *name_{};
   ESPPreferenceObject pref_{};
+  Trigger<uint32_t ,std::vector<uint8_t>> command_trigger_;
 
   std::vector<uint8_t> encryption_key_{};
 

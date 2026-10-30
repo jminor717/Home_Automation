@@ -73,6 +73,29 @@ static constexpr size_t PACKET_MAX_LOG_BYTES = 168;
  * 
  * =====================================================================
  * 
+ * Structure of a command packet; everything is little-endian
+ *
+ * --- In clear text ---
+ * MAGIC_NUMBER: 16 bits
+ * host name length: 1 byte
+ * host name: (length) bytes
+ * padding: 0 or more null bytes to a 4 byte boundary
+ *
+ * --- Encrypted (if key set) ----
+ * COMMAND_KEY: 1 byte
+ * if rolling code enabled:
+ *    ROLLING_CODE_KEY: 1 byte
+ *    Rolling code: 8 bytes
+ * if rolling code disabled: (for making decoding simpler)
+ *    ZERO_FILL_KEY: 1 byte
+ * target host name length: 1 byte
+ * target host name: (length) bytes
+ * command: 4 bytes
+ * data length: 1 byte
+ * data (length) bytes
+ * 
+ * =====================================================================
+ * 
  * Structure of a ping request packet:
  * --- In clear text ---
  * MAGIC_PING: 16 bits
@@ -100,7 +123,8 @@ enum DataKey {
   BINARY_SENSOR_KEY,
   PING_KEY,
   ROLLING_CODE_KEY,
-  ACK_KEY
+  ACK_KEY,
+  COMMAND_KEY
 };
 
 enum DecodeResult {
@@ -111,13 +135,6 @@ enum DecodeResult {
 };
 
 static constexpr size_t MAX_PING_KEYS = 4;
-
-static inline void add(std::vector<uint8_t> &vec, uint32_t data) {
-  vec.push_back(data & 0xFF);
-  vec.push_back((data >> 8) & 0xFF);
-  vec.push_back((data >> 16) & 0xFF);
-  vec.push_back((data >> 24) & 0xFF);
-}
 
 class PacketDecoder {
  public:
@@ -188,6 +205,31 @@ class PacketDecoder {
     return this->decode_string(buf, buflen);
   }
 
+    DecodeResult decode_command(uint32_t &command, std::vector<uint8_t> *data, size_t maxlen) {
+    if (this->position_ == this->len_)
+      return DECODE_EMPTY;
+    uint32_t value = 0;
+    for (size_t i = 0; i != sizeof(uint32_t); ++i) {
+      value += this->buffer_[this->position_++] << (i * 8);
+    }
+    command = value;
+
+    if (this->position_ == this->len_)
+      return DECODE_EMPTY;
+    auto len = this->buffer_[this->position_];
+    if (this->position_ + 1 + len > this->len_ || len >= maxlen)
+      return DECODE_ERROR;
+    if (len == 0){
+      return DECODE_OK;
+    }
+    this->position_++;
+    data->resize(len);
+    memcpy(data->data(), this->buffer_ + this->position_, len);
+    this->position_ += len;
+    ESP_LOGI(TAG, "command %lu Data length %d", command, len);
+    return DECODE_OK;
+  }
+
   DecodeResult decode(uint8_t key) {
     if (this->position_ == this->len_)
       return DECODE_EMPTY;
@@ -231,12 +273,26 @@ static inline void add(std::vector<uint8_t> &vec, uint16_t data) {
   vec.push_back((uint8_t) data);
   vec.push_back((uint8_t) (data >> 8));
 }
+static inline void add(std::vector<uint8_t> &vec, uint32_t data) {
+  vec.push_back((uint8_t) data);
+  vec.push_back((uint8_t) (data >> 8));
+  vec.push_back((uint8_t) (data >> 16));
+  vec.push_back((uint8_t) (data >> 24));
+}
+
 static inline void add(std::vector<uint8_t> &vec, DataKey data) { vec.push_back(data); }
 static void add(std::vector<uint8_t> &vec, const char *str) {
   auto len = strlen(str);
   vec.push_back(len);
   for (size_t i = 0; i != len; i++) {
     vec.push_back(*str++);
+  }
+}
+
+static void add(std::vector<uint8_t> &vec, uint8_t *data, size_t len) {
+  vec.push_back(len);
+  for (size_t i = 0; i != len; i++) {
+    vec.push_back(*data++);
   }
 }
 
@@ -321,6 +377,24 @@ void PacketTransport::init_ack_() {
   }
 }
 
+void PacketTransport::init_command_() {
+  this->data_.clear();
+  add(this->data_, COMMAND_KEY);
+
+  if (this->rolling_code_enable_) {
+    add(this->data_, ROLLING_CODE_KEY);
+    add(this->data_, this->rolling_code_[0]);
+    add(this->data_, this->rolling_code_[1]);
+    this->increment_code_();
+  }
+  else{
+    add(this->data_, ZERO_FILL_KEY);
+  }
+
+
+}
+
+
 void PacketTransport::flush_() {
   if (!this->should_send() || this->data_.empty())
     return;
@@ -369,7 +443,7 @@ void PacketTransport::add_ack_(uint8_t key, const char *id) {
   auto len = 1 + 1 + 1 + strlen(id);
   if (round4(this->header_.size()) + round4(this->data_.size() + len) > this->get_max_packet_size()) {
     this->flush_();
-    this->init_data_();
+    this->init_ack_();
   }
   add(this->data_, key);
   add(this->data_, id);
@@ -429,9 +503,33 @@ void PacketTransport::send_ack_() {
   this->sensors_to_acknowledge.clear();
 }
 
+void PacketTransport::send_command_() {
+  if (this->should_send()) {
+    this->init_command_();
+    
+    uint32_t command = 0b0000'0001;
+    add(this->data_, "host_name");
+    add(this->data_, command);
+
+    uint8_t databuf[10]{};
+    databuf[0] = 0b00010001;
+    databuf[1] = 5;
+    databuf[3] = 200;
+
+    add(this->data_, databuf, 5);
+
+
+    ESP_LOGI(TAG, "sending command Data length %d", 5);
+
+    this->flush_();
+  }
+
+}
+
 void PacketTransport::update() {
-  // resend all sensors if required
-  if (this->is_provider_)
+  // resend all sensors if required, unless disabled to save on traffic
+  // if disabled sensor states will only be sent on change
+  if (this->is_provider_ && !this->dont_send_sensor_states_in_update_)
     this->send_data_(true);
   if (!this->ping_pong_enable_) {
     return;
@@ -445,11 +543,14 @@ void PacketTransport::update() {
   }
   for (const auto &provider : this->providers_) {
     uint32_t key_response_age = now - provider.second.last_key_response_time;
-    if (key_response_age > (this->ping_pong_recyle_time_ * 2000u)) {
+    if (key_response_age > (this->ping_pong_recyle_time_ * 2000u) || provider.second.last_key_response_time == 0) {
 #ifdef USE_STATUS_SENSOR
-      if (provider.second.status_sensor != nullptr && provider.second.status_sensor->state) {
-        ESP_LOGI(TAG, "Ping status for %s timeout at %" PRIu32 " with age %" PRIu32, provider.first.c_str(), now,
-                 key_response_age);
+      // ESP_LOGI(TAG, "checking status timeout for provider %s", provider.second.name);
+      if (provider.second.status_sensor != nullptr) {
+        if (provider.second.status_sensor->state)
+        {
+          ESP_LOGI(TAG, "Ping status for %s timeout at %" PRIu32 " with age %" PRIu32, provider.first.c_str(), now, key_response_age);
+        }
         provider.second.status_sensor->publish_state(false);
       }
 #endif
@@ -457,6 +558,7 @@ void PacketTransport::update() {
       auto it = this->remote_sensors_.find(provider.first);
       if (it != this->remote_sensors_.end()) {
         for (auto &val : it->second | std::views::values) {
+          // do i need this? publishes NAN to any sensor with a disconnected provider
           val->publish_state(NAN);
         }
       }
@@ -471,6 +573,7 @@ void PacketTransport::update() {
 #endif
     } else {
 #ifdef USE_STATUS_SENSOR
+      // ESP_LOGI(TAG, "checking status for provider %s", provider.second.name);
       if (provider.second.status_sensor != nullptr && !provider.second.status_sensor->state) {
         ESP_LOGI(TAG, "Ping status for %s restored at %" PRIu32 " with age %" PRIu32, provider.first.c_str(), now,
                  key_response_age);
@@ -515,6 +618,155 @@ static bool process_rolling_code(Provider &provider, PacketDecoder &decoder) {
   return true;
 }
 
+void PacketTransport::process_command(Provider &provider, PacketDecoder &decoder){
+  char namebuf[256]{};
+
+  uint32_t command;
+  std::vector<uint8_t> data;
+  
+  if (decoder.decode(ROLLING_CODE_KEY) == DECODE_OK) {
+    if (!process_rolling_code(provider, decoder)){
+      return;
+    }
+    // continue;
+  }
+  else if (decoder.decode(ZERO_FILL_KEY) == DECODE_OK) { /* continue*/ }
+    
+  if (decoder.decode_string(namebuf, sizeof namebuf) != DECODE_OK) {
+    ESP_LOGV(TAG, "Bad target hostname length");
+    return;
+  }
+  if (strcmp(this->name_, namebuf) != 0) {
+    ESP_LOGI(TAG, "Ignoring command to other host %s", namebuf);
+    // return; ESP_LOGVV
+  }
+
+  if (decoder.decode_command(command, &data, 256)) {
+    ESP_LOGV(TAG, "Bad Command format");
+    return;
+  }
+
+  // std::vector<uint8_t> v(databuf, databuf + sizeof databuf / sizeof databuf[0]);
+  this->call_command_listeners_(command, data);
+
+
+  // ESP_LOGI(TAG, "Command %lu, data: " BYTE_TO_BINARY_PATTERN " : " BYTE_TO_BINARY_PATTERN, command, BYTE_TO_BINARY(databuf[0]),  BYTE_TO_BINARY(databuf[1]));
+  
+
+}
+void PacketTransport::process_ack(Provider &provider, PacketDecoder &decoder){
+  uint32_t key;
+  uint8_t byte;
+  char namebuf[256]{};
+  while (decoder.get_remaining_size() != 0) {
+
+    if (decoder.decode(ZERO_FILL_KEY) == DECODE_OK)
+      continue;
+    if (decoder.decode(PING_KEY, key) == DECODE_OK) {
+      if (key == this->ping_key_) {
+        provider.last_key_response_time = millis();
+        ESP_LOGV(TAG, "Found good ping key %X at timestamp %" PRIu32, (unsigned) key, provider.last_key_response_time);
+      } else {
+        ESP_LOGV(TAG, "Unknown ping key %X", (unsigned) key);
+      }
+      continue;
+    }
+    if (decoder.decode_name(BINARY_SENSOR_KEY, namebuf, sizeof(namebuf)) == DECODE_OK) {
+#ifdef USE_BINARY_SENSOR
+      for (auto &sensor : this->binary_sensors_) {
+        if (strcmp(sensor.id, namebuf) == 0) {
+          sensor.got_ack = true;
+          ESP_LOGV(TAG, "got ACK for binary sensor: %s", sensor.id);
+          break;
+        }
+      }
+#endif
+      continue;
+    }
+    if (decoder.decode_name(SENSOR_KEY, namebuf, sizeof(namebuf)) == DECODE_OK) {
+#ifdef USE_SENSOR
+      for (auto &sensor : this->sensors_) {
+        if (strcmp(sensor.id, namebuf) == 0) {
+          sensor.got_ack = true;
+          ESP_LOGV(TAG, "got ACK for sensor: %s", sensor.id);
+          break;
+        }
+      }
+#endif
+      continue;
+    }
+    if (decoder.get(byte) == DECODE_OK) {
+      ESP_LOGW(TAG, "Unknown ACK key %X", byte);
+    }
+    break;
+  }
+}
+
+void PacketTransport::process_data(Provider &provider, PacketDecoder &decoder, bool ping_key_seen,
+#ifdef USE_SENSOR
+    string_map_t<sensor::Sensor *> sensors,
+#endif
+#ifdef USE_BINARY_SENSOR
+    string_map_t<binary_sensor::BinarySensor *> binary_sensors
+#endif
+  ){
+  uint32_t key;
+  char namebuf[256]{};
+  uint8_t byte;
+  FuData rdata{};
+
+  while (decoder.get_remaining_size() != 0) {
+    if (decoder.decode(ZERO_FILL_KEY) == DECODE_OK)
+      continue;
+    if (decoder.decode(PING_KEY, key) == DECODE_OK) {
+      if (key == this->ping_key_) {
+        ping_key_seen = true;
+        provider.last_key_response_time = millis();
+        ESP_LOGV(TAG, "Found good ping key %X at timestamp %" PRIu32, (unsigned) key, provider.last_key_response_time);
+      } else {
+        ESP_LOGV(TAG, "Unknown ping key %X", (unsigned) key);
+      }
+      continue;
+    }
+    if (!ping_key_seen) {
+      ESP_LOGW(TAG, "Ping key not seen");
+      this->resend_ping_key_ = true;
+      break;
+    }
+    if (decoder.decode(BINARY_SENSOR_KEY, namebuf, sizeof(namebuf), byte) == DECODE_OK) {
+      ESP_LOGV(TAG, "Got binary sensor %s %d", namebuf, byte);
+#ifdef USE_BINARY_SENSOR
+      auto bs = binary_sensors.find(namebuf);
+      if (bs != binary_sensors.end()) {
+        bs->second->publish_state(byte != 0);
+        add_ack_name(this->binary_sensors_to_acknowledge, namebuf);
+        this->remote_sensors_need_ack = true;
+      }
+#endif
+      continue;
+    }
+    if (decoder.decode(SENSOR_KEY, namebuf, sizeof(namebuf), rdata.u32) == DECODE_OK) {
+      ESP_LOGV(TAG, "Got sensor %s %f", namebuf, rdata.f32);
+#ifdef USE_SENSOR
+      auto sensor_it = sensors.find(namebuf);
+      if (sensor_it != sensors.end()) {
+        sensor_it->second->publish_state(rdata.f32);
+        add_ack_name(this->sensors_to_acknowledge, namebuf);
+        this->remote_sensors_need_ack = true;
+      }
+#endif
+      continue;
+    }
+    if (decoder.get(byte) == DECODE_OK) {
+      ESP_LOGW(TAG, "Unknown key %X", byte);
+      char hex_buf[format_hex_pretty_size(PACKET_MAX_LOG_BYTES)];
+      ESP_LOGD(TAG, "Buffer pos: %zu contents: %s", data.size() - decoder.get_remaining_size(),
+               format_hex_pretty_to(hex_buf, data.data(), data.size()));
+    }
+    break;
+  }
+}
+
 /**
  * Process a received packet
  */
@@ -523,7 +775,6 @@ void PacketTransport::process_(std::span<const uint8_t> data) {
   PacketDecoder decoder(data.data(), data.size());
   char namebuf[256]{};
   uint8_t byte;
-  FuData rdata{};
   uint16_t magic;
   if (decoder.get(magic) != DECODE_OK) {
     ESP_LOGD(TAG, "Short buffer");
@@ -593,99 +844,18 @@ void PacketTransport::process_(std::span<const uint8_t> data) {
     if (!process_rolling_code(provider, decoder))
       return;
   } else if (byte == ACK_KEY) {
-    uint32_t key;
-    while (decoder.get_remaining_size() != 0) {
-      if (decoder.decode(ZERO_FILL_KEY) == DECODE_OK)
-        continue;
-      if (decoder.decode(PING_KEY, key) == DECODE_OK) {
-        continue;
-      }
-      if (decoder.decode_name(BINARY_SENSOR_KEY, namebuf, sizeof(namebuf)) == DECODE_OK) {
-#ifdef USE_BINARY_SENSOR
-        for (auto &sensor : this->binary_sensors_) {
-          if (strcmp(sensor.id, namebuf) == 0) {
-            sensor.got_ack = true;
-            ESP_LOGV(TAG, "got ACK for binary sensor: %s", sensor.id);
-            break;
-          }
-        }
-#endif
-        continue;
-      }
-      if (decoder.decode_name(SENSOR_KEY, namebuf, sizeof(namebuf)) == DECODE_OK) {
-#ifdef USE_SENSOR
-        for (auto &sensor : this->sensors_) {
-          if (strcmp(sensor.id, namebuf) == 0) {
-            sensor.got_ack = true;
-            ESP_LOGV(TAG, "got ACK for sensor: %s", sensor.id);
-            break;
-          }
-        }
-#endif
-        continue;
-      }
-      if (decoder.get(byte) == DECODE_OK) {
-        ESP_LOGW(TAG, "Unknown ACK key %X", byte);
-      }
-      break;
-    }
+    this->process_ack(provider, decoder);
+    return;
+  } else if (byte == COMMAND_KEY) {
+    ESP_LOGI(TAG, "got command code from remote %s", namebuf);
+    this->process_command(provider, decoder);
     return;
   }
   else if (byte != DATA_KEY) {
     ESP_LOGV(TAG, "Expected rolling_key or data_key, got %X", byte);
     return;
   }
-  uint32_t key;
-  while (decoder.get_remaining_size() != 0) {
-    if (decoder.decode(ZERO_FILL_KEY) == DECODE_OK)
-      continue;
-    if (decoder.decode(PING_KEY, key) == DECODE_OK) {
-      if (key == this->ping_key_) {
-        ping_key_seen = true;
-        provider.last_key_response_time = millis();
-        ESP_LOGV(TAG, "Found good ping key %X at timestamp %" PRIu32, (unsigned) key, provider.last_key_response_time);
-      } else {
-        ESP_LOGV(TAG, "Unknown ping key %X", (unsigned) key);
-      }
-      continue;
-    }
-    if (!ping_key_seen) {
-      ESP_LOGW(TAG, "Ping key not seen");
-      this->resend_ping_key_ = true;
-      break;
-    }
-    if (decoder.decode(BINARY_SENSOR_KEY, namebuf, sizeof(namebuf), byte) == DECODE_OK) {
-      ESP_LOGV(TAG, "Got binary sensor %s %d", namebuf, byte);
-#ifdef USE_BINARY_SENSOR
-      auto bs = binary_sensors.find(namebuf);
-      if (bs != binary_sensors.end()) {
-        bs->second->publish_state(byte != 0);
-        add_ack_name(this->binary_sensors_to_acknowledge, namebuf);
-        this->remote_sensors_need_ack = true;
-      }
-#endif
-      continue;
-    }
-    if (decoder.decode(SENSOR_KEY, namebuf, sizeof(namebuf), rdata.u32) == DECODE_OK) {
-      ESP_LOGV(TAG, "Got sensor %s %f", namebuf, rdata.f32);
-#ifdef USE_SENSOR
-      auto sensor_it = sensors.find(namebuf);
-      if (sensor_it != sensors.end()) {
-        sensor_it->second->publish_state(rdata.f32);
-        add_ack_name(this->sensors_to_acknowledge, namebuf);
-        this->remote_sensors_need_ack = true;
-      }
-#endif
-      continue;
-    }
-    if (decoder.get(byte) == DECODE_OK) {
-      ESP_LOGW(TAG, "Unknown key %X", byte);
-      char hex_buf[format_hex_pretty_size(PACKET_MAX_LOG_BYTES)];
-      ESP_LOGD(TAG, "Buffer pos: %zu contents: %s", data.size() - decoder.get_remaining_size(),
-               format_hex_pretty_to(hex_buf, data.data(), data.size()));
-    }
-    break;
-  }
+  this->process_data(provider, decoder, ping_key_seen, sensors, binary_sensors);
 }
 
 void PacketTransport::dump_config() {
@@ -739,19 +909,34 @@ void PacketTransport::loop() {
   if (this->remote_sensors_need_ack) {
     ESP_LOGV(TAG, "sending ACK data");
     this->send_ack_();
+
+    this->send_command_();
   }
   uint32_t now = millis();
   uint32_t last_send_age = now - this->last_send_time;
-  if (this->updated_ || (
-      this->retry_sending_sensor_states_ && 
-      this->waiting_for_ack && 
-      (last_send_age > this->retry_sending_sensor_time_ * 1000u)) ) {
+
+  if (this->waiting_for_ack && last_send_age > this->retry_sending_sensor_timeout_) {
+    ESP_LOGV(TAG, "Retry not acknowledged within timeout %ld", last_send_age);
+    this->waiting_for_ack = false;
+  }
+
+  if (this->updated_ || 
+       (this->retry_sending_sensor_states_ && 
+        this->waiting_for_ack && 
+        (last_send_age > this->retry_rate_ * 1000u))
+    ){
+        // send data if updated or retry needed
     ESP_LOGV(TAG, "loop sending data updated: %d, for ACK: %d, age: %ld ", this->updated_, this->waiting_for_ack, last_send_age);
     this->waiting_for_ack = false;
 
     this->send_data_(false);
   }
 }
+
+void PacketTransport::call_command_listeners_(uint32_t cmd, const std::vector<uint8_t> &data) {
+  this->command_trigger_.trigger(cmd, data);
+}
+
 
 void PacketTransport::send_ping_pong_request_() {
   if (!this->ping_pong_enable_ || !this->should_send())

@@ -2,7 +2,7 @@
 
 import hashlib
 import logging
-
+from esphome import automation
 import esphome.codegen as cg
 from esphome.components.binary_sensor import BinarySensor
 from esphome.components.sensor import Sensor
@@ -36,11 +36,13 @@ CONF_PROVIDERS = "providers"
 CONF_REMOTE_ID = "remote_id"
 CONF_PING_PONG_ENABLE = "ping_pong_enable"
 CONF_PING_PONG_RECYCLE_TIME = "ping_pong_recycle_time"
+CONF_DONT_SEND_SENSOR_STATES_IN_UPDATE = "only_send_sensor_states_on_change"
 CONF_ROLLING_CODE_ENABLE = "rolling_code_enable"
 CONF_RETRY_SENDING_SENSOR_STATES_ENABLE = "retry_sending_sensor_states_enable"
 CONF_RETRY_TIMEOUT = "retry_timeout"
+CONF_RETRY_RATE = "retry_rate"
 CONF_TRANSPORT_ID = "transport_id"
-
+CONF_ON_COMMAND = "on_command"
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -104,8 +106,11 @@ TRANSPORT_SCHEMA = (
         {
             cv.Optional(CONF_ROLLING_CODE_ENABLE, default=False): cv.boolean,
             cv.Optional(CONF_RETRY_SENDING_SENSOR_STATES_ENABLE, default=False): cv.boolean,
-            cv.Optional(CONF_RETRY_TIMEOUT, default="16s"): cv.positive_time_period_seconds,
+            cv.Optional(CONF_RETRY_TIMEOUT, default="2min"): cv.positive_time_period_seconds,
+            cv.Optional(CONF_RETRY_RATE, default="16s"): cv.positive_time_period_seconds,
             cv.Optional(CONF_PING_PONG_ENABLE, default=False): cv.boolean,
+            cv.Optional(CONF_DONT_SEND_SENSOR_STATES_IN_UPDATE, default=False): cv.boolean,
+            cv.Optional(CONF_ON_COMMAND): automation.validate_automation(single=True),
             cv.Optional(
                 CONF_PING_PONG_RECYCLE_TIME, default="600s"
             ): cv.positive_time_period_seconds,
@@ -165,12 +170,25 @@ async def register_packet_transport(var, config):
     cg.add(var.set_rolling_code_enable(config[CONF_ROLLING_CODE_ENABLE]))
     cg.add(var.set_retry_sending_sensor_states_enable(config[CONF_RETRY_SENDING_SENSOR_STATES_ENABLE]))
     cg.add(var.set_retry_timeout(config[CONF_RETRY_TIMEOUT].total_seconds))
+    cg.add(var.set_retry_rate(config[CONF_RETRY_RATE].total_seconds))
     cg.add(var.set_ping_pong_enable(config[CONF_PING_PONG_ENABLE]))
+    cg.add(var.set_dont_send_sensor_states_in_update(config[CONF_DONT_SEND_SENSOR_STATES_IN_UPDATE]))
     cg.add(
         var.set_ping_pong_recycle_time(
             config[CONF_PING_PONG_RECYCLE_TIME].total_seconds
         )
     )
+
+    if CONF_ON_COMMAND in config:
+        await automation.build_automation(
+            var.get_command_trigger(),
+            [
+                (cg.uint32, "cmd"),
+                (cg.std_vector.template(cg.uint8), "data"),
+            ],
+            config[CONF_ON_COMMAND],
+        )
+
     # Get directly configured providers, plus those from sensors and binary sensors
     providers = {
         sensor[CONF_PROVIDER] for sensor in get_sensors(config[CONF_ID])

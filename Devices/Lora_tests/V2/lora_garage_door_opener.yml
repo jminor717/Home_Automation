@@ -143,12 +143,15 @@ font:
 
 packet_transport:
   platform: sx127x
-  update_interval: never
-  encryption: "780905cb-619f-4663-b246-256ba69c2ea6"
+  update_interval: 30s
+  encryption: !secret LoRa_key
   rolling_code_enable: true
   ping_pong_enable: true
+  ping_pong_recycle_time: 80s # after this time sensor from disconnected providers will return NAN
+  only_send_sensor_states_on_change: true
   retry_sending_sensor_states_enable: true
-  retry_timeout: 10s
+  retry_rate: 15s
+  retry_timeout: 1min
   # binary_sensors:
   #   - relay1_sensor
   sensors:
@@ -156,9 +159,16 @@ packet_transport:
       broadcast_id: opener_garage_door_state
   providers:
     - name: $device_name_receiver
-      encryption: "780905cb-619f-4663-b246-256ba69c2ea6"
+      encryption: !secret LoRa_key
     - name: $device_name_test
-      encryption: "780905cb-619f-4663-b246-256ba69c2ea6"
+      encryption: !secret LoRa_key
+  on_command:
+    then:
+      - lambda: |-
+          char hex[256]; 
+          ESP_LOGI("lora", "Received command: %lu :   %s", cmd,  format_hex_to(hex, data));
+
+
 
 switch:
   - platform: gpio
@@ -185,6 +195,12 @@ binary_sensor:
     type: status
     name: receiver connection status
     internal: false
+  - platform: packet_transport
+    provider: $device_name_test
+    type: status
+    name: test connection status
+    internal: false
+
 
 sensor:
   - { platform: uptime, id: uptime_seconds, update_interval: 1min }
@@ -220,7 +236,7 @@ sensor:
     name: remote state 2
     internal: false
     on_value:
-      - { lambda: !lambda 'ESP_LOGI("lora", "opener got request: %.2f from remote", x);' }
+      - { lambda: !lambda 'ESP_LOGI("lora", "opener got request: %.2f from remote 2", x);' }
       - if:
           condition: { lambda: !lambda 'return x > 10;' }
           then:

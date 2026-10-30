@@ -115,7 +115,13 @@ button:
         - lambda: id(sentPackets)++;
         - sx127x.send_packet:
             data: [0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE, 0xBA, 0xBE]
-
+  - platform: template
+    name: "Request Remote Sensor State Update"
+    on_press:
+      then:
+        - lambda: id(sentPackets)++;
+        - sx127x.send_packet:
+            data: [0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE, 0xBA, 0xBE]
 
 # OLED Display
 display:
@@ -141,22 +147,29 @@ font:
 
 packet_transport:
   platform: sx127x
-  update_interval: never
-  encryption: "780905cb-619f-4663-b246-256ba69c2ea6"
+  update_interval: 30s
+  encryption: !secret LoRa_key
   rolling_code_enable: true
   ping_pong_enable: true
+  ping_pong_recycle_time: 80s
+  only_send_sensor_states_on_change: true
   retry_sending_sensor_states_enable: true
-  retry_timeout: 10s
+  retry_rate: 15s
+  retry_timeout: 1min
   # binary_sensors:
-  #   - relay2_sensor
+  #   - relay1_sensor
   sensors:
   #   - wifi_signal_db
     - id: garage_door_state_request
       broadcast_id: garage_door_state_request
   providers:
     - name: $device_name_opener
-      encryption: "780905cb-619f-4663-b246-256ba69c2ea6"
-
+      encryption: !secret LoRa_key
+  on_command:
+    then:
+      - lambda: |-
+          char hex[256]; 
+          ESP_LOGI("lora", "Received command: %lu :   %s", cmd,  format_hex_to(hex, data));
 
 switch:
   - platform: gpio

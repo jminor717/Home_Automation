@@ -179,7 +179,7 @@ button:
 packet_transport:
   platform: sx127x
   update_interval: never
-  encryption: "780905cb-619f-4663-b246-256ba69c2ea6"
+  encryption: !secret LoRa_key
   rolling_code_enable: true
   ping_pong_enable: true
   retry_sending_sensor_states_enable: true
@@ -189,7 +189,7 @@ packet_transport:
       broadcast_id: garage_door_state_request_2
   providers:
     - name: $device_name_opener
-      encryption: "780905cb-619f-4663-b246-256ba69c2ea6"
+      encryption: !secret LoRa_key
 
 switch:
   - platform: template
