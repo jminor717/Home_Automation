@@ -5,8 +5,8 @@ substitutions:
   display_name: EmpVu3
 
 external_components:
-#  - source: github://emporia-vue-local/esphome@dev
-  - source: github://digiblur/esphome-vue3@dev
+  - source: github://emporia-vue-local/esphome@dev
+  # - source: github://digiblur/esphome-vue3@dev
     components:
       - emporia_vue
       
@@ -15,6 +15,9 @@ esp32:
   framework:
     type: esp-idf
     version: recommended
+    advanced:
+      minimum_chip_revision: "3.1"
+
 
 preferences:
   # the default of 1min is far too short--flash chip is rated for approx 100k writes.
@@ -129,8 +132,8 @@ sensor:
           name: "Phase B Phase Angle"
           filters: [*moving_avg, *pos]
     ct_clamps:
-      - { phase_id: phase_a, input:  "A", power: { name: "Phase A Power",               id:  phase_a_power, device_class: power, filters: [ *moving_avg ] } }
-      - { phase_id: phase_b, input:  "B", power: { name: "Phase B Power",               id:  phase_b_power, device_class: power, filters: [ *moving_avg ] } }
+      - { phase_id: phase_a, input:  "A", power: { name: "Phase A Power",               id:  phase_a_power, device_class: power, filters: [ *moving_avg, *invert ] } }
+      - { phase_id: phase_b, input:  "C", power: { name: "Phase B Power",               id:  phase_b_power, device_class: power, filters: [ *moving_avg, *invert ] } }
       # Pay close attention to set the phase_id for each breaker by matching it to the phase/leg it connects to in the panel
       - { phase_id: phase_b, input:  "1", power: { name: "Washer_Hood Power",           id:  cir1, filters: [ *moving_avg,              *invert ] } }
       - { phase_id: phase_b, input:  "2", power: { name: "Well Pump Power",             id:  cir2, filters: [ *moving_avg, multiply: 2, *invert ] } }
@@ -142,15 +145,15 @@ sensor:
       - { phase_id: phase_b, input:  "8", power: { name: "Cook Top Power",              id:  cir8, filters: [ *moving_avg, multiply: 2, *invert ] } }
       - { phase_id: phase_b, input:  "9", power: { name: "Oven Power",                  id:  cir9, filters: [ *moving_avg, multiply: 2, *invert ] } }
       - { phase_id: phase_b, input: "10", power: { name: "Network Power",               id: cir10, filters: [ *moving_avg,              *invert ] } }
-#      - { phase_id: phase_b, input: "11", power: { name: "Circuit 11 Power",           id: cir11, filters: [ *moving_avg ] } }
+      - { phase_id: phase_b, input: "11", power: { name: "Circuit 11 Power",           id: cir11, filters: [ *moving_avg ] } }
       - { phase_id: phase_b, input: "12", power: { name: "Dishwasher_Microwave Power",  id: cir12, filters: [ *moving_avg,              *invert ] } }
-      - { phase_id: phase_a, input: "13", power: { name: "Living Recps Power",          id: cir13, filters: [ *moving_avg ] } } # , *invert
+      - { phase_id: phase_a, input: "13", power: { name: "Living Recps Power",          id: cir13, filters: [ *moving_avg,              *invert ] } }
       - { phase_id: phase_b, input: "14", power: { name: "Air Handler Power",           id: cir14, filters: [ *moving_avg, multiply: 2, *invert ] } }
       - { phase_id: phase_b, input: "15", power: { name: "Lights_Storage Power",        id: cir15, filters: [ *moving_avg,              *invert ] } }
       - { phase_id: phase_a, input: "16", power: { name: "Bedroom_Garage Power",        id: cir16, filters: [ *moving_avg,              *invert ] } }
       # CURRENT
       - { phase_id: phase_a, input:  "A", current: { name:  "Phase A Current",              id:  current_a, device_class: current, filters: [ *moving_avg ] } }
-      - { phase_id: phase_b, input:  "B", current: { name:  "Phase B Current",              id:  current_b, device_class: current, filters: [ *moving_avg ] } }
+      - { phase_id: phase_b, input:  "C", current: { name:  "Phase B Current",              id:  current_b, device_class: current, filters: [ *moving_avg ] } }
       - { phase_id: phase_b, input:  "1", current: { name:  "Washer_Hood Current",          id:  cur1, filters: [ *moving_avg ] } }
       - { phase_id: phase_b, input:  "2", current: { name:  "Well Pump Current",            id:  cur2, filters: [ *moving_avg, multiply: 2 ] } }
       - { phase_id: phase_a, input:  "3", current: { name:  "Fridge Current",               id:  cur3, filters: [ *moving_avg ] } }
@@ -161,7 +164,7 @@ sensor:
       - { phase_id: phase_b, input:  "8", current: { name:  "Cook Top Current",             id:  cur8, filters: [ *moving_avg, multiply: 2 ] } }
       - { phase_id: phase_b, input:  "9", current: { name:  "Oven Current",                 id:  cur9, filters: [ *moving_avg, multiply: 2 ] } }
       - { phase_id: phase_b, input: "10", current: { name: "Network Current",               id: cur10, filters: [ *moving_avg ] } }
-#      - { phase_id: phase_b, input: "11", current: { name: "Circuit 11 Current", id: cur11, filters: [ *moving_avg ] } }
+      - { phase_id: phase_b, input: "11", current: { name: "Circuit 11 Current", id: cur11, filters: [ *moving_avg ] } }
       - { phase_id: phase_b, input: "12", current: { name: "Dishwasher_Microwave Current",  id: cur12, filters: [ *moving_avg ] } }
       - { phase_id: phase_a, input: "13", current: { name: "Living Recps Current",          id: cur13, filters: [ *moving_avg ] } }
       - { phase_id: phase_b, input: "14", current: { name: "Air Handler Current",           id: cur14, filters: [ *moving_avg, multiply: 2 ] } }
@@ -194,6 +197,7 @@ sensor:
         id(cir8).state + 
         id(cir9).state + 
         id(cir10).state + 
+        id(cir11).state + 
         id(cir12).state + 
         id(cir13).state + 
         id(cir14).state + 
@@ -218,7 +222,7 @@ sensor:
   # - { power_id:  cir8, platform: total_daily_energy, restore: false, accuracy_decimals: 0, name:  "Air Handler Energy" }
   - { power_id:  cir9, platform: total_daily_energy, restore: false, accuracy_decimals: 0, name:  "Cook Top Energy" }
   - { power_id: cir10, platform: total_daily_energy, restore: false, accuracy_decimals: 0, name: "Network Energy" }
-#  - { power_id: cir11, platform: total_daily_energy, accuracy_decimals: 0, name: "Circuit 11 Daily Energy" }
+  - { power_id: cir11, platform: total_daily_energy, accuracy_decimals: 0, name: "Circuit 11 Daily Energy" }
   - { power_id: cir12, platform: total_daily_energy, restore: false, accuracy_decimals: 0, name: "Dishwasher_Microwave Energy" }
   - { power_id: cir13, platform: total_daily_energy, restore: false, accuracy_decimals: 0, name: "Living Recps Energy" }
   - { power_id: cir14, platform: total_daily_energy, restore: false, accuracy_decimals: 0, name: "Oven Energy" }
