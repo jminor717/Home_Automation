@@ -94,6 +94,8 @@ static constexpr size_t PACKET_MAX_LOG_BYTES = 168;
  * data length: 1 byte
  * data (length) bytes
  * 
+ * Padded to a 4 byte boundary with nulls
+ * 
  * =====================================================================
  * 
  * Structure of a ping request packet:
@@ -209,11 +211,13 @@ class PacketDecoder {
     if (this->position_ == this->len_)
       return DECODE_EMPTY;
     uint32_t value = 0;
+    // pull the first 4 bytes for the 32 bit command
     for (size_t i = 0; i != sizeof(uint32_t); ++i) {
       value += this->buffer_[this->position_++] << (i * 8);
     }
     command = value;
 
+    // pull the length of the data
     if (this->position_ == this->len_)
       return DECODE_EMPTY;
     auto len = this->buffer_[this->position_];
@@ -223,10 +227,15 @@ class PacketDecoder {
       return DECODE_OK;
     }
     this->position_++;
+
+    if (len == 0 || this->position_ + 1 + len > this->len_ || len >= maxlen)
+      return DECODE_ERROR;
+
+    // copy the data into the vector
     data->resize(len);
     memcpy(data->data(), this->buffer_ + this->position_, len);
     this->position_ += len;
-    ESP_LOGI(TAG, "command %lu Data length %d", command, len);
+    ESP_LOGVV(TAG, "command %lu Data length %d", command, len);
     return DECODE_OK;
   }
 
@@ -289,7 +298,7 @@ static void add(std::vector<uint8_t> &vec, const char *str) {
   }
 }
 
-static void add(std::vector<uint8_t> &vec, uint8_t *data, size_t len) {
+static void add(std::vector<uint8_t> &vec, const uint8_t *data, size_t len) {
   vec.push_back(len);
   for (size_t i = 0; i != len; i++) {
     vec.push_back(*data++);
@@ -367,34 +376,6 @@ void PacketTransport::init_data_() {
   }
 }
 
-void PacketTransport::init_ack_() {
-  this->data_.clear();
-  add(this->data_, ACK_KEY);
-
-  for (auto &value : this->ping_keys_ | std::views::values) {
-    add(this->data_, PING_KEY);
-    add(this->data_, value);
-  }
-}
-
-void PacketTransport::init_command_() {
-  this->data_.clear();
-  add(this->data_, COMMAND_KEY);
-
-  if (this->rolling_code_enable_) {
-    add(this->data_, ROLLING_CODE_KEY);
-    add(this->data_, this->rolling_code_[0]);
-    add(this->data_, this->rolling_code_[1]);
-    this->increment_code_();
-  }
-  else{
-    add(this->data_, ZERO_FILL_KEY);
-  }
-
-
-}
-
-
 void PacketTransport::flush_() {
   if (!this->should_send() || this->data_.empty())
     return;
@@ -437,18 +418,6 @@ void PacketTransport::add_data_(uint8_t key, const char *id, uint32_t data) {
   add(this->data_, data);
   add(this->data_, id);
 }
-
-
-void PacketTransport::add_ack_(uint8_t key, const char *id) {
-  auto len = 1 + 1 + 1 + strlen(id);
-  if (round4(this->header_.size()) + round4(this->data_.size() + len) > this->get_max_packet_size()) {
-    this->flush_();
-    this->init_ack_();
-  }
-  add(this->data_, key);
-  add(this->data_, id);
-}
-
 void PacketTransport::send_data_(bool all) {
   if (!this->should_send())
     return;
@@ -481,48 +450,6 @@ void PacketTransport::send_data_(bool all) {
   this->flush_();
   this->updated_ = false;
   ESP_LOGV(TAG, "finished sending sensor data");
-
-}
-
-
-void PacketTransport::send_ack_() {
-  if (this->should_send()) {
-    this->init_ack_();
-    
-    for (const auto &name : this->binary_sensors_to_acknowledge) {
-      this->add_ack_(BINARY_SENSOR_KEY, name.c_str());
-    }
-
-    for (const auto &name : this->sensors_to_acknowledge) {
-      this->add_ack_(SENSOR_KEY, name.c_str());
-    }
-    this->flush_();
-  }
-
-  this->remote_sensors_need_ack = false;
-  this->sensors_to_acknowledge.clear();
-}
-
-void PacketTransport::send_command_() {
-  if (this->should_send()) {
-    this->init_command_();
-    
-    uint32_t command = 0b0000'0001;
-    add(this->data_, "host_name");
-    add(this->data_, command);
-
-    uint8_t databuf[10]{};
-    databuf[0] = 0b00010001;
-    databuf[1] = 5;
-    databuf[3] = 200;
-
-    add(this->data_, databuf, 5);
-
-
-    ESP_LOGI(TAG, "sending command Data length %d", 5);
-
-    this->flush_();
-  }
 
 }
 
@@ -628,31 +555,32 @@ void PacketTransport::process_command(Provider &provider, PacketDecoder &decoder
     if (!process_rolling_code(provider, decoder)){
       return;
     }
-    // continue;
+    // continue
   }
   else if (decoder.decode(ZERO_FILL_KEY) == DECODE_OK) { /* continue*/ }
+  else {
+    uint8_t byte;
+    decoder.get(byte);
+    ESP_LOGW(TAG, "Bad Command format, unexpected key: %" PRIX8, byte);
+  }
     
   if (decoder.decode_string(namebuf, sizeof namebuf) != DECODE_OK) {
-    ESP_LOGV(TAG, "Bad target hostname length");
+    ESP_LOGW(TAG, "Bad target hostname length");
     return;
   }
-  if (strcmp(this->name_, namebuf) != 0) {
+  if (strcmp(this->name_, namebuf) != 0 && strcmp("*", namebuf) != 0) {
     ESP_LOGI(TAG, "Ignoring command to other host %s", namebuf);
-    // return; ESP_LOGVV
+    // ESP_LOGV
+    return; 
   }
 
   if (decoder.decode_command(command, &data, 256)) {
-    ESP_LOGV(TAG, "Bad Command format");
+    ESP_LOGW(TAG, "Bad Command format");
     return;
   }
 
   // std::vector<uint8_t> v(databuf, databuf + sizeof databuf / sizeof databuf[0]);
   this->call_command_listeners_(command, data);
-
-
-  // ESP_LOGI(TAG, "Command %lu, data: " BYTE_TO_BINARY_PATTERN " : " BYTE_TO_BINARY_PATTERN, command, BYTE_TO_BINARY(databuf[0]),  BYTE_TO_BINARY(databuf[1]));
-  
-
 }
 void PacketTransport::process_ack(Provider &provider, PacketDecoder &decoder){
   uint32_t key;
@@ -702,7 +630,7 @@ void PacketTransport::process_ack(Provider &provider, PacketDecoder &decoder){
   }
 }
 
-void PacketTransport::process_data(Provider &provider, PacketDecoder &decoder, bool ping_key_seen,
+void PacketTransport::process_data(Provider &provider, PacketDecoder &decoder, bool ping_key_seen, std::span<const uint8_t> data,
 #ifdef USE_SENSOR
     string_map_t<sensor::Sensor *> sensors,
 #endif
@@ -855,7 +783,7 @@ void PacketTransport::process_(std::span<const uint8_t> data) {
     ESP_LOGV(TAG, "Expected rolling_key or data_key, got %X", byte);
     return;
   }
-  this->process_data(provider, decoder, ping_key_seen, sensors, binary_sensors);
+  this->process_data(provider, decoder, ping_key_seen, data, sensors, binary_sensors);
 }
 
 void PacketTransport::dump_config() {
@@ -910,7 +838,7 @@ void PacketTransport::loop() {
     ESP_LOGV(TAG, "sending ACK data");
     this->send_ack_();
 
-    this->send_command_();
+    this->send_command_test();
   }
   uint32_t now = millis();
   uint32_t last_send_age = now - this->last_send_time;
@@ -937,6 +865,93 @@ void PacketTransport::call_command_listeners_(uint32_t cmd, const std::vector<ui
   this->command_trigger_.trigger(cmd, data);
 }
 
+
+void PacketTransport::send_command(const char *consumer, uint32_t cmd, const std::vector<uint8_t> &data) {
+  if (this->should_send()) {
+    this->init_command_();
+    
+    add(this->data_, consumer);
+    add(this->data_, cmd);
+
+    add(this->data_, data.data(), data.size());
+
+    ESP_LOGI(TAG, "sending command Data length %d", data.size());
+
+    this->flush_();
+  }
+}
+
+void PacketTransport::send_command_test() {
+  if (this->should_send()) {
+    this->init_command_();
+    
+    uint32_t command = 0b0000'0001;
+    add(this->data_, "host_name");
+    add(this->data_, command);
+
+    uint8_t databuf[10]{};
+    databuf[0] = 0b00010001;
+    databuf[1] = 5;
+    databuf[3] = 200;
+
+    add(this->data_, databuf, 5);
+
+    ESP_LOGVV(TAG, "sending command Data length %d", 5);
+
+    this->flush_();
+  }
+}
+void PacketTransport::init_command_() {
+  this->data_.clear();
+  add(this->data_, COMMAND_KEY);
+
+  if (this->rolling_code_enable_) {
+    add(this->data_, ROLLING_CODE_KEY);
+    add(this->data_, this->rolling_code_[0]);
+    add(this->data_, this->rolling_code_[1]);
+    this->increment_code_();
+  }
+  else{
+    add(this->data_, ZERO_FILL_KEY);
+  }
+}
+
+void PacketTransport::send_ack_() {
+  if (this->should_send()) {
+    this->init_ack_();
+    
+    for (const auto &name : this->binary_sensors_to_acknowledge) {
+      this->add_ack_(BINARY_SENSOR_KEY, name.c_str());
+    }
+
+    for (const auto &name : this->sensors_to_acknowledge) {
+      this->add_ack_(SENSOR_KEY, name.c_str());
+    }
+    this->flush_();
+  }
+  this->remote_sensors_need_ack = false;
+  this->sensors_to_acknowledge.clear();
+}
+
+void PacketTransport::add_ack_(uint8_t key, const char *id) {
+  auto len = 1 + 1 + 1 + strlen(id);
+  if (round4(this->header_.size()) + round4(this->data_.size() + len) > this->get_max_packet_size()) {
+    this->flush_();
+    this->init_ack_();
+  }
+  add(this->data_, key);
+  add(this->data_, id);
+}
+
+void PacketTransport::init_ack_() {
+  this->data_.clear();
+  add(this->data_, ACK_KEY);
+
+  for (auto &value : this->ping_keys_ | std::views::values) {
+    add(this->data_, PING_KEY);
+    add(this->data_, value);
+  }
+}
 
 void PacketTransport::send_ping_pong_request_() {
   if (!this->ping_pong_enable_ || !this->should_send())

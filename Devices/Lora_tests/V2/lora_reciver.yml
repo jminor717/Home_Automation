@@ -116,12 +116,21 @@ button:
         - sx127x.send_packet:
             data: [0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE, 0xBA, 0xBE]
   - platform: template
-    name: "Request Remote Sensor State Update"
+    name: "Send command Packet"
     on_press:
       then:
         - lambda: id(sentPackets)++;
-        - sx127x.send_packet:
+        - packet_transport.send_command:
+            command: 222
             data: [0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE, 0xBA, 0xBE]
+  - platform: template
+    name: "Send empty commandPacket"
+    on_press:
+      then:
+        - lambda: id(sentPackets)++;
+        - packet_transport.send_command:
+            command: 0b1010_0101
+            consumer: $device_name_receiver
 
 # OLED Display
 display:
@@ -184,8 +193,6 @@ switch:
       - sensor.template.publish: { id: garage_door_state_request, state: 12}
     turn_off_action:
       - sensor.template.publish: { id: garage_door_state_request, state: 8}
-
-
 
 
 binary_sensor:

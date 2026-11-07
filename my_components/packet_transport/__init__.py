@@ -16,8 +16,10 @@ from esphome.const import (
     CONF_NAME,
     CONF_PLATFORM,
     CONF_SENSORS,
+    CONF_DATA,
+    CONF_COMMAND
 )
-from esphome.core import CORE
+from esphome.core import CORE, ID
 from esphome.cpp_generator import MockObjClass
 
 CODEOWNERS = ["@clydebarrow"]
@@ -25,6 +27,10 @@ AUTO_LOAD = ["xxtea"]
 
 packet_transport_ns = cg.esphome_ns.namespace("packet_transport")
 PacketTransport = packet_transport_ns.class_("PacketTransport", cg.PollingComponent)
+
+SendCommandAction = packet_transport_ns.class_(
+    "SendCommandAction", automation.Action, cg.Parented.template(PacketTransport)
+)
 
 IS_PLATFORM_COMPONENT = True
 
@@ -43,6 +49,7 @@ CONF_RETRY_TIMEOUT = "retry_timeout"
 CONF_RETRY_RATE = "retry_rate"
 CONF_TRANSPORT_ID = "transport_id"
 CONF_ON_COMMAND = "on_command"
+CONF_CONSUMER = "consumer"
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -232,3 +239,59 @@ async def new_packet_transport(config):
     cg.add(var.set_platform_name(config[CONF_PLATFORM]))
     providers = await register_packet_transport(var, config)
     return var, providers
+
+
+
+def validate_raw_data(value):
+    if isinstance(value, str):
+        return value.encode("utf-8")
+    if isinstance(value, list):
+        return cv.Schema([cv.hex_uint8_t])(value)
+    raise cv.Invalid(
+        "data must either be a string wrapped in quotes or a list of bytes"
+    )
+
+
+# hex_uint32_t  uint32_t
+SEND_COMMAND_ACTION_SCHEMA = cv.maybe_simple_value(
+    {
+        cv.GenerateID(): cv.use_id(PacketTransport),
+        cv.Required(CONF_COMMAND): cv.Any(cv.uint32_t, cv.hex_uint32_t),
+        cv.Optional(CONF_CONSUMER): provider_name_validate, # same name restrictions as providers, if excluded then command is broadcast to all
+        cv.Optional(CONF_DATA): cv.templatable(validate_raw_data),
+    },
+    key=CONF_COMMAND,
+)
+
+
+
+@automation.register_action(
+    "packet_transport.send_command",
+    SendCommandAction,
+    SEND_COMMAND_ACTION_SCHEMA,
+    synchronous=True,
+)
+async def send_command_action_to_code(config, action_id, template_arg, args):
+    var = cg.new_Pvariable(action_id, template_arg)
+    await cg.register_parented(var, config[CONF_ID])
+    command = config[CONF_COMMAND]
+
+    consumer = "*" # can't set default in schema because "*" is a special character and will fail validation in a normal name
+    if CONF_CONSUMER in config:
+        consumer = config[CONF_CONSUMER]
+
+    if CONF_DATA in config:
+        data = config[CONF_DATA]
+        if isinstance(data, bytes):
+            data = list(data)
+        if cg.is_template(data):
+            templ = await cg.templatable(data, args, cg.std_vector.template(cg.uint8))
+            cg.add(var.set_data_template(consumer, command, templ))
+        else:
+            # Generate static array in flash to avoid RAM copy
+            arr_id = ID(f"{action_id}_data", is_declaration=True, type=cg.uint8)
+            arr = cg.static_const_array(arr_id, cg.ArrayInitializer(*data))
+            cg.add(var.set_data_static(consumer, command, arr, len(data)))
+    else:
+        cg.add(var.set_command_no_data(consumer, command))
+    return var

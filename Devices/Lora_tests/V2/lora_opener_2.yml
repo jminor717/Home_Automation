@@ -174,7 +174,14 @@ button:
         - lambda: id(sentPackets)++;
         - sx127x.send_packet:
             data: [0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE, 0xBA, 0xBE]
-
+  - platform: template
+    name: "Send empty commandPacket"
+    on_press:
+      then:
+        - lambda: id(sentPackets)++;
+        - packet_transport.send_command:
+            command: 0b1010_0101
+            consumer: $device_name_receiver
 
 packet_transport:
   platform: sx127x
@@ -182,14 +189,22 @@ packet_transport:
   encryption: !secret LoRa_key
   rolling_code_enable: true
   ping_pong_enable: true
+  ping_pong_recycle_time: 80s
+  only_send_sensor_states_on_change: true
   retry_sending_sensor_states_enable: true
-  retry_timeout: 10s
+  retry_rate: 15s
+  retry_timeout: 1min
   sensors:
     - id: garage_door_state_request
       broadcast_id: garage_door_state_request_2
   providers:
     - name: $device_name_opener
       encryption: !secret LoRa_key
+  on_command:
+    then:
+      - lambda: |-
+          char hex[256]; 
+          ESP_LOGI("lora", "Received command: %lu :   %s", cmd,  format_hex_to(hex, data));
 
 switch:
   - platform: template
@@ -202,12 +217,31 @@ switch:
       - sensor.template.publish: { id: garage_door_state_request, state: 8}
 
 
+esp32_touch:
+  id: esp32_touch_1
+  setup_mode: true
+  sleep_duration: 0.1ms
+  measurement_duration: 0.25ms
+  low_voltage_reference: 0.6V
+  high_voltage_reference: 2.6V
+  voltage_attenuation: 0V
+  filter_mode: JITTER
+  debounce_count: 3
+  noise_threshold: 1
+  jitter_step: 15
+  smooth_mode: IIR_4
+
 binary_sensor:
   - platform: packet_transport
     provider: $device_name_opener
     type: status
     name: opener connection status
     internal: false
+  - platform: esp32_touch
+    id: esp32_touch_pad
+    name: "ESP32 Touch Pad"
+    pin: GPIO8
+    threshold: 100_000
 
 sensor:
   - { platform: uptime, id: uptime_seconds, update_interval: 1min }
@@ -226,4 +260,23 @@ sensor:
     name: local state
     internal: false
     update_interval: never
-
+  - platform: template
+    name: "Raw touch value"
+    device_class: "voltage"
+    lambda: |-
+        return id(esp32_touch_pad).get_value();
+    update_interval: 0.5s
+    filters: 
+      - sliding_window_moving_average:
+          window_size: 30
+          send_every: 15
+  - platform: template
+    name: "Touch diff"
+    device_class: "voltage"
+    lambda: |-
+        return id(esp32_touch_pad).get_difference();
+    update_interval: 0.5s
+    filters: 
+      - sliding_window_moving_average:
+          window_size: 30
+          send_every: 15

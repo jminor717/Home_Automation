@@ -127,6 +127,8 @@ class PacketTransport : public PollingComponent {
 #endif
   void set_platform_name(const char *name) { this->platform_name_ = name; }
 
+  void send_command(const char *consumer, uint32_t cmd, const std::vector<uint8_t> &data);
+  
  protected:
   // child classes must implement this
   virtual void send_packet(const std::vector<uint8_t> &buf) const = 0;
@@ -137,7 +139,7 @@ class PacketTransport : public PollingComponent {
   void process_(std::span<const uint8_t> data);
   void send_data_(bool all);
   void send_ack_();
-  void send_command_();
+  void send_command_test();
   void flush_();
   void add_data_(uint8_t key, const char *id, float data);
   void add_data_(uint8_t key, const char *id, uint32_t data);
@@ -150,7 +152,7 @@ class PacketTransport : public PollingComponent {
   void call_command_listeners_(uint32_t cmd, const std::vector<uint8_t> &data);
   void process_command(Provider &provider, PacketDecoder &decoder);
   void process_ack(Provider &provider, PacketDecoder &decoder);
-  void process_data(Provider &provider, PacketDecoder &decoder, bool ping_key_seen, 
+  void process_data(Provider &provider, PacketDecoder &decoder, bool ping_key_seen, std::span<const uint8_t> data, 
 #ifdef USE_SENSOR
     string_map_t<sensor::Sensor *> sensors,
 #endif
