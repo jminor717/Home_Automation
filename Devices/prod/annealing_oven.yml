@@ -17,7 +17,7 @@ substitutions:
 external_components:
   - source:
       type: local
-      path: ../my_components # path relative to Devices folder
+      path: ../../my_components # path relative to Devices folder
 
 esphome:
     name: $device_name
@@ -51,7 +51,7 @@ ota:
   password: ""
 
 logger:
-  level: VERBOSE
+  level: Debug
   logs:
     sensor: WARN
     button: INFO
@@ -90,6 +90,7 @@ globals:
   - { id: running_profile, type: bool, initial_value: "false" }
   - { id: run_start_time, type: "uint32_t", initial_value: "1" }
   - { id: run_index, type: "int32_t", initial_value: "-1" }
+  - { id: last_profile_log, type: "uint32_t", initial_value: "0" }
 
 button:
   - platform: restart
@@ -101,7 +102,12 @@ button:
   - platform: template
     name: "PID Right Autotune"
     on_press:
-      - climate.pid.autotune: pid_right
+      - climate.control: { id: pid_right, mode: "HEAT", target_temperature: 50°C }
+      - climate.pid.autotune: 
+          id: pid_right
+          noiseband: 1
+          positive_output: 20%
+
   - platform: template
     name: "PID Bottom Autotune"
     on_press:
@@ -109,7 +115,7 @@ button:
       - climate.pid.autotune:
           id: pid_bottom
           noiseband: 1
-          positive_output: 25%
+          positive_output: 20%
 
   - platform: template
     name: "turn off"
@@ -186,33 +192,37 @@ script:
           auto elapsed = (time - id(run_start_time));
           
           auto localIndex = id(run_index);
-          if(id(profile_times)[localIndex+1] <= elapsed){
+          auto next_time = id(profile_times)[localIndex + 1];
+          if(next_time <= elapsed){
             localIndex++;
             id(run_index) = localIndex;
           }
 
-            if(localIndex >= (id(profile_points) - 1)){
-              ESP_LOGI("run_profile", "profile complete, stopping");
-              id(running_profile) = false;
-              id(profile_is_running).publish_state(false); 
-              id(pid_left).make_call().set_mode(CLIMATE_MODE_OFF).set_target_temperature(18).perform();
-              id(pid_right).make_call().set_mode(CLIMATE_MODE_OFF).set_target_temperature(18).perform();
-              id(pid_bottom).make_call().set_mode(CLIMATE_MODE_OFF).set_target_temperature(18).perform();
-              return;
-            }
+          if(localIndex >= (id(profile_points) - 1)){
+            ESP_LOGI("run_profile", "profile complete, stopping");
+            id(running_profile) = false;
+            id(profile_is_running).publish_state(false); 
+            id(pid_left).make_call().set_mode(CLIMATE_MODE_OFF).set_target_temperature(18).perform();
+            id(pid_right).make_call().set_mode(CLIMATE_MODE_OFF).set_target_temperature(18).perform();
+            id(pid_bottom).make_call().set_mode(CLIMATE_MODE_OFF).set_target_temperature(18).perform();
+            return;
+          }
 
           auto prior_temp = id(profile_temps)[localIndex];
           auto next_temp = id(profile_temps)[localIndex + 1];
           auto prior_time = id(profile_times)[localIndex];
-          auto next_time = id(profile_times)[localIndex + 1];
-
+          next_time = id(profile_times)[localIndex + 1];
+          
           auto delta = elapsed - prior_time;
           auto time_delta = next_time - prior_time;
           auto temp_delta = next_temp - prior_temp;
           auto interpolated_temp = prior_temp + (temp_delta * delta / time_delta);
-          
-          ESP_LOGI("run_profile", "point: %ld|%ld, delta: %.2f, elapsed %lld, prior: %.2f, next: %.2f, inter: %.2f", 
-                          localIndex, id(profile_points)-1, delta, elapsed, prior_temp, next_temp, interpolated_temp);
+
+          if (millis() - id(last_profile_log) >= 30000 || id(last_profile_log) == 0) {
+            id(last_profile_log) = millis();
+            ESP_LOGI("run_profile", "point: %ld|%ld, next: %.2f, elapsed %lld, prior: %.2f, next: %.2f, inter: %.2f", 
+                            localIndex, id(profile_points)-1, next_time, elapsed, prior_temp, next_temp, interpolated_temp);
+          }
           id(pid_left).make_call().set_mode(CLIMATE_MODE_HEAT).set_target_temperature(interpolated_temp).perform();
           id(pid_right).make_call().set_mode(CLIMATE_MODE_HEAT).set_target_temperature(interpolated_temp).perform();
           id(pid_bottom).make_call().set_mode(CLIMATE_MODE_HEAT).set_target_temperature(interpolated_temp).perform();
@@ -290,9 +300,9 @@ output:
   - platform: gpio
     id: rf_antenna_select
     pin: RF_ANT_SELECT
-  - { platform: ledc, pin: $left_heater_pin, id: heater_left, frequency: 1220Hz}
-  - { platform: ledc, pin: $right_heater_pin, id: heater_right, frequency: 1220Hz}
-  - { platform: ledc, pin: $bottom_heater_pin, id: heater_bottom, frequency: 1220Hz}
+  - { platform: ledc, pin: $left_heater_pin, id: heater_left, frequency: 19531Hz, max_power: 0.75}
+  - { platform: ledc, pin: $right_heater_pin, id: heater_right, frequency: 19531Hz, max_power: 0.75}
+  - { platform: ledc, pin: $bottom_heater_pin, id: heater_bottom, frequency: 19531Hz, max_power: 0.75}
   - platform: template
     id: null_output
     type: float
@@ -354,9 +364,9 @@ climate:
       max_temperature: 110
       temperature_step: 1
     control_parameters:
-      kp: 0.07366 # second tune 25%
-      ki: 0.00049
-      kd: 2.76258
+      kp: 0.05123
+      ki: 0.00050
+      kd: 1.31293
       output_averaging_samples: 5      # smooth the output over 5 samples
       derivative_averaging_samples: 10  # smooth the derivative value over 10 samples
     deadband_parameters:
@@ -373,9 +383,9 @@ climate:
       max_temperature: 110
       temperature_step: 1
     control_parameters:
-      kp: 0.07366 # second tune 25%
-      ki: 0.00049
-      kd: 2.76258
+      kp: 0.05123
+      ki: 0.00050
+      kd: 1.31293
       output_averaging_samples: 5      # smooth the output over 5 samples
       derivative_averaging_samples: 10  # smooth the derivative value over 10 samples
     deadband_parameters:
@@ -399,9 +409,24 @@ climate:
       # kp: 0.24595 # first tune 100%
       # ki: 0.00413
       # kd: 3.65898
-      kp: 0.07366 # second tune 25%
-      ki: 0.00049
-      kd: 2.76258
+      
+      # 24 volt
+      # kp: 0.05123
+      # ki: 0.00050
+      # kd: 1.31293
+      # Alternative Rules:
+      #   Rule 'Ziegler-Nichols PI':
+      #     kp: 0.03842, ki: 0.00022, kd: 0.00000
+      #   Rule 'Pessen Integral PID':
+      #     kp: 0.05977, ki: 0.00073, kd: 1.83810
+      #   Rule 'Some Overshoot PID':
+      #     kp: 0.02843, ki: 0.00028, kd: 1.94313
+      #   Rule 'No Overshoot PID':
+      #     kp: 0.01708, ki: 0.00017, kd: 1.09410
+
+      kp: 0.05123
+      ki: 0.00050
+      kd: 1.31293
       output_averaging_samples: 5      # smooth the output over 5 samples
       derivative_averaging_samples: 10  # smooth the derivative value over 10 samples
     deadband_parameters:

@@ -36,23 +36,7 @@ esphome:
   name: $device_name
   platformio_options:
     board_build.flash_mode: dio
-  on_boot:
-    - priority: -100
-      then:
-        - lambda: |-
-            // if cover is at one of the end stops move to the opposite end
-            if(id(close_endstop_binary_sensor).state){
-              id(frd_cover).make_call().set_command_open().perform();
-              id(open_start_time) = millis();
-            }
-            else if(id(open_endstop_binary_sensor).state){
-              id(frd_cover).make_call().set_command_close().perform();
-              id(close_start_time) = millis();
-            }
-            else {
-              id(startup_setup) = true;
-              id(frd_cover).make_call().set_command_close().perform();
-            }
+
 
 esp32:
   board: esp32-s3-devkitc-1
@@ -91,6 +75,15 @@ time:
 button:
   - platform: restart
     name: "$device_name Restart"
+  - platform: template
+    id: run_call
+    name: "home vent erv servo"
+    entity_category: "diagnostic"
+    on_press:
+      then:
+        lambda: !lambda |-
+          id(damper)->setup();
+
 
 text_sensor:
   - platform: version
@@ -111,10 +104,6 @@ output:
   - {platform: ledc, id: servo_output, pin: $servo_pin, frequency: 200 Hz}
 
 globals:
-  - { id: running_startup, type: bool, initial_value: "true" }
-  - { id: startup_setup, type: bool, initial_value: "false" }
-  - { id: open_start_time, type: uint32_t, initial_value: "0" }
-  - { id: close_start_time, type: uint32_t, initial_value: "0" }
   - { id: speed, type: float, initial_value: "0.5" }
 
 binary_sensor:
@@ -123,33 +112,13 @@ binary_sensor:
     id: open_endstop_binary_sensor
     pin: { number: $stop_2, mode: { input: true, pulldown : true } }
     filters: [ delayed_on_off: 100ms]
-    on_state: 
-      then:
-        - lambda: |-
-            ESP_LOGI("cover", "Open endstop triggered");
-            if (id(running_startup)) {
-              auto now = millis();
-              ESP_LOGI("cover", "Open endstop triggered at %lu ms, started at %lu: dif %lu", now, id(open_start_time), now - id(open_start_time));
-              // id(running_startup) = false;
-            }
+    entity_category: "diagnostic"
   - platform: gpio
     name: "Close Endstop"
     id: close_endstop_binary_sensor
     pin: { number: $stop_1, mode: { input: true, pulldown : true } }
     filters: [ delayed_on_off: 100ms]
-    on_state: 
-      then:
-        - lambda: |-
-            ESP_LOGI("cover", "Close endstop triggered");
-            if (id(running_startup)) {
-              auto now = millis();
-              if (id(startup_setup)) {
-                id(startup_setup) = false;
-              }
-              // id(running_startup) = false;
-              ESP_LOGI("cover", "close endstop triggered at %lu ms, started at %lu: dif %lu", now, id(close_start_time), now - id(close_start_time));
-
-            }
+    entity_category: "diagnostic"
 
 cover:
   - platform: endstop
@@ -160,31 +129,31 @@ cover:
       - output.turn_on: motor_dir_1
       # - output.turn_on: motor_speed
       - output.set_level: { id: motor_speed, level: !lambda "return id(speed);" }
-    open_duration: 9s
+    open_duration: 18s
     open_endstop: open_endstop_binary_sensor
     close_action:
       - output.turn_off: motor_dir_1
       - output.turn_on: motor_dir_2
       # - output.turn_on: motor_speed
       - output.set_level: { id: motor_speed, level:  !lambda "return id(speed);" }
-    close_duration: 9s
+    close_duration: 17s
     close_endstop: close_endstop_binary_sensor
     stop_action:
       - output.turn_off: motor_speed
       - output.turn_off: motor_dir_1
       - output.turn_off: motor_dir_2
-  # - platform: template
-  #   device_class: damper
-  #   id: test_vent
-  #   name: printer vent_erv
-  #   restore_mode: NO_RESTORE
-  #   has_position: true
-  #   open_action: { servo.write: { id: servo_, level: !lambda "return id(damper).open_position;" } }
-  #   close_action: { servo.write: { id: servo_, level: !lambda "return  id(damper).close_position;" }}
-  #   position_action: { servo.write: { id: servo_, level: !lambda "return id(damper).tilt_to_servo_position(pos);" }}
-  #   lambda: "return id(damper).get_tilt();"
-  #   tilt_action: { servo.write: { id: servo_, level: !lambda "return id(damper).tilt_to_servo_position(tilt);" }}
-  #   tilt_lambda: !lambda "return id(damper).get_tilt();"
+  - platform: template
+    device_class: damper
+    id: test_vent
+    name: printer vent_erv
+    restore_mode: NO_RESTORE
+    has_position: true
+    open_action: { servo.write: { id: servo_, level: !lambda "return id(damper).open_position;" } }
+    close_action: { servo.write: { id: servo_, level: !lambda "return  id(damper).close_position;" }}
+    position_action: { servo.write: { id: servo_, level: !lambda "return id(damper).tilt_to_servo_position(pos);" }}
+    lambda: "return id(damper).get_tilt();"
+    tilt_action: { servo.write: { id: servo_, level: !lambda "return id(damper).tilt_to_servo_position(tilt);" }}
+    tilt_lambda: !lambda "return id(damper).get_tilt();"
 
 
 .defaultfilters:
@@ -215,9 +184,9 @@ sensor:
     
   - { platform: adc, id: servo_potentiometer, name: "A v_meas", pin: $servo_pot_pin, update_interval: 250ms, attenuation: 12db }
 
-# hard_stop_damper:
-#   - {id: damper, servo_position_sensor: servo_potentiometer, servo: servo_, 
-#     open_at_center: true, switch_open_and_close: false, check_position_physically: true }
+hard_stop_damper:
+  - {id: damper, servo_position_sensor: servo_potentiometer, servo: servo_, 
+    open_at_center: true, switch_open_and_close: false, check_position_physically: true }
 
 servo:
   - { id: servo_, output: servo_output, transition_length: 0s, auto_detach_time: 1000ms, max_level: 50%, min_level: 1%} # transition_length: 7s
@@ -228,15 +197,14 @@ servo:
 
 number:
   - platform: template
-    name: vent Control
+    name: vent speed control
     min_value: 0
     initial_value: 0.5
     max_value: 1
     step: 0.01
     optimistic: true
+    device_class: Speed
+    entity_category: "diagnostic"
     set_action:
       then:
         - globals.set: { id: speed, value: x }
-        # - servo.write:
-        #     id: servo_
-        #     level: !lambda "return id(speed).tilt_to_servo_position(( x / 100.0));"

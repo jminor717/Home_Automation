@@ -114,6 +114,4 @@
         "millis"
     ],
     "C_Cpp.errorSquiggles": "disabled",
-    "snyk.advanced.autoSelectOrganization": true,
-    "python-envs.pythonProjects": []
 }
