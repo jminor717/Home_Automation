@@ -1,0 +1,164 @@
+substitutions:
+  device_name_bathroom: bathroom-vent-controller
+  device_name_shop: t3-lora32
+  device_name: $device_name_shop
+  printer_exhaust_id: 1
+  shop_exhaust_id: 2
+  bathroom_exhaust_id: 3
+  kitchen_exhaust_id: 4
+
+  printer_servo_pot_pin: GPIO34
+  printer_servo_pin: GPIO33
+  shop_servo_pot_pin: GPIO32
+  shop_servo_pin: GPIO21
+
+  
+
+external_components:
+  - source:
+      type: local
+      path: ../../../my_components # path relative to Devices folder
+    components: [packet_transport, vent_coordinator, hard_stop_damper]
+esphome:
+  name: $device_name
+
+esp32:
+  variant: esp32
+  cpu_frequency: 240MHZ
+  framework:
+    type: esp-idf
+
+preferences:
+  # the default of 1min is far too short--flash chip is rated for approx 100k writes.
+  flash_write_interval: "240h"
+
+api:
+  # password: ""
+ota:
+  platform: esphome
+  password: ""
+
+logger:
+  level: INFO
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "$device_name AP"
+    password: "BiSG9yrKP394"
+captive_portal:
+
+time:
+  - platform: homeassistant
+
+text_sensor:
+  - platform: version
+    name: "$device_name Version"
+
+# spi: { clk_pin: GPIO5, mosi_pin: GPIO27, miso_pin: GPIO19 }
+# sx127x: { 
+#     dio0_pin: GPIO26, cs_pin: GPIO18, rst_pin: GPIO23,
+#     pa_pin: BOOST, pa_power: 10, bandwidth: 125_0kHz, frequency: 915MHz,
+#     modulation: LORA, sync_value: 0x12, preamble_size: 8, spreading_factor: 7, coding_rate: CR_4_6,
+#     crc_enable: true, rx_start: true
+# }
+
+udp:
+    listen_address: 255.255.255.255
+    addresses: ["255.255.255.255" ] # "208.87.135.110"
+
+packet_transport:
+  id: udp_transport
+  platform: udp
+  update_interval: 30s
+  encryption: !secret LoRa_key
+  rolling_code_enable: true
+  ping_pong_enable: true
+  ping_pong_recycle_time: 80s
+  only_send_sensor_states_on_change: true
+  retry_sending_sensor_states_enable: true
+  retry_rate: 15s
+  retry_timeout: 1min
+  sensors:
+    - id: printer_vent_position
+    - id: shop_vent_position
+  providers:
+    - name: $device_name_bathroom
+      encryption: !secret LoRa_key
+  on_command:
+    then:
+      - lambda: |-
+          char hex[256]; 
+          ESP_LOGI("lora", "Received command: %lu :   %s", cmd,  format_hex_to(hex, data));
+
+vent_coordinator:
+  transport: udp_transport
+  vents: [
+    { id: printer_v,  cover: printer_vent, control_id: $printer_exhaust_id, cover_position_sensor: printer_vent_position },
+    { id: shop_v, cover: shop_vent, control_id: $shop_exhaust_id, cover_position_sensor: shop_vent_position },
+    { id: bathroom_v, remote_provider: $device_name_bathroom, remote_id: $bathroom_exhaust_id, cover_position_sensor: bathroom_vent_position  },
+    { id: kitchen_v, remote_provider: $device_name_bathroom, remote_id: $kitchen_exhaust_id, cover_position_sensor: kitchen_vent_position  },
+  ]
+
+.defaultfilters:
+  - &moving_avg
+    sliding_window_moving_average:
+      window_size: 4
+      send_every: 4
+
+sensor:
+  - { platform: uptime, id: uptime_seconds, update_interval: 1min }
+  - { platform: template, id: uptime_days, name: "$device_name uptime", update_interval: 1min, 
+        device_class: duration, entity_category: "diagnostic", unit_of_measurement: "d", accuracy_decimals: 2,
+        lambda: !lambda "return id(uptime_seconds).state / 86'400;"}
+    # servo potentiometers for vents
+  - { platform: adc, id: shop_servo_potentiometer, pin: $shop_servo_pot_pin, update_interval: 250ms, attenuation: 12db }
+  - { platform: adc, id: printer_servo_potentiometer, pin: $printer_servo_pot_pin, update_interval: 250ms, attenuation: 12db }
+    # sensors for vent positions
+  - { platform: packet_transport, id: kitchen_vent_position, provider: $device_name_bathroom }
+  - { platform: packet_transport, id: bathroom_vent_position, provider: $device_name_bathroom }
+  - { platform: template, id: shop_vent_position, lambda: !lambda "return id(shop_damper).get_tilt();", update_interval: 250ms, filters: [ *moving_avg, delta: 0.05 ] }
+  - { platform: template, id: printer_vent_position, lambda: !lambda "return id(printer_damper).get_tilt();", update_interval: 250ms, filters: [ *moving_avg, delta: 0.05 ] }
+
+
+hard_stop_damper:
+  - {id: shop_damper, servo_position_sensor: shop_servo_potentiometer, servo: servo_shop, 
+    open_at_center: true, switch_open_and_close: false, check_position_physically: true }
+  - {id: printer_damper, servo_position_sensor: printer_servo_potentiometer, servo: servo_printer, 
+    open_at_center: true, switch_open_and_close: false, check_position_physically: true }
+
+servo:
+  - { id: servo_shop, output: shop_servo_output, transition_length: 0s, auto_detach_time: 1000ms, max_level: 47%, min_level: 0% } # transition_length: 7s
+  - { id: servo_printer, output: printer_servo_output, transition_length: 0s, auto_detach_time: 1000ms, max_level: 47%, min_level: 0% }
+
+output:
+  - { platform: ledc, id: shop_servo_output, pin: $shop_servo_pin, frequency: 200 Hz }
+  - { platform: ledc, id: printer_servo_output, pin: $printer_servo_pin, frequency: 200 Hz }
+
+cover:
+  - platform: template
+    device_class: damper
+    id: shop_vent
+    name: shop vent_erv
+    restore_mode: NO_RESTORE
+    has_position: true
+    open_action: { servo.write: { id: servo_shop, level: !lambda "return id(shop_damper).open_position;" } }
+    close_action: { servo.write: { id: servo_shop, level: !lambda "return  id(shop_damper).close_position;" }}
+    position_action: { servo.write: { id: servo_shop, level: !lambda "return id(shop_damper).tilt_to_servo_position(pos);" }}
+    lambda: "return id(shop_damper).get_tilt();"
+    tilt_action: { servo.write: { id: servo_shop, level: !lambda "return id(shop_damper).tilt_to_servo_position(tilt);" }}
+    tilt_lambda: !lambda "return id(shop_damper).get_tilt();"
+  - platform: template
+    device_class: damper
+    id: printer_vent
+    name: printer vent_erv
+    restore_mode: NO_RESTORE
+    has_position: true
+    open_action: { servo.write: { id: servo_printer, level: !lambda "return id(printer_damper).open_position;" } }
+    close_action: { servo.write: { id: servo_printer, level: !lambda "return  id(printer_damper).close_position;" }}
+    position_action: { servo.write: { id: servo_printer, level: !lambda "return id(printer_damper).tilt_to_servo_position(pos);" }}
+    lambda: "return id(printer_damper).get_tilt();"
+    tilt_action: { servo.write: { id: servo_printer, level: !lambda "return id(printer_damper).tilt_to_servo_position(tilt);" }}
+    tilt_lambda: !lambda "return id(printer_damper).get_tilt();"
+
