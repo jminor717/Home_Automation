@@ -152,12 +152,12 @@ class PacketTransport : public PollingComponent {
   void call_command_listeners_(uint32_t cmd, const std::vector<uint8_t> &data);
   void process_command(Provider &provider, PacketDecoder &decoder);
   void process_ack(Provider &provider, PacketDecoder &decoder);
-  void process_data(Provider &provider, PacketDecoder &decoder, bool ping_key_seen, std::span<const uint8_t> data, 
+  void process_data(Provider &provider, PacketDecoder &decoder, bool ping_key_seen, std::span<const uint8_t> data
 #ifdef USE_SENSOR
-    string_map_t<sensor::Sensor *> sensors,
+    , string_map_t<sensor::Sensor *> sensors
 #endif
 #ifdef USE_BINARY_SENSOR
-    string_map_t<binary_sensor::BinarySensor *> binary_sensors
+    , string_map_t<binary_sensor::BinarySensor *> binary_sensors
 #endif
     );
 

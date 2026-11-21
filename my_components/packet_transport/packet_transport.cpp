@@ -305,6 +305,7 @@ static void add(std::vector<uint8_t> &vec, const uint8_t *data, size_t len) {
   }
 }
 
+#if defined(USE_BINARY_SENSOR) || defined(USE_SENSOR)
 static void add_ack_name(std::vector<std::string> &names, const char *name) {
   for (const auto &existing : names) {
     if (existing == name)
@@ -312,6 +313,7 @@ static void add_ack_name(std::vector<std::string> &names, const char *name) {
   }
   names.emplace_back(name);
 }
+#endif
 
 void PacketTransport::setup() {
   this->name_ = App.get_name().c_str();
@@ -630,12 +632,12 @@ void PacketTransport::process_ack(Provider &provider, PacketDecoder &decoder){
   }
 }
 
-void PacketTransport::process_data(Provider &provider, PacketDecoder &decoder, bool ping_key_seen, std::span<const uint8_t> data,
+void PacketTransport::process_data(Provider &provider, PacketDecoder &decoder, bool ping_key_seen, std::span<const uint8_t> data
 #ifdef USE_SENSOR
-    string_map_t<sensor::Sensor *> sensors,
+    , string_map_t<sensor::Sensor *> sensors
 #endif
 #ifdef USE_BINARY_SENSOR
-    string_map_t<binary_sensor::BinarySensor *> binary_sensors
+    , string_map_t<binary_sensor::BinarySensor *> binary_sensors
 #endif
   ){
   uint32_t key;
@@ -783,7 +785,14 @@ void PacketTransport::process_(std::span<const uint8_t> data) {
     ESP_LOGV(TAG, "Expected rolling_key or data_key, got %X", byte);
     return;
   }
-  this->process_data(provider, decoder, ping_key_seen, data, sensors, binary_sensors);
+  this->process_data(provider, decoder, ping_key_seen, data
+#ifdef USE_SENSOR
+    , sensors
+#endif
+#ifdef USE_BINARY_SENSOR
+    , binary_sensors
+#endif
+  );
 }
 
 void PacketTransport::dump_config() {

@@ -34,7 +34,7 @@ from esphome.const import (
 CODEOWNERS = ["@jacob"]
 # DEPENDENCIES = ["spi"]
 
-# AUTO_LOAD = ["LEDCOutput"]
+AUTO_LOAD = ["sensor", "switch"]
 
 
 CONF_MOTORS = "motors"

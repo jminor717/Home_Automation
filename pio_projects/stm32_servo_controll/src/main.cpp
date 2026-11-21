@@ -2,6 +2,24 @@
 #include <SPI.h>
 #include <Wire.h>
 
+/*
+  TODO: 
+    implement i2c commands
+    fault states:
+      stepper fault state
+      garage door object present sensor triggered
+    fault recovery
+      if moving down- decelerate quickly, and move back up one inch above when fault occurs
+      if moving up- decelerate quickly
+
+
+*/
+
+
+
+
+
+
 // put function declarations here:
 void moveServoFloat(uint32_t total_steps, uint16_t max_speed, uint16_t acceleration, uint16_t min_speed);
 void moveServoMicros(uint32_t total_steps, uint16_t max_speed, uint16_t acceleration, uint16_t min_speed);
@@ -14,12 +32,51 @@ const int enable_pin = PB3;
 #define MISO_PIN  6  // D12 = pin18 = PortB.4
 #define MOSI_PIN  7  // D11 = pin17 = PortB.3
 #define SS_PIN    4  // D10 = pin16 = PortB.2
+
+// #define SDA_PIN   5  // D13 = pin19 = PortB.5
+// #define SCL_PIN  6  // D12 = pin18 = PortB.4
+#define SDA_PIN  PB5   // D13 = pin19 = PortB.5
+#define SCL_PIN  PB4  // D12 = pin18 = PortB.4
+// static const pin_size_t SDA = PIN_WIRE_SDA; PB3
+// static const pin_size_t SCL = PIN_WIRE_SCL; PB10
+
 const int LED_PIN = PC13; 
 
 volatile bool rx = false;
+volatile byte receivedData = 0;
+volatile byte responseData = 0x00;
 
-void SPI_ISR() {
-  rx = true;
+byte RxByte;
+int numBytesFromHandler;
+
+// void SPI_ISR() {
+//   rx = true;
+// }
+// TwoWire Wire2(SDA_PIN, SCL_PIN); // SDA, SCL
+
+void I2C_RxHandler(int numBytes) {
+  rx = false;
+  while (Wire.available()) {
+    receivedData = Wire.read();
+    // Wire.write(receivedData);
+  }
+}
+
+
+// (int numBytes)
+// {
+//   rx = true;
+//   numBytesFromHandler = numBytes;
+//   while(Wire2.available()) {  // Read Any Received Data
+//     RxByte = Wire2.read();
+//     Wire2.write(0b11001010);
+//     Wire2.write(RxByte);
+//   }
+// }
+
+void I2C_TxHandler() {
+  rx = false;
+  Wire.write(0x0a);
 }
 
 // SPIClass spi = SPIClass(MOSI_PIN, MISO_PIN, SCK_PIN, SS_PIN);
@@ -27,46 +84,45 @@ void SPI_ISR() {
 // HardwareSerial Serial2(); 
 
 
-
-byte RxByte;
-
-void I2C_RxHandler(int numBytes)
-{
-  while(Wire.available()) {  // Read Any Received Data
-    RxByte = Wire.read();
-    Wire.write(0b11001010);
-    Wire.write(RxByte);
-  }
-}
-
+// auto uart = Uart(PA3, PA2); // working
+auto uart = Uart(PA3, PA2);
 
 void setup() {
-  pinMode(enable_pin, OUTPUT);
-  digitalWrite(enable_pin, HIGH);
-  delay(50);
-  digitalWrite(enable_pin, LOW);
-
-
-  pinMode(SCK_PIN, INPUT);
-  pinMode(MOSI_PIN, INPUT);
-  pinMode(MISO_PIN, OUTPUT);  // (only if bidirectional mode needed)
-  pinMode(SS_PIN, INPUT);
-
-  // spi.begin(SPI_PERIPHERAL);
-  // spi.attachSlaveInterrupt(SS_PIN, SPI_ISR); // Add an ISR to the SS pin to detect device selection by SPI master
-  Wire.begin(0x55); // Initialize I2C (Slave Mode: address=0x55 )
-  Wire.onReceive(I2C_RxHandler);
-
-  pinMode(step_pin, OUTPUT);
-  digitalWrite(step_pin, LOW);
-  pinMode(dir_pin, OUTPUT);
-  digitalWrite(dir_pin, LOW);
-  
-  
+  // Serial.begin(38400);
+  uart.begin(38400);
+  // pinMode(enable_pin, OUTPUT);
+  // digitalWrite(enable_pin, HIGH);
+  // delay(50);
+  // digitalWrite(enable_pin, LOW);
+  // pinMode(step_pin, OUTPUT);
+  // digitalWrite(step_pin, LOW);
+  // pinMode(dir_pin, OUTPUT);
+  // digitalWrite(dir_pin, LOW);
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, HIGH);
 
-  delay(9000);
+  // pinMode(SCK_PIN, INPUT);
+  // pinMode(MOSI_PIN, INPUT);
+  // pinMode(MISO_PIN, OUTPUT);  // (only if bidirectional mode needed)
+  // pinMode(SS_PIN, INPUT);
+
+  // spi.begin(SPI_PERIPHERAL);
+  // spi.attachSlaveInterrupt(SS_PIN, SPI_ISR); // Add an ISR to the SS pin to detect device selection by SPI master
+
+
+
+  // Wire2.begin(SDA_PIN, SCL_PIN);
+
+  // pinMode(SDA_PIN, INPUT);
+  // pinMode(SCL_PIN, INPUT);
+  Wire.setSCL(PB10);
+  Wire.setSDA(PB3);
+  Wire.onReceive(I2C_RxHandler);
+  Wire.onRequest(I2C_TxHandler);
+  Wire.begin(0b10001100, true, true); // Initialize I2C (Slave Mode: address=0x55 )
+
+
+  delay(90);
 }
 int MHZ = 84000000 / 1000000;
 void localDelayMicroseconds(uint32_t us)
@@ -76,23 +132,59 @@ void localDelayMicroseconds(uint32_t us)
 
   while ((int32_t)dwt_getCycles() - start < cycles);
 }
-
+int itt = 0;
 void loop() {
+  itt++;
+  delay(500);
+  uart.write("loop", 4);
+  uart.write(ulong(0xab12 + itt));
+
+  // Serial.println("loop");
+  // moveServoMicros(80000, 18000, 8953, 40);
+  // moveServoMicros(10000, 18000, 20000, 40);
+  uint32_t max = 1000;
+  for (unsigned int i = 0; i < max; i++)
+  {
+    digitalWrite(LED_PIN, HIGH);
+    localDelayMicroseconds(max+2-i);
+    digitalWrite(LED_PIN, LOW);
+    localDelayMicroseconds(i);
+  }
+
+  if (receivedData != 0) {
+    // Serial.print("Received from Master: 0x");
+    // Serial.println(receivedData, HEX);
+    receivedData = 0; // Reset flag
+
+    uint32_t max = 1000;
+    for (unsigned int i = 0; i < max; i++)
+    {
+      digitalWrite(LED_PIN, HIGH);
+      localDelayMicroseconds(max+2-i);
+      digitalWrite(LED_PIN, LOW);
+      localDelayMicroseconds(i);
+    }
+  }
 
   if (rx) {
     // Use the various SPI.transfer() functions to read and write data
     rx = false;
+    // while(Wire2.available()) {  // Read Any Received Data
+    //   RxByte = Wire2.read();
+    //   Wire2.write(0b11001010);
+    //   Wire2.write(RxByte);
+    // }
     // SPI_MODE0 == CPOL=0 && CPHA=0
-    auto set = SPISettings(200000, MSBFIRST, SPI_MODE0, SPI_PERIPHERAL);
-    spi.beginTransaction(set);
-    uint8_t bits = spi.transfer(0b0);
-    uint8_t bits2 = spi.transfer(0b11111111);
-    uint8_t second = spi.transfer(0b11111111);
-    uint8_t second2 = spi.transfer(bits);
-    spi.endTransaction();
+    // auto set = SPISettings(200000, MSBFIRST, SPI_MODE0, SPI_PERIPHERAL);
+    // spi.beginTransaction(set);
+    // uint8_t bits = spi.transfer(0b0);
+    // uint8_t bits2 = spi.transfer(0b11111111);
+    // uint8_t second = spi.transfer(0b11111111);
+    // uint8_t second2 = spi.transfer(bits);
+    // spi.endTransaction();
     // Serial.println("Hello World!");
 
-      uint32_t max = 1000;
+    uint32_t max = 1000;
     for (unsigned int i = 0; i < max; i++)
     {
       digitalWrite(LED_PIN, HIGH);
@@ -128,9 +220,6 @@ void loop() {
 
 
 
-  // delay(500);
-  // moveServoMicros(80000, 18000, 8953, 40);
-  // moveServoMicros(10000, 18000, 20000, 40);
 
 
 

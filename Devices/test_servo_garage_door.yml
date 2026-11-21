@@ -1,0 +1,153 @@
+substitutions:
+#   device_name: erv-return-box
+  device_name: test-garage-door-servo
+#   erv-return-box
+# test-garage-door-servo
+  eth_cs: GPIO9
+  eth_clk: GPIO10
+  eth_miso: GPIO11
+  eth_mosi: GPIO12
+  eth_int: GPIO13
+  eth_rst: GPIO14
+
+external_components:
+  - source:
+      type: local
+      path: ../my_components # path relative to Devices folder
+
+
+esphome:
+  name: $device_name
+
+esp32:
+  board: esp32-s3-devkitc-1
+  variant: esp32s3
+  flash_size: 8MB
+  framework:
+    type: esp-idf
+
+
+
+preferences:
+  flash_write_interval: "240h"
+
+api:
+  # password: ""
+ota:
+  platform: esphome
+  password: ""
+
+# logger:
+#   # level: very_verbose
+#   level: INFO
+logger:
+  level: verbose
+  logs:
+    wifi: INFO
+    sensor: INFO
+    binary_sensor: INFO
+
+
+
+ethernet:
+  type: W5500
+  clk_pin: $eth_clk
+  mosi_pin: $eth_mosi
+  miso_pin: $eth_miso
+  cs_pin: $eth_cs
+  interrupt_pin: $eth_int
+  reset_pin: $eth_rst
+
+time:
+  - platform: homeassistant
+
+
+button:
+  - platform: restart
+    name: "$device_name Restart"
+  - platform: template
+    name: "$device_name Send I2C Data"
+    on_press:
+      - lambda: |-
+          const uint8_t address = 0b10001100;
+          const uint8_t data[] = {0x01, 0x02, 0x03};
+          uint8_t response[3] = {0};
+          // i2c::I2CDevice device;
+          // device.set_i2c_bus(&id(bus_a));
+          // device.set_i2c_address(address);
+          // auto result = device.write_read(data, sizeof(data), response, sizeof(response));
+          // auto result = id(bus_a).write(address, data, sizeof(data));
+          // auto result = id(bus_a).write_readv(address, data, sizeof(data), response, sizeof(response));
+
+          // if (result == i2c::ERROR_OK) {
+          //   char hex[256]; 
+          //   ESP_LOGI("i2c_send", "Received from 0x%02X: %s", address, format_hex_to(hex, response));
+          //   // ESP_LOGI("i2c_send", "Received from 0x%02X: %s", address,
+          //   //          format_hex_pretty(response, sizeof(response)).c_str());
+          // } else {
+          //   ESP_LOGW("i2c_send", "Write/read to address 0x%02X failed with error %d", address, result);
+          // }
+  - platform: template
+    name: "$device_name Send UART Data"
+    on_press:
+      - uart.write: 'Hello World'
+
+text_sensor:
+  - platform: version
+    name: "$device_name Version"
+
+
+# interval:
+#   - interval: 1s
+#     then:
+#       - lambda: |-
+#           ESP_LOGE("custom", "This runs every second!");
+
+
+# wifi:
+#   ssid: !secret wifi_ssid
+#   password: !secret wifi_password
+#   ap:
+#     ssid: "$device_name AP"
+#     password: "BiSG9yrKP394"
+# captive_portal:
+
+
+
+# vent_coordinator:
+#   transport: udp_transport
+#   vents: []
+
+# servo_garage_door:
+#   id: garage_door_controller
+#   motors:
+#       step_pin: GPIO21
+#       steps_per_rotation: 400
+
+
+# i2c:
+#   - id: bus_a
+#     sda: GPIO4
+#     scl: GPIO5
+#     scan: true
+#     timeout: 13ms
+
+
+uart:
+  tx_pin: GPIO5
+  rx_pin: GPIO4
+  baud_rate: 38400
+  debug:
+    direction: BOTH
+    dummy_receiver: true
+    debug_prefix: "[MODS] "
+    after:
+      delimiter: "\n"
+    sequence:
+      - lambda: UARTDebug::log_string(direction, bytes, debug_prefix);
+
+sensor:
+  - { platform: uptime, id: uptime_seconds, update_interval: 1min }
+  - { platform: template, id: uptime_days, name: "$device_name uptime", update_interval: 1min, 
+        device_class: duration, entity_category: "diagnostic", unit_of_measurement: "d", accuracy_decimals: 2,
+        lambda: !lambda "return id(uptime_seconds).state / 86'400;"}
