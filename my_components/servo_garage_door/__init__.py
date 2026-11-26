@@ -1,9 +1,10 @@
-from esphome.components import spi, sensor, voltage_sampler, switch, output  #, i2c, LEDCOutput
+from esphome.components import uart, sensor, switch
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome import pins
 from esphome.const import (
     CONF_ID,
+    CONF_UART_ID,
     CONF_ENABLE_PIN,
     CONF_DIR_PIN,
     CONF_STEP_PIN,
@@ -46,7 +47,7 @@ MULTI_CONF = False
 
 servo_garage_door_ns = cg.esphome_ns.namespace("servo_garage_door")
 
-Servo_Garage_Door = servo_garage_door_ns.class_("ServoGarageDoor", cg.Component) # , spi.SPIDevice
+Servo_Garage_Door = servo_garage_door_ns.class_("ServoGarageDoor", cg.Component, uart.UARTDevice)
 
 ServoMotor = servo_garage_door_ns.class_("ServoMotor")
 
@@ -67,21 +68,29 @@ CONFIG_SCHEMA = cv.All(
     cv.Schema(
         {
             cv.GenerateID(): cv.declare_id(Servo_Garage_Door),
+            cv.Required(CONF_UART_ID): cv.use_id(uart.UARTComponent),
         
             cv.Required(CONF_MOTORS): cv.ensure_list(SCHEMA_MOTOR),
 
         }
     )
+    .extend(uart.UART_DEVICE_SCHEMA)
     .extend(cv.COMPONENT_SCHEMA),
-    # .extend(spi.spi_device_schema(True, 200000, "mode0")),
     cv.only_on_esp32,
+)
+
+FINAL_VALIDATE_SCHEMA = uart.final_validate_device_schema(
+    "servo_garage_door",
+    require_tx=True,
+    require_rx=True,
+    baud_rate=38400,
 )
 
 
 async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
     await cg.register_component(var, config)
-    # await spi.register_spi_device(var, config)
+    await uart.register_uart_device(var, config)
     
     motors = []
     for motor_config in config[CONF_MOTORS]:

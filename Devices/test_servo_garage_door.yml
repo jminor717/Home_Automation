@@ -18,7 +18,9 @@ external_components:
 
 esphome:
   name: $device_name
-
+  includes:
+    - ..\lib
+    - <vector>
 esp32:
   board: esp32-s3-devkitc-1
   variant: esp32s3
@@ -66,51 +68,56 @@ button:
   - platform: restart
     name: "$device_name Restart"
   - platform: template
-    name: "$device_name Send I2C Data"
+    name: "$device_name move servo"
     on_press:
       - lambda: |-
           const uint8_t address = 0b10001100;
           const uint8_t data[] = {0x01, 0x02, 0x03};
           uint8_t response[3] = {0};
-          // i2c::I2CDevice device;
-          // device.set_i2c_bus(&id(bus_a));
-          // device.set_i2c_address(address);
-          // auto result = device.write_read(data, sizeof(data), response, sizeof(response));
-          // auto result = id(bus_a).write(address, data, sizeof(data));
-          // auto result = id(bus_a).write_readv(address, data, sizeof(data), response, sizeof(response));
+          // void move_servo(uint32_t steps, servoMoveDirection direction, uint32_t max_speed, uint32_t acceleration, uint8_t interrupt_pin_function = 0);
 
-          // if (result == i2c::ERROR_OK) {
-          //   char hex[256]; 
-          //   ESP_LOGI("i2c_send", "Received from 0x%02X: %s", address, format_hex_to(hex, response));
-          //   // ESP_LOGI("i2c_send", "Received from 0x%02X: %s", address,
-          //   //          format_hex_pretty(response, sizeof(response)).c_str());
-          // } else {
-          //   ESP_LOGW("i2c_send", "Write/read to address 0x%02X failed with error %d", address, result);
-          // }
-  - platform: template
-    name: "$device_name Send UART Data"
-    on_press:
-      - uart.write: 'Hello World'
+          id(garage_door_controller).move_servo(id(move_steps).state, id(move_dir).state ? servoMoveDirection::DOWN : servoMoveDirection::UP, id(move_vel).state, id(move_acc).state, 0);
+          // i2c::I2CDevice device;
+  # - platform: template
+  #   name: "$device_name Send UART Data"
+  #   on_press:
+  #     - uart.write: 'Hello World'
 
 text_sensor:
   - platform: version
     name: "$device_name Version"
 
-
-# interval:
-#   - interval: 1s
-#     then:
-#       - lambda: |-
-#           ESP_LOGE("custom", "This runs every second!");
+globals:
+  - { id: iter, type: int, initial_value: '240' }
 
 
-# wifi:
-#   ssid: !secret wifi_ssid
-#   password: !secret wifi_password
-#   ap:
-#     ssid: "$device_name AP"
-#     password: "BiSG9yrKP394"
-# captive_portal:
+interval:
+  - interval: 5s
+    then:
+      # - uart.write: !lambda |-
+      - lambda: |-
+          id(iter) += 1;
+          // uint8_t data[26] = {0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+          uint8_t data[26] = {0};
+          esp_fill_random(data, 16);
+          // uint32_t crc_value = CRC32::CRC32::calc(data, sizeof(data));
+          // for (int i = 0; i < 4; i++) {
+          //   data[17 + i] = (crc_value >> (24 - (8 * i))) & 0xFF;
+          //   data[22 + i] = (id(iter) >> (24 - (8 * i))) & 0xFF;
+          // }
+          // int n = sizeof(data) / sizeof(data[0]);
+          // std::vector<unsigned char> vec(data, data + n);
+          // auto str = format_hex(vec) + "\n";
+          /////id(uart_1).write_str(str.c_str());
+          
+          
+          
+          // id(garage_door_controller).move_servo(8000, servoMoveDirection::UP, 2000, std::max((uint8_t)50, data[1]), 0);
+          // std::string str = to_string(id(iter)) +" CRC:"+ to_string(crc_value) + "\n";
+          // id(uart_1).write_array(data, sizeof(data));
+          // return std::vector<uint8_t>(str.begin(), str.end());
+
+
 
 
 
@@ -118,11 +125,12 @@ text_sensor:
 #   transport: udp_transport
 #   vents: []
 
-# servo_garage_door:
-#   id: garage_door_controller
-#   motors:
-#       step_pin: GPIO21
-#       steps_per_rotation: 400
+servo_garage_door:
+  id: garage_door_controller
+  uart_id: uart_1
+  motors:
+      step_pin: GPIO21
+      steps_per_rotation: 400
 
 
 # i2c:
@@ -134,20 +142,27 @@ text_sensor:
 
 
 uart:
+  id: uart_1
   tx_pin: GPIO5
   rx_pin: GPIO4
   baud_rate: 38400
-  debug:
-    direction: BOTH
-    dummy_receiver: true
-    debug_prefix: "[MODS] "
-    after:
-      delimiter: "\n"
-    sequence:
-      - lambda: UARTDebug::log_string(direction, bytes, debug_prefix);
+  # debug:
+  #   direction: BOTH
+  #   # dummy_receiver: true
+  #   debug_prefix: "[MODS] "
+  #   after:
+  #     delimiter: "\n"
+  #   sequence:
+  #     - lambda: UARTDebug::log_string(direction, bytes, debug_prefix);
 
 sensor:
   - { platform: uptime, id: uptime_seconds, update_interval: 1min }
   - { platform: template, id: uptime_days, name: "$device_name uptime", update_interval: 1min, 
         device_class: duration, entity_category: "diagnostic", unit_of_measurement: "d", accuracy_decimals: 2,
         lambda: !lambda "return id(uptime_seconds).state / 86'400;"}
+
+number:
+  - { platform: template, id: move_steps, name: steps, initial_value: 8000,  min_value: 0,  max_value: 100000, step: 1, optimistic: true }
+  - { platform: template, id: move_acc, name: acceleration, initial_value: 8000,  min_value: 0,  max_value: 20000, step: 1, optimistic: true }
+  - { platform: template, id: move_vel, name: velocity, initial_value: 8000,  min_value: 0,  max_value: 20000, step: 1, optimistic: true }
+  - { platform: template, id: move_dir, name: direction, initial_value: 0,  min_value: 0,  max_value: 1, step: 1, optimistic: true }
